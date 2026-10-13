@@ -1,0 +1,108 @@
+{
+  "fallback_conditions": [
+    "USER_CHOICE_ALLOWS",
+    "ORIGINAL_BUDGET_ALLOWS",
+    "HOST_MODEL_AND_EFFORT_SUPPORTED",
+    "TASK_REQUIREMENTS_AND_TOOL_CAPABILITIES_MET",
+    "ORIGINAL_ROLE_AND_ACCEPTANCE_UNCHANGED",
+    "PREVIOUS_WORKER_STOPPED_IF_WRITING"
+  ],
+  "modes": [
+    {
+      "id": "economy",
+      "name": "经济",
+      "levels": {
+        "L1": {
+          "model": "gpt-6-luna",
+          "effort": "high",
+          "fallback": {
+            "model": "gpt-6.1-sol",
+            "effort": "medium"
+          }
+        },
+        "L2": {
+          "model": "gpt-6-luna",
+          "effort": "high",
+          "fallback": {
+            "model": "gpt-6.1-sol",
+            "effort": "medium"
+          }
+        },
+        "L3": {
+          "model": "gpt-6.1-sol",
+          "effort": "medium",
+          "fallback": null
+        },
+        "L4": {
+          "model": "gpt-6.1-sol",
+          "effort": "high",
+          "fallback": null
+        }
+      }
+    },
+    {
+      "id": "balanced",
+      "name": "适中",
+      "levels": {
+        "L1": {
+          "model": "gpt-6-luna",
+          "effort": "high",
+          "fallback": {
+            "model": "gpt-6.1-sol",
+            "effort": "medium"
+          }
+        },
+        "L2": {
+          "model": "gpt-6.1-sol",
+          "effort": "medium",
+          "fallback": null
+        },
+        "L3": {
+          "model": "gpt-6.1-sol",
+          "effort": "high",
+          "fallback": null
+        },
+        "L4": {
+          "model": "gpt-6.1-sol",
+          "effort": "high",
+          "fallback": null
+        }
+      }
+    },
+    {
+      "id": "performance",
+      "name": "性能",
+      "levels": {
+        "L1": {
+          "model": "gpt-6-luna",
+          "effort": "high",
+          "fallback": {
+            "model": "gpt-6.1-sol",
+            "effort": "medium"
+          }
+        },
+        "L2": {
+          "model": "gpt-6.1-sol",
+          "effort": "high",
+          "fallback": null
+        },
+        "L3": {
+          "model": "gpt-6-astra",
+          "effort": "low",
+          "fallback": {
+            "model": "gpt-6.1-sol",
+            "effort": "high"
+          }
+        },
+        "L4": {
+          "model": "gpt-6-astra",
+          "effort": "low",
+          "fallback": {
+            "model": "gpt-6.1-sol",
+            "effort": "high"
+          }
+        }
+      }
+    }
+  ]
+}

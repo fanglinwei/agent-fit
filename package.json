@@ -1,0 +1,14 @@
+{
+  "name": "subagent-delegation",
+  "version": "0.2.0",
+  "description": "Local Codex subagent delegation profiles, safe configuration and restore.",
+  "type": "module",
+  "license": "MIT",
+  "author": "fanglinwei",
+  "repository": { "type": "git", "url": "https://github.com/fanglinwei/subagent-delegation.git" },
+  "bin": { "subagent-delegation": "bin/subagent-delegation.mjs" },
+  "engines": { "node": ">=22" },
+  "files": ["bin/", "lib/", "web/", "adapters/", "VERSION", "README.md", "docs/README.md", "docs/usage.md", "docs/implementation-review.md", "LICENSE", "install.py"],
+  "scripts": { "test": "node --test tests/*.test.mjs", "test:browser": "node tests/browser.mjs" },
+  "dependencies": { "smol-toml": "1.9.1" }
+}

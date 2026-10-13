@@ -1,0 +1,69 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="color-scheme" content="light">
+  <title>子代理委派配置</title>
+  <link rel="stylesheet" href="/styles.css">
+  <script src="/app.js" defer></script>
+</head>
+<body>
+  <a class="skip-link" href="#main">跳到配置内容</a>
+  <div class="page">
+    <header class="header">
+      <div class="heading-row">
+        <div><h1>子代理委派配置</h1><p class="subtitle">Codex · 本地配置工具</p></div>
+        <button id="refresh" type="button" class="secondary">刷新状态</button>
+      </div>
+      <div class="environment"><span id="versions">正在连接本地服务…</span><details><summary>绑定的 Codex home</summary><p id="home" class="path">加载中</p><p class="muted">配置目标由启动服务的终端指定。</p></details></div>
+      <nav class="tabs" aria-label="配置页面">
+        <a href="#modes" aria-current="page">档位配置</a><a href="#rules">委派规则</a><a href="#models">模型检查</a><a href="#restore">恢复配置</a>
+      </nav>
+    </header>
+    <main id="main" tabindex="-1">
+      <p id="progress" class="progress" role="status" hidden></p>
+      <div id="error" class="notice error" tabindex="-1" hidden><h2>操作未完成</h2><div id="error-content"></div><button id="compare" type="button" class="secondary" hidden>刷新后比较</button></div>
+      <div id="result" class="notice result" role="status" hidden></div>
+      <section id="modes" class="panel" aria-labelledby="modes-title">
+        <div class="section-heading"><div><h2 id="modes-title">档位与四级配置</h2><p id="configured" class="muted">正在读取配置…</p></div><button id="new-mode" type="button" class="secondary" disabled>新建档位</button></div>
+        <p id="runtime" class="runtime" hidden></p>
+        <div id="diagnostics" class="notice warning" hidden></div>
+        <div class="workspace">
+          <div class="editor surface">
+            <fieldset id="mode-options" class="mode-options"><legend>查看档位</legend><div id="mode-radios" class="segmented"></div><div id="custom-picker" class="custom-picker" hidden><label for="custom-mode">自定义名称</label><select id="custom-mode"></select></div></fieldset>
+            <div class="editor-heading"><div><h3 id="editing-title">四级模型预设</h3><p id="editing-note" class="muted">选择档位后查看完整定义。</p></div><button id="copy-mode" type="button" class="secondary" disabled>复制为自定义</button></div>
+            <div id="levels" class="levels"></div>
+            <datalist id="model-suggestions"></datalist><datalist id="effort-suggestions"><option value="low"></option><option value="medium"></option><option value="high"></option><option value="xhigh"></option></datalist>
+            <details class="technical"><summary>备用成立条件</summary><p>备用候选只有在原授权与预算允许、宿主支持参数、工具与任务要求满足且原职责与验收不变时使用。写入任务改用备用前，先确认上一产出者已经停止。</p><p>目录信息与静态配置不能证明模型调用权限。页面不会自动派发备用模型。</p></details>
+          </div>
+          <aside class="changes surface" aria-labelledby="changes-title">
+            <h3 id="changes-title">本次变更</h3><p id="changes-count" class="muted">尚未修改</p><div id="change-list"></div>
+            <p id="save-note" class="muted"></p>
+            <div class="actions"><button id="apply" type="button" class="primary" disabled>无修改</button><button id="cancel-draft" type="button" class="secondary" hidden>取消修改</button><button id="cancel-selection" type="button" class="secondary" hidden>取消选择</button><button id="preview" type="button" class="secondary" disabled>预览文件变更</button><button id="upgrade" type="button" class="secondary" hidden>升级配置</button></div>
+            <details id="command-details" class="technical"><summary>查看终端命令</summary><p id="command-label" class="muted">将执行的命令（POSIX 参数引用，尚未执行）</p><pre id="command"></pre><button id="copy-definition" type="button" class="secondary" hidden>复制完整四级 JSON</button><p id="copy-status" class="muted" role="status"></p></details>
+          </aside>
+        </div>
+        <section id="preview-area" class="surface preview" hidden aria-labelledby="preview-title"><div class="section-heading"><h3 id="preview-title">文件变更预览</h3><button id="close-preview" type="button" class="secondary">关闭预览</button></div><p id="preview-note" class="muted"></p><div id="preview-files"></div></section>
+      </section>
+      <section id="rules" class="panel" hidden aria-labelledby="rules-title">
+        <div class="section-heading"><div><h2 id="rules-title">委派规则</h2><p>任务难度决定模型预设；职责决定权限边界。</p></div></div>
+        <div class="surface"><h3>已配置职责</h3><div id="role-list"></div><details class="technical"><summary>共同边界与完整规则</summary><div id="rule-summary"></div></details><details class="technical"><summary>配置来源与未检查范围</summary><div id="sources"></div></details></div>
+        <form id="explain-form" class="surface explain-form"><h3>查看选择解释</h3><div class="field-grid"><div><label for="explain-mode">档位</label><select id="explain-mode"></select></div><div><label for="explain-level">任务等级</label><select id="explain-level"><option value="L1">L1 · 明确简单</option><option value="L2" selected>L2 · 范围内产出</option><option value="L3">L3 · 独立复核</option><option value="L4">L4 · 困难与高影响</option></select></div><div><label for="explain-role">本次职责</label><select id="explain-role"><option value="task_scan">扫描取证（只读）</option><option value="task_execute">范围内产出</option><option value="task_review">独立复核（只读）</option><option value="task_delegate">明确委派</option></select></div></div><button id="explain" type="button" class="primary">查看解释</button><div id="explanation" class="explanation" hidden></div></form>
+      </section>
+      <section id="models" class="panel" hidden aria-labelledby="models-title">
+        <div class="section-heading"><div><h2 id="models-title">模型检查</h2><p>目录支持与该次实际调用结果分别展示，保留未知项。</p></div></div>
+        <div class="surface"><h3>账号与模型目录</h3><p>读取绑定 home 的账号状态和目录。此操作不发起推理请求。</p><button id="check-models" type="button" class="primary">检查账号与目录</button><p id="models-time" class="muted">尚未检查。配置值的调用权限未确认。</p><div id="models-result"></div></div>
+        <form id="verify-form" class="surface"><h3>验证实际调用</h3><p>验证可能消耗额度或产生费用；只在确认本次组合后执行。</p><fieldset class="verify-options"><legend>验证范围</legend><label><input type="radio" name="verify-scope" value="current" checked> 已配置档位的主模型组合（最多四组）</label><label><input type="radio" name="verify-scope" value="single"> 一个模型与推理强度</label></fieldset><div id="verify-pair" class="field-grid" hidden><div><label for="verify-model">模型标识</label><input id="verify-model" list="model-suggestions" maxlength="400" autocomplete="off"></div><div><label for="verify-effort">推理强度</label><input id="verify-effort" list="effort-suggestions" maxlength="80" autocomplete="off"></div></div><button id="verify" type="button" class="secondary">选择组合并确认验证</button></form>
+      </section>
+      <section id="restore" class="panel" hidden aria-labelledby="restore-title">
+        <div class="section-heading"><div><h2 id="restore-title">恢复原配置</h2><p>恢复首次配置前的记录，保留原有配置与无关文件。</p></div></div>
+        <div class="surface"><h3>恢复能力</h3><p id="restore-capability">正在读取恢复状态…</p><p id="restore-target" class="path"></p><p>将移除本工具的委派规则和四个角色，并清理本工具创建的全部自定义档位。</p><div id="restore-customs"></div><button id="restore-preview" type="button" class="secondary" disabled>预览恢复</button><section id="restore-plan" class="restore-plan" hidden><h3>本次恢复计划</h3><div id="restore-files"></div><p id="restore-plan-note" class="muted"></p><button id="restore-confirm" type="button" class="danger">恢复原配置</button></section></div>
+      </section>
+    </main>
+    <footer><p>配置文件、规则发现与运行加载分别核对。此页面不确认 Codex 已加载新配置。</p><p id="last-read"></p></footer>
+  </div>
+  <dialog id="confirm-dialog" aria-labelledby="dialog-title" aria-describedby="dialog-description"><form method="dialog"><h2 id="dialog-title"></h2><p id="dialog-description"></p><div id="dialog-content"></div><div id="dialog-actions" class="dialog-actions"></div></form></dialog>
+  <noscript><p>本地配置页面需要 JavaScript。也可在终端使用 subagent-delegation 命令。</p></noscript>
+</body>
+</html>

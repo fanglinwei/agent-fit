@@ -1,0 +1,17 @@
+# 仅供需要显式注册角色的客户端使用；支持独立代理发现时无需合并。
+# 相对路径以该配置文件所在目录为基准，不覆盖 default 或主代理模型。
+[agents.task_delegate]
+description = "Bounded general-purpose delegation honoring explicit model choices or host inheritance."
+config_file = "agents/task-delegate.toml"
+
+[agents.task_scan]
+description = "Narrow, read-only evidence collection with an explicit target and easily checked output."
+config_file = "agents/task-scan.toml"
+
+[agents.task_execute]
+description = "Bounded multi-step execution or content production with a defined outcome."
+config_file = "agents/task-execute.toml"
+
+[agents.task_review]
+description = "Independent review of complex reasoning, assumptions, evidence, or task results."
+config_file = "agents/task-review.toml"

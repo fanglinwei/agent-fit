@@ -1,0 +1,244 @@
+# 使用说明
+
+`subagent-delegation` 0.2.0。首版支持 Codex；Node.js 22+。命令、网页和生成的 Skill 使用同一套档位数据。
+
+## 安装与配置
+
+GitHub 安装需要 Git；本地 `.tgz` 安装只需 Node/npm。
+
+```sh
+npm install -g github:fanglinwei/subagent-delegation
+subagent-delegation setup --agent codex --mode balanced --dry-run
+subagent-delegation setup --agent codex --mode balanced
+```
+
+一行安装并配置：
+
+```sh
+npm install -g github:fanglinwei/subagent-delegation && subagent-delegation setup --agent codex --mode balanced
+```
+
+目标目录优先级为 `--codex-home PATH`、`CODEX_HOME`、用户 `~/.codex`。空格路径需要 shell 引号。命令不会设置主代理模型、全局子代理默认、供应商、审批、沙箱、并发或子代理启用开关。
+
+首次 setup 默认适中；已安装时保留当前选择。setup 也用于安全升级。npm 安装没有 postinstall 配置动作。`--dry-run` 不创建目标 home、锁或状态文件。
+
+所有配置部署变化都提示：**配置已写入，请重启 Codex 后使用新委派规则。** 运行中的任务继续使用原上下文；工具不自动重启、停止任务或保证动态加载。
+
+## 命令表
+
+业务命令支持 `--agent codex` 和 `--codex-home PATH`。省略 agent 时默认 codex。除 serve 外都支持 `--json`；写命令支持 `--dry-run` 和 `--expect-revision REV`。
+
+| 命令 | 用途 |
+| --- | --- |
+| `setup [--mode MODE]` | 首次配置或升级，保留无关文件 |
+| `mode set MODE` | 切换已安装 home 的档位 |
+| `mode list` | 列出内置、自定义及当前选择 |
+| `mode show MODE` | 查看四级主/备用、来源与定义版本，不激活 |
+| `mode create NAME [--from MODE]` | 复制完整定义，默认从 balanced，不自动激活 |
+| `mode configure MODE --level Lx --model M --effort E` | 修改自定义一个等级 |
+| `mode configure MODE --definition-stdin` | stdin 一次保存完整四级 |
+| `status [--details] [--project PATH]` | 模式、角色、完整性、规则与覆盖诊断 |
+| `explain --level Lx [--mode MODE] [--role ROLE]` | 静态解释任务等级、组合与职责角色，不调用 AI |
+| `models check [--verify] [--model M --effort E]` | 账号/目录；verify 另受严格隔离门禁约束 |
+| `restore` | 恢复首次配置前的受影响内容，清理本工具配置 |
+| `serve [--port PORT] [--open]` | 前台启动本地设置页面 |
+| `--help` / `--version` | 帮助及工具版本，可带 --json，不接受 home 参数 |
+
+`MODE` 可用内置 id、中文别名、自定义 id 或唯一名称。职责为 `task_scan`、`task_execute`、`task_review`、`task_delegate`，explain 省略职责时默认 task_delegate。默认 explain 使用当前有效档位；未安装时需明确 `--mode balanced` 等内置预览。
+
+名称以 `-` 开头时，在全部选项后使用 `--`：
+
+```sh
+subagent-delegation mode create --agent codex -- '-我的档位'
+```
+
+## 查询与切换
+
+```sh
+subagent-delegation status --agent codex
+subagent-delegation status --agent codex --details --json
+subagent-delegation status --agent codex --project "/path/to/project" --details
+subagent-delegation mode list --agent codex
+subagent-delegation mode show performance --agent codex
+subagent-delegation mode set economy --agent codex
+subagent-delegation explain --agent codex --level L4 --role task_review
+```
+
+详细查询分开呈现已配置值、预设值、潜在覆盖与运行未验证。检查相关项目及祖先目录，不扫描全电脑；不输出账号凭据、私有指令、完整 TOML 或认证记录。范围外注册路径与未确定的 profile 只报告候选及未检查原因，不跟随任意文件。
+
+同一档位重复切换不重写；仅保存非活动定义不要求重启。配置版本与 CLI 版本不同，先 setup 升级，不能直接跨版本切换。
+
+npm 形式查询本地包：
+
+```sh
+npm exec --package="/path/to/subagent-delegation-0.2.0.tgz" -- subagent-delegation status --agent codex --details
+```
+
+## 任务等级与委派职责
+
+| 等级 | 判断依据 | 经济 | 适中 | 性能 |
+| --- | --- | --- | --- | --- |
+| L1 | 范围窄，容易直接核验 | Luna/high | Luna/high | Luna/high |
+| L2 | 明确目标，多步产出 | Luna/high，仅容易核验 | Sol 6.1/medium | Sol 6.1/high |
+| L3 | 复杂分析或关键独立复核 | Sol 6.1/medium | Sol 6.1/high | Astra/low |
+| L4 | 困难推理、深层歧义、跨领域设计 | Sol 6.1/high | Sol 6.1/high | Astra/low |
+
+完整 id：`gpt-6-luna`、`gpt-6.1-sol`、`gpt-6-astra`。名称不证明价格、能力或账号权限。高影响结果需要独立证据与专业验证。
+
+四个职责：
+
+- `task_scan`：L1 固定预设，只读取证。
+- `task_execute`：L2 固定预设，只在明确独占范围产出。
+- `task_review`：L3 固定预设，独立复核。
+- `task_delegate`：不固定 model/effort，用于用户指定、继承、L4 或固定组合不匹配；保留原请求职责。
+
+等级与职责互相独立。例如经济模式下复杂产出升为 L3 时，不能继续用固定 Luna 的 task_execute 覆盖选择；应使用 task_delegate 请求 Sol/medium，同时保留范围内产出的权限契约。继承需核对宿主全局默认，省略参数不证明继承。
+
+AGENTS 管理入口要求启动时读取 Skill，每次创建、重新委派或模型变化前按 Skill 检查。用户选择、预算、宿主和项目规则优先，工具不自动授权委派。主代理保留最终设计、共享裁决、Git 写操作、集成、关键验证及完成声明。子代理禁止递归、写 Git、外部环境和代理配置改动、图像生成；独占写入、局部适配/阻断、最小充分验证及 PARTIAL 返回在全部档位保留。
+
+## 备用与模型不可用
+
+| 档位 | L1 备用 | L2 备用 | L3 备用 | L4 备用 |
+| --- | --- | --- | --- | --- |
+| 经济 | Sol 6.1/medium | Sol 6.1/medium | 无 | 无 |
+| 适中 | Sol 6.1/medium | 无 | 无 | 无 |
+| 性能 | Sol 6.1/medium | 无 | Sol 6.1/high | Sol 6.1/high |
+
+备用是候选，需要同时满足用户选择、原预算、宿主支持、原工具/输入能力、原职责与验收不变。写入任务还必须确认旧 worker 已停止并检查部分产出。CLI 不转发推理、不替父代理自动发备用、不换账号或供应商。
+
+Astra 不可用：先区分认证、权限、额度、临时故障或能力不支持。允许备用且全部条件满足才用已配置 Sol/high；用户强制只用 Astra、预算不允许或旧 worker 停止未知时，受影响部分 BLOCKED，继续其他独立工作。缺资料或工具故障先补前提，不能靠强模型掩盖。
+
+每任务最多三次父代理发起的委派，同一组合最多额外一次；累计等待不超过 30 秒并遵守 Retry-After。宿主已重试或次数未知时不追加。异常或部分结果标 PARTIAL，不自动撤销其他人的修改。完整分类见 [失败处理](../adapters/codex/skills/subagent-model-selection/references/failure-policy.md)。
+
+## 自定义档位
+
+```sh
+subagent-delegation mode create "我的研究方案" --agent codex --from performance
+subagent-delegation mode configure "我的研究方案" --agent codex \
+  --level L4 --model gpt-6-astra --effort low \
+  --fallback-model gpt-6.1-sol --fallback-effort high
+subagent-delegation mode set "我的研究方案" --agent codex
+```
+
+名称 trim + Unicode NFC 归一化，1–80 个码点，不能含控制字符、无效 Unicode 或与既有名称/id 混淆。名称只用于显示与查找，不拼文件路径；内部 id 为 UUID。模型 1–200、effort 1–40 个码点，拒绝无效 Unicode、控制字符和首尾空白。目录未知不等于标识无效。
+
+创建是完整快照，之后不跟随来源变化。内置档位不可改，先复制；不支持重命名、删除单个档位或增加任务等级。自定义也不能扩大权限。
+
+单级修改主组合时，未明确提供备用会清空原备用；完全相同的主组合重复保存保留已有备用。`--clear-fallback` 与备用参数互斥，主配置仍需完整。
+
+四级一次保存的 stdin 格式：
+
+```sh
+subagent-delegation mode configure "我的研究方案" --agent codex --definition-stdin <<'JSON'
+{
+  "levels": {
+    "L1": {"model": "gpt-6-luna", "effort": "high", "fallback": {"model": "gpt-6.1-sol", "effort": "medium"}},
+    "L2": {"model": "gpt-6.1-sol", "effort": "medium", "fallback": null},
+    "L3": {"model": "gpt-6.1-sol", "effort": "high", "fallback": null},
+    "L4": {"model": "gpt-6-astra", "effort": "low", "fallback": {"model": "gpt-6.1-sol", "effort": "high"}}
+  }
+}
+JSON
+```
+
+最高 64 KiB UTF-8 JSON；必须明确全部等级与备用/null，拒绝未知字段、缺级、半对参数或主备用相同。与单级参数互斥。活动定义与部署角色同一事务保存；非活动定义只保存，不激活。
+
+## 模型检查
+
+```sh
+subagent-delegation models check --agent codex
+subagent-delegation models check --agent codex --model gpt-6-astra --effort low --json
+subagent-delegation models check --agent codex --verify
+```
+
+setup、切换、活动自定义部署实际改变后，解锁再查询所选 home 的账号及模型目录；失败不撤销合法配置。查询和定义保存、restore、dry-run、无变化操作不会附带检查。
+
+检查通过 stdio app-server 在空临时目录进行，无认证刷新参数、无项目加载，不输出原始 RPC、stderr、邮箱、账号 ID 或凭据。分页最多 100 页，共享 30 秒期限，单帧 1 MiB、总接收 8 MiB。自定义供应商的空账号不直接判无权限。
+
+分别查看：目录是否完整、effort 是否支持、账号实际请求权限、可信实际身份。目录列出模型不证明请求成功；目录缺项仍 unknown。桌面会话、启动参数、profile 与 CLI 上下文匹配未核验，检查结果不能冒充桌面账号能力。
+
+**0.2.0 的实际推理门禁关闭。** 已核验的 Codex CLI 0.156.1 无法证明禁用全部工具/委派及限定外部读取，因此 `--verify` 返回 exit 1、`PROBE_ISOLATION_UNSUPPORTED`，不创建线程或发送推理。没有有效当前档位且无显式目标时先报 `PROBE_TARGET_REQUIRED`。未来只有宿主强制隔离得到验证才能启用；页面仍保留显式额度确认，不默认调用。
+
+## 本地网页
+
+```sh
+subagent-delegation serve --agent codex --codex-home "/path/to/codex-home" --open
+subagent-delegation serve --agent codex --port 17321
+```
+
+只监听 `127.0.0.1`。默认端口 0 自动分配，指定端口允许 1024–65535；占用即失败。`--open` 打开浏览器，失败时手动复制终端 URL；Ctrl+C 等待正在执行的 CLI 安全完成后停止服务。
+
+服务绑定一个 home 和启动 cwd。换 home 时重新启动。四页入口为档位、委派规则、模型检查、恢复。先编辑草稿，再保存/应用；自定义四级由一个 stdin 命令事务提交。未保存的非活动定义不能直接激活。取消只清除草稿；已创建的档位会保留。
+
+页面通过白名单动作实际 spawn 本包 CLI，显示命令与结果；不直接写配置、不执行任意 shell。HTTP 使用精确 Host/Origin、会话 Cookie、随机 CSRF token、CSP；不支持远程监听、CORS、CDN、守护进程或自动排队。
+
+配置版本冲突保留草稿并零写入，点击“刷新后比较”后再决定保存。断线或结果未知不自动重试写操作，先刷新状态。页面关闭/重载可能丢失内存草稿，未使用浏览器持久存储。
+
+## JSON、退出码与冲突
+
+JSON stdout 只有统一 envelope：
+
+```json
+{"report_schema_version":1,"data":{},"errors":[]}
+```
+
+状态含 `configuration_revision`、CLI/配置版本、四级定义、角色、完整性与诊断。写报告含 `result`、`configuration_status`、变化路径、前后版本、后检查、`restart`、`runtime_verification`。`applied/written` 才是已写入；`preview/not_written` 是预览；失败分未写、已回退、部分残留，不能都当成功。
+
+`--expect-revision` 是可选的终端乐观锁，网页写动作必须携带；版本不匹配报 `CONFIG_CHANGED`。来源版本不会被模型检查结束时的新配置版本替换。未确认的读取返回 null 版本，不猜测。
+
+| 退出码 | 含义 |
+| --- | --- |
+| 0 | 命令完成；模型目录完整不等于调用已验证 |
+| 1 | 关键配置/读写失败、检查未完成或安全门禁不支持 |
+| 2 | 参数、定义或选择无效 |
+| 3 | 完整目录可靠证明所请求参数不支持 |
+
+常见诊断：
+
+- `RULES_SHADOWED`：非空 home AGENTS.override.md 遮蔽入口。工具不改 override；用户自行合并原规则并停用 override，或选择未遮蔽 home。
+- `MANAGED_FILE_DRIFT` / `MANAGED_RULES_DRIFT`：人工改动、删除或 chmod；保留用户内容，核对后重新操作，无 force 覆盖开关。
+- `BUSY`：有写入锁或读取持续变化。先确认其他命令已停止；不要自动删除锁。进程崩溃后可能需人工核对锁与残留。
+- `VERSION_MISMATCH`：先用当前工具 setup 升级；禁止旧工具降级覆盖。
+- `RESTORE_METADATA_INVALID` / `RESTORE_BASELINE_UNAVAILABLE`：恢复记录损坏或旧版没有原始基线，使用原备份或人工核对，不猜测恢复。
+- `MODEL_ACCESS_UNKNOWN` / `MODEL_NOT_LISTED`：权限未知；不能当作可用或不可用的最终证明。
+
+配置文件采用逐文件原子替换、共同独占锁、完整观察复读、状态最后写入和普通失败回退。回退不覆盖并发编辑，残留单独报告。多文件在进程崩溃/断电时并非一个原子事务；不要在应用期间手工修改管理文件。
+
+## 恢复、迁移与卸载
+
+```sh
+subagent-delegation restore --agent codex --dry-run
+subagent-delegation restore --agent codex
+npm uninstall -g subagent-delegation
+```
+
+restore 后重启 Codex。它不会卸载 npm 工具、删除整个 home、清理账号或重启应用。npm 卸载也不会代做 restore。
+
+首次新版 setup 记录受影响文件的原存在状态与普通权限，仅允许接管同内容公开工具资产；AGENTS 只记录管理区块与校验元数据，不保存完整私有正文、config 或认证文件。切换/升级保留首次基线，新路径追加原值，退场路径保留原始恢复记录。
+
+恢复清理本工具新增 Skill、四角色、规则区块、当前档位、全部自定义与元数据；保留用户原文件和后续标记外正文。只非递归删除本工具创建的空目录，home 与无关文件保留。冲突先完整预检，失败不猜测删除。
+
+0.1.0 升级为 schema 2 时标 `legacy_unavailable`：摘要不能重建安装前内容，不把迁移当天配置冒充原始基线。旧 Python 命令现在是 Node setup 兼容入口，需要 Node 22+ 和已安装依赖：
+
+```sh
+npm ci --ignore-scripts
+python3 install.py --codex-home "/path/to/codex-home" --dry-run
+```
+
+## 开发验证
+
+```sh
+npm ci --ignore-scripts
+npm test
+npm pack
+```
+
+原十项 Python 保护测试保存在测试 fixture 上，同时 CLI 用例检查新的兼容入口。可在具备 Python 3.11+ 时运行 `python3 -m unittest discover -s tests -v`。
+
+浏览器集成脚本不安装额外依赖；使用开发环境已存在的 Playwright 和 Chrome：
+
+```sh
+PLAYWRIGHT_MODULE=/path/to/playwright CHROME_PATH=/path/to/chrome npm run test:browser
+```
+
+跨平台 API 设计不代替实机验收；Linux/Windows、其他 Codex 客户端及真实账号推理仍需单独验证。兼容依据和五轮审查见 [实施验收记录](implementation-review.md)。
