@@ -5,7 +5,7 @@ import os from 'node:os';
 import path from 'node:path';
 import { createHash } from 'node:crypto';
 import { mutate, readSnapshot, statusReport, setTestHooks, resolveHome } from '../lib/install.mjs';
-import { renderPayload, resolveDefinition, PACKAGE_ROOT } from '../lib/codex.mjs';
+import { renderPayload, resolveDefinition } from '../lib/codex.mjs';
 
 const temporary = [];
 afterEach(async () => { setTestHooks(); await Promise.all(temporary.splice(0).map(directory => fs.rm(directory, { recursive: true, force: true }))); });
@@ -56,10 +56,10 @@ test('existing same public assets and rule block are restored with their origina
 test('restore clears all custom modes and tool metadata, while preserving new user files and unrelated config', async () => {
   const { home } = await fixture(); await fs.mkdir(home); const config = 'model = "private"\n'; await fs.writeFile(path.join(home, 'config.toml'), config); await mutate(home, 'setup');
   await mutate(home, 'create', { name: 'one' }); await mutate(home, 'create', { name: 'two' }); await mutate(home, 'set', { mode: 'one' });
-  await fs.writeFile(path.join(home, 'skills/subagent-model-selection/user-notes.md'), 'user notes'); await fs.writeFile(path.join(home, 'agents/user-role.toml'), 'name = "user-role"\n');
+  await fs.writeFile(path.join(home, 'skills/subagent-delegation/user-notes.md'), 'user notes'); await fs.writeFile(path.join(home, 'agents/user-role.toml'), 'name = "user-role"\n');
   const dryBefore = await tree(home); const preview = await mutate(home, 'restore', { dryRun: true }); assert.deepEqual(preview.custom_modes_removed, ['one', 'two']); assert.deepEqual(await tree(home), dryBefore);
   const report = await mutate(home, 'restore'); assert.deepEqual(report.custom_modes_removed, ['one', 'two']);
-  assert.equal(await fs.readFile(path.join(home, 'config.toml'), 'utf8'), config); assert.equal(await fs.readFile(path.join(home, 'skills/subagent-model-selection/user-notes.md'), 'utf8'), 'user notes'); assert.equal(await fs.readFile(path.join(home, 'agents/user-role.toml'), 'utf8'), 'name = "user-role"\n');
+  assert.equal(await fs.readFile(path.join(home, 'config.toml'), 'utf8'), config); assert.equal(await fs.readFile(path.join(home, 'skills/subagent-delegation/user-notes.md'), 'utf8'), 'user notes'); assert.equal(await fs.readFile(path.join(home, 'agents/user-role.toml'), 'utf8'), 'name = "user-role"\n');
   assert.equal(await fs.stat(path.join(home, '.subagent-delegation')).catch(() => null), null); assert.equal(await fs.stat(path.join(home, 'AGENTS.md')).catch(() => null), null);
 });
 
@@ -107,7 +107,7 @@ test('managed drift, removed files, chmod and state chmod refuse restore with al
   for (const edit of [
     async home => fs.appendFile(path.join(home, 'agents/task-review.toml'), '\n# User edit\n'),
     async home => fs.unlink(path.join(home, 'agents/task-scan.toml')),
-    async home => fs.chmod(path.join(home, 'skills/subagent-model-selection/SKILL.md'), 0o644),
+    async home => fs.chmod(path.join(home, 'skills/subagent-delegation/SKILL.md'), 0o644),
     async home => fs.chmod(path.join(home, '.subagent-delegation/state.json'), 0o644),
   ]) {
     const { home } = await fixture(); await mutate(home, 'setup'); await edit(home); const before = await tree(home);
@@ -150,26 +150,6 @@ test('restore and reinstall changes instance id to defeat ABA stale revisions', 
   const { home } = await fixture(); await mutate(home, 'setup'); const first = await readSnapshot(home); await mutate(home, 'restore'); await mutate(home, 'setup'); const second = await readSnapshot(home);
   assert.notEqual(first.state.instance_id, second.state.instance_id); assert.notEqual(first.configuration_revision, second.configuration_revision);
   await assert.rejects(mutate(home, 'set', { mode: 'low', expectRevision: first.configuration_revision }), error => error.code === 'CONFIG_CHANGED');
-});
-
-// The copy is a local release fixture; package assets under test remain untouched.
-test('upgrade records new paths, retires obsolete assets and restores first values across releases', async () => {
-  const { home, directory } = await fixture(); const release = path.join(directory, 'release'); await fs.mkdir(release);
-  for (const relative of ['lib', 'adapters']) await fs.cp(path.join(PACKAGE_ROOT, relative), path.join(release, relative), { recursive: true });
-  await fs.copyFile(path.join(PACKAGE_ROOT, 'VERSION'), path.join(release, 'VERSION')); await fs.writeFile(path.join(release, 'package.json'), '{"type":"module"}'); await fs.symlink(path.join(PACKAGE_ROOT, 'node_modules'), path.join(release, 'node_modules'));
-  const obsolete = 'skills/subagent-model-selection/retired/obsolete.txt';
-  await fs.mkdir(path.join(release, 'adapters/codex/skills/subagent-model-selection/retired')); await fs.writeFile(path.join(release, 'adapters/codex/skills/subagent-model-selection/retired/obsolete.txt'), 'public obsolete');
-  await fs.mkdir(path.dirname(path.join(home, obsolete)), { recursive: true }); await fs.writeFile(path.join(home, obsolete), 'public obsolete'); await fs.chmod(path.join(home, obsolete), 0o640);
-  const original = await import(`${new URL(`file://${path.join(release, 'lib/install.mjs')}`).href}?first`); await original.mutate(home, 'setup'); const firstBaseline = await restoreRecord(home);
-  await fs.unlink(path.join(release, 'adapters/codex/skills/subagent-model-selection/retired/obsolete.txt')); await fs.writeFile(path.join(release, 'adapters/codex/skills/subagent-model-selection/new-public.txt'), 'new public');
-  const nextVersion = (await fs.readFile(path.join(release, 'VERSION'), 'utf8')).trim().split('.').map((part, index) => index === 2 ? Number(part) + 1 : part).join('.');
-  await fs.writeFile(path.join(release, 'VERSION'), `${nextVersion}\n`);
-  await fs.copyFile(path.join(release, 'lib/codex.mjs'), path.join(release, 'lib/codex-upgraded.mjs'));
-  await fs.writeFile(path.join(release, 'lib/install-upgraded.mjs'), (await fs.readFile(path.join(release, 'lib/install.mjs'), 'utf8')).replace("from './codex.mjs'", "from './codex-upgraded.mjs'"));
-  const upgraded = await import(new URL(`file://${path.join(release, 'lib/install-upgraded.mjs')}`).href); await upgraded.mutate(home, 'setup'); const second = await upgraded.readSnapshot(home);
-  assert.equal(second.state.version, nextVersion); assert.ok(second.state.restoration.retired_paths.includes(obsolete)); assert.deepEqual(second.baseline.entries[obsolete], firstBaseline.entries[obsolete]); assert.equal(second.baseline.entries['skills/subagent-model-selection/new-public.txt'], null);
-  await fs.writeFile(path.join(home, obsolete), 'user recreation'); await assert.rejects(upgraded.mutate(home, 'restore'), error => error.code === 'RESTORE_CONFLICT'); await fs.unlink(path.join(home, obsolete)); await fs.rmdir(path.dirname(path.join(home, obsolete)));
-  await upgraded.mutate(home, 'restore'); assert.deepEqual(await tree(home), { [obsolete]: { bytes: Buffer.from('public obsolete').toString('base64'), mode: 0o640 } });
 });
 
 test('new lock after committed restore preserves success and removes signal listeners even when final observation is BUSY', async () => {

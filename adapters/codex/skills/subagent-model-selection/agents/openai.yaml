@@ -1,6 +1,0 @@
-interface:
-  display_name: "Subagent Model Selection"
-  short_description: "Choose subagent models by task difficulty, scope, and budget"
-  default_prompt: "Use $subagent-model-selection to choose models and reasoning effort for authorized delegation while respecting my model preferences and budget."
-policy:
-  allow_implicit_invocation: true

@@ -9,7 +9,7 @@
   ],
   "modes": [
     {
-      "id": "economy",
+      "id": "low",
       "name": "经济",
       "levels": {
         "L1": {
@@ -41,7 +41,7 @@
       }
     },
     {
-      "id": "balanced",
+      "id": "mid",
       "name": "适中",
       "levels": {
         "L1": {
@@ -70,7 +70,7 @@
       }
     },
     {
-      "id": "performance",
+      "id": "fire",
       "name": "性能",
       "levels": {
         "L1": {

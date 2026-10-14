@@ -40,5 +40,6 @@ test('global default subagent inheritance and enabled settings are safely projec
  assert.equal(result.related_config.agents_enabled,false);
  assert.equal(result.related_config.default_subagent_model,'custom');
  assert.equal(result.related_config.default_subagent_reasoning_effort,'high');
+ assert.ok(!result.rules.summary.some(rule=>/Git|图像/.test(rule)));
  assert.ok(!JSON.stringify(result).includes('TEST_ONLY_NOT_REAL'));
 });

@@ -33,11 +33,16 @@ test('real CLI supports setup/switch/custom whole stdin/status/explain/restore w
   assert.equal(run(home, ['explain', '--level', 'L1']).status, 1);
   assert.equal(run(home, ['explain', '--mode', 'mid', '--level', 'L1']).status, 0);
   let result = run(home, ['setup']); assert.equal(result.status, 0, result.stdout); assert.equal(result.report.data.restart.required, true);
-  for (const [command, id] of [['low', 'economy'], ['mid', 'balanced'], ['fire', 'performance']]) {
-    result = run(home, ['mode', 'set', command]); assert.equal(result.status, 0, result.stdout);
+  for (const id of ['low', 'mid', 'fire']) {
+    result = run(home, ['mode', 'set', id]); assert.equal(result.status, 0, result.stdout);
     assert.equal(result.report.data.mode.id, id); assert.match(result.report.data.restart.message, /重启 Codex/);
+    assert.equal(run(home, ['status']).report.data.mode.id, id);
+    assert.equal(run(home, ['mode', 'show', id]).report.data.definition.id, id);
+    assert.equal(run(home, ['explain', '--level', 'L1']).report.data.mode_id, id);
+    assert.equal(JSON.parse(await readFile(path.join(home, '.subagent-delegation/state.json'), 'utf8')).mode, id);
+    assert.equal(JSON.parse(await readFile(path.join(home, 'skills/subagent-delegation/references/current-mode.json'), 'utf8')).id, id);
   }
-  assert.deepEqual(run(home, ['mode', 'list']).report.data.modes.map(mode => mode.command), ['low', 'mid', 'fire']);
+  assert.deepEqual(run(home, ['mode', 'list']).report.data.modes.map(mode => mode.id), ['low', 'mid', 'fire']);
   result = run(home, ['mode', 'create', '我的任务', '--from', 'fire']); assert.equal(result.status, 0); assert.equal(result.report.data.restart.required, false);
   const definition = { levels: structuredClone(BUILTINS[1].levels) }; definition.levels.L4 = { model: 'my-model', effort: 'high', fallback: null };
   result = run(home, ['mode', 'configure', '我的任务', '--definition-stdin'], JSON.stringify(definition)); assert.equal(result.status, 0, result.stdout);
@@ -80,7 +85,7 @@ test('real CLI JSON errors redact malformed private config and reject stale revi
   await writeFile(path.join(home, 'config.toml'), 'model = "user"\n');
   result = run(home, ['setup']); assert.equal(result.status, 0);
   result = run(home, ['mode', 'set', 'low', '--expect-revision', 'old']); assert.equal(result.status, 1); assert.equal(result.report.errors[0].code, 'CONFIG_CHANGED');
-  assert.equal(run(home, ['status']).report.data.mode.id, 'balanced');
+  assert.equal(run(home, ['status']).report.data.mode.id, 'mid');
   assert.equal(run(home, ['mode', 'configure', 'mid', '--definition-stdin'], '{broken').status, 2);
   assert.equal(run(home, ['mode', 'configure', 'mid', '--definition-stdin'], ' '.repeat(65537)).status, 2);
   const roleFile = path.join(home, 'agents/task-scan.toml');
@@ -100,10 +105,11 @@ test('human CLI errors escape terminal controls in untrusted paths', async t => 
   assert.ok(!result.stderr.includes('\u001b')); assert.match(result.stderr, /\\u001b\[2JATTACK/);
 });
 
-test('short and original npm command aliases run the same CLI entry', async t => {
+test('npm exposes the sub-d executable and runs its symlink entry', async t => {
   const dir = await mkdtemp(path.join(os.tmpdir(), 'delegation-bin-')); t.after(() => rm(dir, { recursive: true, force: true }));
   const { bin } = JSON.parse(await readFile(new URL('../package.json', import.meta.url), 'utf8'));
-  for (const command of ['sub-d', 'subagent-delegation']) {
+  assert.deepEqual(Object.keys(bin), ['sub-d']);
+  for (const command of Object.keys(bin)) {
     const link = path.join(dir, command);
     await symlink(fileURLToPath(new URL(`../${bin[command]}`, import.meta.url)), link);
     const result = spawnSync(process.execPath, [link, '--version', '--json'], { encoding: 'utf8' });

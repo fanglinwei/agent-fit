@@ -1,5 +1,5 @@
 import { createRequire } from 'node:module';
-import { mkdtemp, realpath, rm } from 'node:fs/promises';
+import { mkdtemp, realpath, readFile, writeFile, rm } from 'node:fs/promises';
 import os from 'node:os';
 import path from 'node:path';
 import assert from 'node:assert/strict';
@@ -23,9 +23,9 @@ try {
  assert.match(await page.locator('#command').textContent(),/^sub-d /);
  assert.doesNotMatch(await page.locator('#command').textContent(),/--agent/);
  assert.match(await page.locator('#command').textContent(),/--mode=mid/);
- assert.equal(await page.locator('#mode-economy').getAttribute('aria-label'),'经济 · low');
- assert.equal(await page.locator('#mode-balanced').getAttribute('aria-label'),'适中 · mid');
- assert.equal(await page.locator('#mode-performance').getAttribute('aria-label'),'性能 · fire');
+ assert.equal(await page.locator('#mode-low').getAttribute('aria-label'),'经济 · low');
+ assert.equal(await page.locator('#mode-mid').getAttribute('aria-label'),'适中 · mid');
+ assert.equal(await page.locator('#mode-fire').getAttribute('aria-label'),'性能 · fire');
  await page.locator('#refresh').focus(); await page.keyboard.press('Shift+Tab');
  assert.equal(await page.locator(':focus').getAttribute('href'),'#main');
  await page.keyboard.press('Enter'); assert.equal(await page.locator(':focus').getAttribute('id'),'main');
@@ -38,7 +38,7 @@ try {
  await page.getByRole('radio',{name:'适中 · mid',exact:true}).focus();
  await page.keyboard.press('ArrowRight');
  await page.waitForFunction(()=>document.querySelector('#editing-title').textContent.includes('性能'));
- assert.equal(await page.locator(':focus').getAttribute('id'),'mode-performance');
+ assert.equal(await page.locator(':focus').getAttribute('id'),'mode-fire');
  assert.match(await page.locator('#configured').innerText(),/适中/);
  assert.match(await page.locator('#command').textContent(),/'fire'/);
  assert.equal(await page.locator('.level').count(),4);
@@ -131,6 +131,16 @@ try {
  assert.equal(await page.evaluate(()=>document.documentElement.scrollWidth>innerWidth),false,'overflow with enlarged text');
  await page.evaluate(()=>document.documentElement.style.fontSize='');
  if (process.env.BROWSER_ARTIFACT_DIR) await page.screenshot({path:path.join(process.env.BROWSER_ARTIFACT_DIR,'mobile.png'),fullPage:true});
+ const setup=spawnSync(process.execPath,[cli,'setup','--codex-home',home,'--json'],{encoding:'utf8'});
+ assert.equal(setup.status,0,setup.stdout);
+ const statePath=path.join(home,'.subagent-delegation/state.json');
+ const unsupported=JSON.parse(await readFile(statePath,'utf8')); unsupported.version='0.0.0';
+ const unsupportedBytes=JSON.stringify(unsupported); await writeFile(statePath,unsupportedBytes);
+ await page.reload();
+ await page.waitForFunction(()=>document.querySelector('#error').textContent.includes('VERSION_MISMATCH'));
+ assert.equal(await page.locator('#apply').isDisabled(),true);
+ assert.equal(await page.locator('#upgrade').count(),0);
+ assert.equal(await readFile(statePath,'utf8'),unsupportedBytes);
  assert.deepEqual(errors,[]);
  console.log('BROWSER_PASS',service.url,'all four pages at widths375,768,1280,1440, runtime errors0');
 } finally {await browser?.close();await service.close();await rm(dir,{recursive:true,force:true});}

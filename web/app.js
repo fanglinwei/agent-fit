@@ -24,8 +24,8 @@ function node(tag, attributes = {}, ...children) {
   return element;
 }
 function replace(id, ...children) { $(id).replaceChildren(...children.flat()); }
-function installed() { return typeof state.status?.installation === 'object' ? state.status.installation.status : state.status?.installation; }
-function activeMode() { return typeof state.status?.mode === 'object' ? state.status.mode : state.modes.find(mode => mode.id === state.status?.installation?.mode) ?? null; }
+function installed() { return state.status?.installation; }
+function activeMode() { return state.status?.mode ?? null; }
 function dirty() { return Boolean(state.saved && state.draft && !same(state.saved.levels, state.draft.levels)); }
 function current() { return state.selected === activeMode()?.id; }
 function custom() { return state.saved?.kind === 'custom'; }
@@ -37,12 +37,7 @@ function displayValue(value) { return value === null || value === undefined ? '�
 class ActionError extends Error {
   constructor(code, message, response = null) { super(message); this.code = code; this.response = response; }
 }
-function modeCommand(selector) {
-  return state.modes.find(mode => mode.id === selector)?.command ?? selector;
-}
 async function request(action, params = {}, allowPartial = false) {
-  if (params.mode) params = { ...params, mode: modeCommand(params.mode) };
-  if (params.from) params = { ...params, from: modeCommand(params.from) };
   let response, payload;
   try {
     response = await fetch('/api/actions', { method: 'POST', credentials: 'same-origin', headers: { 'Content-Type': 'application/json', 'X-Delegation-Token': state.bootstrap.csrf_token }, body: JSON.stringify({ action, params }) });
@@ -78,7 +73,7 @@ function busy(value, text = '') {
   for (const button of $('dialog-actions').querySelectorAll('button')) button.disabled = value;
 }
 function writeBlocked() {
-  const integrity = state.status?.integrity ?? state.status?.installation?.integrity;
+  const integrity = state.status?.integrity;
   return !state.connected || !state.revision || state.stale || integrity === 'drifted' || installed() === 'invalid' || (state.status?.diagnostics ?? []).some(item => item.status === 'fail' || ['RULES_SHADOWED', 'ADAPTER_UNSUPPORTED'].includes(item.code));
 }
 
@@ -88,9 +83,9 @@ async function readBatch(preferred) {
     const status = (await request('status', { details: true }, true)).report.data;
     const listing = (await request('list', {}, true)).report.data;
     if (!status || !Array.isArray(listing?.modes)) throw new ActionError('COMMAND_RESULT_INVALID', '配置查询缺少状态或档位列表。');
-    const active = typeof status.mode === 'object' ? status.mode?.id : status.installation?.mode;
-    const selected = listing.modes.some(mode => mode.id === preferred) ? preferred : active ?? listing.modes.find(mode => mode.id === 'balanced')?.id ?? listing.modes[0]?.id;
-    const shown = selected ? (await request('show', { mode: listing.modes.find(mode => mode.id === selected)?.command ?? selected }, true)).report.data : null;
+    const active = status.mode?.id;
+    const selected = listing.modes.some(mode => mode.id === preferred) ? preferred : active ?? listing.modes.find(mode => mode.id === 'mid')?.id ?? listing.modes[0]?.id;
+    const shown = selected ? (await request('show', { mode: selected }, true)).report.data : null;
     const revision = status.configuration_revision;
     if (revision && revision === listing.configuration_revision && (!shown || revision === shown.configuration_revision)) {
       if (shown && (!shown.definition?.levels || LEVELS.some(level => !shown.definition.levels[level]))) throw new ActionError('COMMAND_RESULT_INVALID', '档位报告缺少完整 L1–L4 定义。');
@@ -140,8 +135,6 @@ async function refresh({ selected = state.selected, compare = false, preserve = 
 }
 
 function commandArguments(action, params) {
-  if (params.mode) params = { ...params, mode: modeCommand(params.mode) };
-  if (params.from) params = { ...params, from: modeCommand(params.from) };
   const args = [];
   if (['set', 'create', 'configure'].includes(action)) args.push('mode', action);
   else if (action === 'models') args.push('models', 'check');
@@ -165,7 +158,7 @@ function commandText(argv) { return ['sub-d', ...argv.map(value => "'" + String(
 function nextWrite() {
   if (!state.saved) return null;
   const params = { mode: state.selected, expectRevision: state.revision };
-  if (installed() === 'not_installed' || installed() === 'legacy') return { action: 'setup', params };
+  if (installed() === 'not_installed') return { action: 'setup', params };
   if (dirty()) return { action: 'configure', params: { ...params, definition: { levels: clone(state.draft.levels) } } };
   if (!current()) return { action: 'set', params };
   return null;
@@ -289,8 +282,8 @@ function showTab(tab) {
 function renderModePicker() {
   const focusedMode = $('mode-radios').contains(document.activeElement) ? document.activeElement.id : null;
   const isCustom = state.modes.find(mode => mode.id === state.selected)?.kind === 'custom';
-  const descriptions = { economy: '简单任务，优先节省', balanced: '日常任务，兼顾质量', performance: '复杂任务，优先质量', custom: '自行设置模型与备用' };
-  const radios = state.modes.filter(mode => mode.kind !== 'custom').map(mode => ({ value: mode.id, label: `${mode.name} · ${mode.command ?? mode.id}` }));
+  const descriptions = { low: '简单任务，优先节省', mid: '日常任务，兼顾质量', fire: '复杂任务，优先质量', custom: '自行设置模型与备用' };
+  const radios = state.modes.filter(mode => mode.kind !== 'custom').map(mode => ({ value: mode.id, label: `${mode.name} · ${mode.id}` }));
   radios.push({ value: 'custom', label: '自定义' });
   replace('mode-radios', radios.map(option => node('label', {}, node('input', { id: `mode-${option.value}`, type: 'radio', name: 'mode', value: option.value, 'aria-label': option.label, 'aria-describedby': `mode-${option.value}-note`, checked: option.value === 'custom' ? isCustom : state.selected === option.value, disabled: state.busy || !state.connected, on: { change: () => { if (option.value !== 'custom') selectMode(option.value); else { const target = state.modes.find(mode => mode.kind === 'custom'); if (target) selectMode(target.id); else { renderModePicker(); createMode(); } } } } }), node('span', { class: 'mode-name' }, option.label), node('span', { id: `mode-${option.value}-note`, class: 'mode-description' }, descriptions[option.value] ?? '查看模型分配'))));
   $('custom-picker').hidden = !isCustom;
@@ -359,7 +352,7 @@ function updateLevelSummary(level) {
 }
 function renderChanges() {
   if (!state.draft) { $('changes-count').textContent = '暂无可编辑的定义'; replace('change-list'); return; }
-  const setup = installed() === 'not_installed' || installed() === 'legacy';
+  const setup = installed() === 'not_installed';
   const old = dirty() || current() ? state.saved : activeMode();
   const changes = LEVELS.filter(level => setup || !same(old?.levels?.[level], state.draft.levels[level]));
   $('changes-count').textContent = changes.length ? `${setup ? '将配置' : '变化涉及'} ${changes.length} 个任务等级` : current() ? '尚未修改' : '模型组合不变，将切换档位';
@@ -377,20 +370,18 @@ function renderControls() {
   const blocked = state.busy || writeBlocked();
   const operation = nextWrite();
   $('draft-label').hidden = !operation;
-  $('apply').textContent = state.busy ? '请等待操作完成…' : installed() === 'not_installed' ? '配置 Codex' : installed() === 'legacy' ? '升级并配置 Codex' : dirty() ? current() ? '保存并应用' : '保存档位' : !current() && state.saved ? '设为当前档位' : '无修改';
+  $('apply').textContent = state.busy ? '请等待操作完成…' : installed() === 'not_installed' ? '配置 Codex' : dirty() ? current() ? '保存并应用' : '保存档位' : !current() && state.saved ? '设为当前档位' : '无修改';
   $('apply').disabled = blocked || !operation;
   $('preview').disabled = blocked || !operation;
-  $('new-mode').disabled = blocked || !['installed', 'legacy'].includes(installed());
-  $('copy-mode').disabled = blocked || !state.saved || !['installed', 'legacy'].includes(installed());
+  $('new-mode').disabled = blocked || installed() !== 'installed';
+  $('copy-mode').disabled = blocked || !state.saved || installed() !== 'installed';
   $('cancel-draft').hidden = !dirty(); $('cancel-draft').disabled = state.busy;
   $('cancel-selection').hidden = !activeMode() || current() || dirty(); $('cancel-selection').disabled = state.busy;
-  const version = state.status?.configuration_version ?? state.status?.installation?.version;
-  $('upgrade').hidden = !version || version === state.bootstrap?.cli_version || installed() !== 'installed'; $('upgrade').disabled = blocked;
   $('refresh').disabled = state.busy;
   for (const id of ['custom-mode', 'explain', 'explain-mode', 'explain-level', 'explain-role', 'check-models', 'verify', 'verify-model', 'verify-effort', 'close-preview', 'compare']) $(id).disabled = state.busy || !state.connected;
   for (const input of document.querySelectorAll('#levels input, #mode-radios input, #verify-form input[type=radio]')) input.disabled = state.busy || !state.connected;
   for (const link of document.querySelectorAll('.tabs a')) link.setAttribute('aria-disabled', String(state.busy));
-  const restoration = state.status?.restoration?.status ?? state.status?.installation?.restoration?.status;
+  const restoration = state.status?.restoration?.status;
   $('restore-preview').disabled = state.busy || !state.connected || !state.revision || state.stale || !['available'].includes(restoration);
   $('restore-confirm').disabled = state.busy || !state.restorePreview || state.restorePreview.revision !== state.revision;
 }
@@ -411,15 +402,15 @@ function renderFiles(id, data) {
 function renderRules() {
   replace('role-list', (state.status?.roles ?? []).map(role => node('div', { class: 'role' }, node('h4', {}, `${ROLE_LABELS[role.name] ?? role.name} · ${role.name}`), node('p', {}, `${role.configured_model ?? role.model ?? '模型未固定'} / ${role.configured_effort ?? role.effort ?? '推理强度未固定'}`), node('p', {}, role.name === 'task_scan' || role.name === 'task_review' ? '只读职责；不获得项目写入权限。' : role.name === 'task_execute' ? '仅在本次明确范围内产出，写入范围须独占。' : '按照本次明确授权与原职责执行。'), role.source ? node('p', { class: 'path' }, `来源：${role.source}`) : null)));
   if (!state.status?.roles?.length) replace('role-list', node('p', { class: 'muted' }, '未安装本工具的角色。可在档位页先预览并配置。'));
-  const summary = state.status?.rules?.summary ?? ['用户与宿主授权优先', '禁止递归委派', '只读 Git', '明确独占写入', '外部写入交回主代理', '局部阻断与最小充分验证', '保留专业规则、预算和高影响裁决边界'];
+  const summary = state.status?.rules?.summary ?? ['用户与宿主授权优先', '禁止递归委派', '明确独占写入', '外部写入交回主代理', '局部阻断与最小充分验证', '保留专业规则、预算和高影响裁决边界'];
   replace('rule-summary', node('ul', {}, summary.map(item => node('li', {}, typeof item === 'string' ? item : displayValue(item)))));
   replace('sources', node('p', { class: 'muted' }, `项目查询范围：${state.bootstrap?.project ?? '服务启动时的工作目录'}`), node('pre', {}, JSON.stringify({ rules: state.status?.rules, related_config: state.status?.related_config, inspection: state.status?.inspection, diagnostics: state.status?.diagnostics }, null, 2)));
   const previous = $('explain-mode').value;
   replace('explain-mode', state.modes.map(mode => node('option', { value: mode.id, selected: mode.id === (previous || state.selected) }, mode.name)));
 }
 function renderRestore() {
-  const restoration = state.status?.restoration?.status ?? state.status?.installation?.restoration?.status;
-  const messages = { available: '安装前恢复记录可用。仍需先预览并通过完整预检。', not_installed: '未安装本工具，无需恢复。', not_applicable: '未安装本工具，无需恢复。', legacy_unavailable: '旧版安装没有首次配置前的恢复基线。自动恢复不可用，请使用原备份或在本地人工核对。', invalid: '恢复记录无效。自动恢复已阻止，请核对诊断与原备份。' };
+  const restoration = state.status?.restoration?.status;
+  const messages = { available: '安装前恢复记录可用。仍需先预览并通过完整预检。', not_installed: '未安装本工具，无需恢复。', invalid: '恢复记录无效。自动恢复已阻止，请核对诊断与原备份。' };
   $('restore-capability').textContent = messages[restoration] ?? '恢复能力未确认，请查看状态诊断。';
   $('restore-target').textContent = `绑定 home：${state.bootstrap?.home ?? ''}`;
   const customs = state.modes.filter(mode => mode.kind === 'custom');
@@ -457,8 +448,8 @@ function renderModels() {
 function render() {
   const active = activeMode();
   $('configured').dataset.state = installed();
-  $('versions').textContent = `工具 ${state.bootstrap?.cli_version ?? '未知'} · 已安装配置 ${state.status?.configuration_version ?? state.status?.installation?.version ?? '未安装'}`;
-  $('configured').textContent = installed() === 'legacy' ? '旧版安装，档位未记录' : active ? `已配置：${active.name}` : '尚未配置本工具';
+  $('versions').textContent = `工具 ${state.bootstrap?.cli_version ?? '未知'} · 已安装配置 ${state.status?.configuration_version ?? '未安装'}`;
+  $('configured').textContent = active ? `已配置：${active.name}` : '尚未配置本工具';
   $('runtime').hidden = installed() !== 'installed';
   $('runtime').textContent = '使用已配置规则前请重启 Codex；运行生效未验证。';
   $('editing-title').textContent = state.saved ? `${custom() ? '正在编辑' : '正在查看'}：${state.saved.name}` : '四级模型预设';
@@ -481,7 +472,7 @@ async function createMode() {
     source.addEventListener('change', () => { preview.hidden = true; });
     const valid = () => {
       const normalized = name.value.trim().normalize('NFC');
-      if (!validText(normalized, 80) || state.modes.some(mode => mode.id === normalized || mode.name === normalized || mode.command === normalized)) {
+      if (!validText(normalized, 80) || state.modes.some(mode => mode.id === normalized || mode.name === normalized)) {
         error.textContent = '名称须为唯一的 1–80 个字符，不能与内置命令同名或包含控制字符。'; error.hidden = false; name.focus(); return false;
       }
       return true;
@@ -558,13 +549,6 @@ $('preview').addEventListener('click', () => apply(true));
 $('cancel-draft').addEventListener('click', async () => { state.draft = clone(state.saved); state.preview = null; if (state.stale) await refresh({ preserve: false }); else render(); });
 $('cancel-selection').addEventListener('click', () => selectMode(activeMode().id));
 $('close-preview').addEventListener('click', () => { state.preview = null; renderPreview(); $('preview').focus(); });
-$('upgrade').addEventListener('click', async () => {
-  if (dirty()) { showError(new ActionError('UNSAVED_DRAFT', '请先保存或取消草稿，再预览升级配置。')); return; }
-  const params = { mode: activeMode()?.id ?? state.selected, expectRevision: state.revision };
-  if (!await performWrite('setup', params, { preview: true })) return;
-  const answer = await dialog({ title: '升级已安装配置？', description: '以下是 CLI 预览的文件变化。保留已选择的档位与自定义定义；升级后请重启 Codex。', content: node('pre', {}, JSON.stringify(state.preview.response.report.data?.changes ?? state.preview.response.report.data?.changed_files ?? [], null, 2)), choices: [{ label: '返回查看预览', value: null }, { label: '升级配置', value: true, class: 'primary' }] });
-  if (answer) await performWrite('setup', params);
-});
 $('copy-definition').addEventListener('click', async () => {
   try { await navigator.clipboard.writeText(JSON.stringify({ levels: state.draft.levels }, null, 2)); $('copy-status').textContent = '完整四级 JSON 已复制。'; }
   catch { $('copy-status').textContent = '浏览器未允许复制，请展开以下 JSON 手动复制。'; $('command').textContent += `\n\n${JSON.stringify({ levels: state.draft.levels }, null, 2)}`; }

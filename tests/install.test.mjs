@@ -34,12 +34,12 @@ test('setup dry run never creates home and status has an uninstalled revision', 
 
 test('setup preserves private config, existing default role, permissions and outside rules; repeated setup is no-op', async () => {
   const { home } = await fixture(); await fs.mkdir(path.join(home, 'agents'), { recursive: true });
-  const config = 'model = "user-model"\n[model_providers.custom]\napi_key = "TEST_ONLY_NOT_REAL"\n';
+  const config = 'model = "user-model"\n[features]\nimage_generation = true\n[model_providers.custom]\napi_key = "TEST_ONLY_NOT_REAL"\n';
   await fs.writeFile(path.join(home, 'config.toml'), config);
   await fs.writeFile(path.join(home, 'agents/default.toml'), 'name = "default"\ndescription = "User"\nmodel = "own"\n');
   await fs.writeFile(path.join(home, 'AGENTS.md'), '# User rules\n'); await fs.chmod(path.join(home, 'AGENTS.md'), 0o640);
   const installed = await mutate(home, 'setup');
-  assert.equal(installed.mode.id, 'balanced'); assert.equal(installed.restart.required, true);
+  assert.equal(installed.mode.id, 'mid'); assert.equal(installed.restart.required, true);
   assert.equal(await fs.readFile(path.join(home, 'config.toml'), 'utf8'), config);
   assert.ok((await fs.readFile(path.join(home, 'AGENTS.md'), 'utf8')).startsWith('# User rules\n'));
   assert.equal((await fs.stat(path.join(home, 'AGENTS.md'))).mode & 0o777, 0o640);
@@ -57,14 +57,14 @@ test('mode switches share immutable baseline and synchronize roles, mode record 
   const { home } = await fixture(); await mutate(home, 'setup');
   const baseline = await fs.readFile(path.join(home, '.subagent-delegation/restore.json'));
   const initial = await readSnapshot(home), instance = initial.state.instance_id;
-  for (const [mode, id] of [['low', 'economy'], ['fire', 'performance'], ['mid', 'balanced']]) {
+  for (const mode of ['low', 'fire', 'mid']) {
     const report = await mutate(home, 'set', { mode });
     assert.equal(report.result, 'applied'); assert.equal(report.restart.required, true);
     const snapshot = await readSnapshot(home);
-    assert.equal(snapshot.mode.id, id); assert.equal(snapshot.state.instance_id, instance); assert.equal(snapshot.diagnostics.filter(item => item.status === 'fail').length, 0);
+    assert.equal(snapshot.mode.id, mode); assert.equal(snapshot.state.instance_id, instance); assert.equal(snapshot.diagnostics.filter(item => item.status === 'fail').length, 0);
     assert.deepEqual(await fs.readFile(path.join(home, '.subagent-delegation/restore.json')), baseline);
     for (const role of (await statusReport(home)).roles) assert.equal(role.matches_mode, true);
-    assert.equal(JSON.parse(await fs.readFile(path.join(home, 'skills/subagent-model-selection/references/current-mode.json'), 'utf8')).id, id);
+    assert.equal(JSON.parse(await fs.readFile(path.join(home, 'skills/subagent-delegation/references/current-mode.json'), 'utf8')).id, mode);
   }
   assert.equal((await mutate(home, 'set', { mode: 'mid' })).result, 'unchanged');
 });
@@ -103,7 +103,7 @@ test('matching own explicit registrations and public existing assets are allowed
 test('unsafe manifest paths, symlink children and symlink homes cannot redirect writes', async () => {
   const { home, directory } = await fixture(); await fs.mkdir(home); const outside = path.join(directory, 'outside'); await fs.mkdir(outside);
   await fs.symlink(outside, path.join(home, 'agents')); await rejectsCode(mutate(home, 'setup'), 'UNSAFE_PATH'); assert.deepEqual(await fs.readdir(outside), []); await fs.unlink(path.join(home, 'agents'));
-  await fs.mkdir(path.join(home, '.subagent-delegation')); await fs.writeFile(path.join(home, '.subagent-delegation/state.json'), JSON.stringify({ schema_version: 1, agent: 'codex', version: '0.1.0', files: { '../outside/private.txt': '0'.repeat(64) }, rules_sha256: '0'.repeat(64) }));
+  await mutate(home, 'setup'); const state = (await readSnapshot(home)).state; state.files['../outside/private.txt'] = '0'.repeat(64); await fs.writeFile(path.join(home, '.subagent-delegation/state.json'), JSON.stringify(state));
   await rejectsCode(mutate(home, 'setup'), 'STATE_INVALID'); assert.deepEqual(await fs.readdir(outside), []);
   const alias = path.join(directory, 'alias'); await fs.symlink(outside, alias); await rejectsCode(mutate(alias, 'setup'), 'UNSAFE_PATH');
 });
@@ -172,20 +172,30 @@ test('unstable reads retry once, then BUSY without writing', async () => {
   await rejectsCode(readSnapshot(home), 'BUSY'); assert.equal(count, 2);
 });
 
-test('legacy schema 1 migrates ownership without inventing a restoration baseline', async () => {
-  const { home } = await fixture(); await mutate(home, 'setup'); const snapshot = await readSnapshot(home);
-  await fs.writeFile(path.join(home, '.subagent-delegation/state.json'), JSON.stringify({ schema_version: 1, agent: 'codex', version: '0.1.0', files: snapshot.state.files, rules_sha256: snapshot.state.rules_sha256 })); await fs.unlink(path.join(home, '.subagent-delegation/restore.json'));
-  assert.equal((await statusReport(home)).installation, 'legacy');
-  await mutate(home, 'setup'); const migrated = await readSnapshot(home); assert.equal(migrated.state.schema_version, 2); assert.equal(migrated.state.restoration.status, 'legacy_unavailable'); assert.equal(migrated.mode.id, 'balanced');
-  await rejectsCode(mutate(home, 'restore'), 'RESTORE_BASELINE_UNAVAILABLE'); assert.equal(await fs.stat(path.join(home, '.subagent-delegation/restore.json')).catch(() => null), null);
+test('unsupported state formats and mode ids are rejected without migrating or writing', async () => {
+  const { home } = await fixture(); await mutate(home, 'setup');
+  const target = path.join(home, '.subagent-delegation/state.json');
+  const state = JSON.parse(await fs.readFile(target, 'utf8'));
+  for (const change of [{ schema_version: 1 }, { schema_version: 3 }, ...['economy', 'balanced', 'performance'].map(mode => ({ mode })), { restoration: { status: 'unavailable', baseline_sha256: null } }, { files: { ...state.files, 'skills/unsupported-skill/SKILL.md': '0'.repeat(64) } }]) {
+    await fs.writeFile(target, JSON.stringify({ ...state, ...change }));
+    const before = await tree(home);
+    await rejectsCode(statusReport(home), 'STATE_INVALID');
+    for (const action of ['setup', 'set', 'create', 'configure', 'restore']) await rejectsCode(mutate(home, action, { mode: 'low', name: 'test' }), 'STATE_INVALID');
+    assert.deepEqual(await tree(home), before);
+  }
 });
 
-test('all modifying actions enforce version gates, and setup rejects downgrading', async () => {
-  const { home } = await fixture(); await mutate(home, 'setup'); const target = path.join(home, '.subagent-delegation/state.json'); let state = JSON.parse(await fs.readFile(target, 'utf8'));
-  state.version = '0.1.9'; await fs.writeFile(target, JSON.stringify(state));
-  for (const action of ['set', 'create', 'configure']) await rejectsCode(mutate(home, action, { mode: 'low', name: 'test' }), 'VERSION_MISMATCH');
-  await mutate(home, 'setup'); state = JSON.parse(await fs.readFile(target, 'utf8')); assert.equal(state.version, VERSION);
-  state.version = '99.0.0'; await fs.writeFile(target, JSON.stringify(state)); await rejectsCode(mutate(home, 'setup'), 'VERSION_TOO_OLD');
+test('different configuration versions block reads and writes without upgrading or downgrading', async () => {
+  const { home } = await fixture(); await mutate(home, 'setup');
+  const target = path.join(home, '.subagent-delegation/state.json');
+  const state = JSON.parse(await fs.readFile(target, 'utf8'));
+  for (const otherVersion of ['0.1.9', '99.0.0']) {
+    await fs.writeFile(target, JSON.stringify({ ...state, version: otherVersion }));
+    const before = await tree(home);
+    await rejectsCode(statusReport(home), 'VERSION_MISMATCH');
+    for (const action of ['setup', 'set', 'create', 'configure', 'restore']) await rejectsCode(mutate(home, action, { mode: 'low', name: 'test' }), 'VERSION_MISMATCH');
+    assert.deepEqual(await tree(home), before);
+  }
 });
 
 test('override shadowing blocks deployments but restore remains available', async () => {
@@ -228,13 +238,13 @@ test('signals before first write cancel without changes and signals after writes
 });
 
 test('stable installed mode data is read from its owned deployed snapshot instead of current package preset', async () => {
-  const { home } = await fixture(); await mutate(home, 'setup'); const target = path.join(home, 'skills/subagent-model-selection/references/current-mode.json'); const current = JSON.parse(await fs.readFile(target, 'utf8'));
-  current.version = '0.1.9'; current.levels.L1.model = 'historical-installed-model'; const bytes = Buffer.from(JSON.stringify(current)); await fs.writeFile(target, bytes);
-  const stateTarget = path.join(home, '.subagent-delegation/state.json'); const state = JSON.parse(await fs.readFile(stateTarget, 'utf8')); state.version = '0.1.9'; state.files['skills/subagent-model-selection/references/current-mode.json'] = createHash('sha256').update(bytes).digest('hex'); await fs.writeFile(stateTarget, JSON.stringify(state));
-  assert.equal((await readSnapshot(home)).mode.levels.L1.model, 'historical-installed-model'); assert.equal((await statusReport(home)).mode.levels.L1.model, 'historical-installed-model');
+  const { home } = await fixture(); await mutate(home, 'setup'); const target = path.join(home, 'skills/subagent-delegation/references/current-mode.json'); const current = JSON.parse(await fs.readFile(target, 'utf8'));
+  current.levels.L1.model = 'installed-snapshot-model'; const bytes = Buffer.from(JSON.stringify(current)); await fs.writeFile(target, bytes);
+  const stateTarget = path.join(home, '.subagent-delegation/state.json'); const state = JSON.parse(await fs.readFile(stateTarget, 'utf8')); state.files['skills/subagent-delegation/references/current-mode.json'] = createHash('sha256').update(bytes).digest('hex'); await fs.writeFile(stateTarget, JSON.stringify(state));
+  assert.equal((await readSnapshot(home)).mode.levels.L1.model, 'installed-snapshot-model'); assert.equal((await statusReport(home)).mode.levels.L1.model, 'installed-snapshot-model');
   for (const selector of ['mid', undefined]) {
     const shown = await showReport(home, selector);
-    assert.equal(shown.definition.levels.L1.model, 'historical-installed-model'); assert.equal(shown.definition_version, '0.1.9');
+    assert.equal(shown.definition.levels.L1.model, 'installed-snapshot-model'); assert.equal(shown.definition_version, VERSION);
   }
   await mutate(home, 'setup'); assert.equal((await readSnapshot(home)).mode.levels.L1.model, resolveDefinition('mid').levels.L1.model);
 });

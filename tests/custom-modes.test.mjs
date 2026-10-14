@@ -17,7 +17,7 @@ test('create copies complete source by value without activating and extends firs
   const home = await fixture(); const initial = await readSnapshot(home), baseline = initial.baseline;
   const report = await mutate(home, 'create', { name: '我的四级档位', from: 'fire' });
   assert.equal(report.result, 'applied'); assert.equal(report.restart.required, false); assert.equal(report.restart.reason, 'definition_only');
-  assert.equal((await readSnapshot(home)).mode.id, 'balanced');
+  assert.equal((await readSnapshot(home)).mode.id, 'mid');
   const custom = (await listReport(home)).modes.find(mode => mode.name === '我的四级档位'); assert.match(custom.id, /^custom-/); assert.deepEqual(custom.levels, resolveDefinition('fire').levels);
   const after = await readSnapshot(home); assert.equal(after.baseline.entries['.subagent-delegation/custom-modes.json'], null);
   for (const [relative, before] of Object.entries(baseline.entries)) assert.deepEqual(after.baseline.entries[relative], before); assert.deepEqual(after.baseline.rules, baseline.rules);
@@ -27,31 +27,10 @@ test('create copies complete source by value without activating and extends firs
 test('NFC names are unique, aliases cannot collide, and names remain data even with path separators', async () => {
   const home = await fixture(); await mutate(home, 'create', { name: '  Cafe\u0301  ' });
   assert.equal((await readSnapshot(home)).customModes[0].name, 'Café');
-  for (const name of ['Café', '适中', 'balanced', 'low', 'mid', 'fire', '\u0000bad', '', 'x'.repeat(81)]) await assert.rejects(mutate(home, 'create', { name }), error => error.exitCode === 2);
+  for (const name of ['Café', '适中', 'low', 'mid', 'fire', '\u0000bad', '', 'x'.repeat(81)]) await assert.rejects(mutate(home, 'create', { name }), error => error.exitCode === 2);
   const id = (await readSnapshot(home)).customModes[0].id; await assert.rejects(mutate(home, 'create', { name: id }), error => error.exitCode === 2);
   await mutate(home, 'create', { name: '../data-only/name' });
   assert.equal((await readSnapshot(home)).customModes.length, 2); assert.equal(await fs.stat(path.join(path.dirname(home), 'data-only')).catch(() => null), null);
-});
-
-test('legacy custom names matching new commands remain readable and selectable by id', async () => {
-  const home = await fixture(); await mutate(home, 'create', { name: 'legacy' });
-  const snapshot = await readSnapshot(home), relative = '.subagent-delegation/custom-modes.json';
-  const custom = JSON.parse(await fs.readFile(path.join(home, relative), 'utf8'));
-  custom.modes[0].name = 'low';
-  const bytes = Buffer.from(JSON.stringify(custom)); await fs.writeFile(path.join(home, relative), bytes);
-  snapshot.state.files[relative] = createHash('sha256').update(bytes).digest('hex');
-  await fs.writeFile(path.join(home, '.subagent-delegation/state.json'), JSON.stringify(snapshot.state));
-  const before = await managed(home);
-  assert.equal((await readSnapshot(home)).customModes[0].name, 'low');
-  await assert.rejects(mutate(home, 'set', { mode: 'economy' }), error => error.code === 'MODE_NOT_FOUND');
-  assert.deepEqual(await managed(home), before);
-  await mutate(home, 'set', { mode: 'low' });
-  assert.equal((await readSnapshot(home)).mode.kind, 'builtin');
-  assert.equal((await readSnapshot(home)).customModes[0].name, 'low');
-  await mutate(home, 'set', { mode: custom.modes[0].id });
-  assert.equal((await readSnapshot(home)).mode.name, 'low');
-  await mutate(home, 'restore');
-  assert.equal((await readSnapshot(home)).state, null);
 });
 
 test('inactive configure changes only definition and metadata; primary changes clear old fallback unless specified', async () => {
@@ -71,7 +50,7 @@ test('active custom atomic four-level configure updates deployed roles and mode 
   const report = await mutate(home, 'configure', { mode: 'active', definition });
   assert.equal(report.restart.required, true); assert.equal(report.restart.reason, 'deployment_changed');
   const current = await readSnapshot(home); assert.deepEqual(current.mode.levels, definition.levels); assert.equal(current.diagnostics.filter(value => value.status === 'fail').length, 0);
-  const modeFile = JSON.parse(await fs.readFile(path.join(home, 'skills/subagent-model-selection/references/current-mode.json'), 'utf8')); assert.deepEqual(modeFile.levels, definition.levels);
+  const modeFile = JSON.parse(await fs.readFile(path.join(home, 'skills/subagent-delegation/references/current-mode.json'), 'utf8')); assert.deepEqual(modeFile.levels, definition.levels);
   const role = await fs.readFile(path.join(home, 'agents/task-execute.toml'), 'utf8'); assert.ok(role.includes('model-L2')); assert.ok(role.includes('effort-L2'));
 });
 

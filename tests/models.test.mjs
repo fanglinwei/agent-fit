@@ -198,7 +198,7 @@ test('post-deployment check keeps immutable committed pairs and revision across 
   const report = await checkAccountModels({ home, selection }, { spawn: server.spawn, readSnapshot: async () => ({ configuration_revision: snapshots++ ? 'later-revision' : 'start-revision', mode: BUILTINS[2] }) });
   assert.equal(report.configuration_revision, 'start-revision');
   assert.equal(report.source_revision, 'committed-revision');
-  assert.equal(report.mode.id, 'economy');
+  assert.equal(report.mode.id, 'low');
   assert.deepEqual(report.checked_pairs.map(({ model: name, effort }) => ({ model: name, effort })), [single, { model: 'old-custom', effort: 'high' }]);
   assert.equal(report.configuration_changed, true);
   assert.deepEqual(selection.pairs, [single, single, { model: 'old-custom', effort: 'high' }]);

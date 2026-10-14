@@ -2,11 +2,11 @@
 import { parseArgs } from 'node:util';
 import { realpath } from 'node:fs/promises';
 import { pathToFileURL } from 'node:url';
-import { VERSION, LEVELS, ROLES, MODE_COMMANDS, argumentError, validateDefinition, validatePair, explainSelection, inspectProject } from '../lib/codex.mjs';
+import { VERSION, LEVELS, ROLES, argumentError, validateDefinition, validatePair, explainSelection, inspectProject } from '../lib/codex.mjs';
 
 const HELP = `sub-d ${VERSION} — Codex 子代理委派配置
 需要 Node.js 22+。npm 安装仅安装命令；setup 显式配置 Codex。
-用法：sub-d <命令> [选项]。原命令 subagent-delegation 同样可用。
+用法：sub-d <命令> [选项]。
 
 setup [--mode MODE] [--dry-run]
 mode set MODE [--dry-run]
@@ -124,12 +124,11 @@ function emit(data, errors, json) {
 function renderHuman(data) {
   const lines = [];
   const pair = value => value ? `${value.model} / ${value.effort}` : '无';
-  const modeId = mode => mode.kind === 'builtin' ? Object.keys(MODE_COMMANDS).find(command => MODE_COMMANDS[command] === mode.id) ?? mode.id : mode.id;
   const levels = definition => {
     for (const [level, value] of Object.entries(definition.levels || {})) lines.push(`${level}  ${pair(value)}  备用：${pair(value.fallback)}`);
   };
   if (data.installation) {
-    lines.push(`Codex home：${data.home}`, `工具 ${data.cli_version} · 配置 ${data.configuration_version || '未安装'}`, `状态：${data.installation} · 完整性：${data.integrity}`, `已配置档位：${data.mode?.name || '无'}${data.mode ? ` (${modeId(data.mode)})` : ''}`, `恢复基线：${data.restoration.status}`);
+    lines.push(`Codex home：${data.home}`, `工具 ${data.cli_version} · 配置 ${data.configuration_version || '未安装'}`, `状态：${data.installation} · 完整性：${data.integrity}`, `已配置档位：${data.mode?.name || '无'}${data.mode ? ` (${data.mode.id})` : ''}`, `恢复基线：${data.restoration.status}`);
     if (data.mode) levels(data.mode);
     if (data.rules.summary.length) {
       lines.push('', '职责与规则：');
@@ -146,9 +145,9 @@ function renderHuman(data) {
     if (data.post_check?.status !== 'not_requested') lines.push(`账号目录后检查：${data.post_check?.status}；目录不证明实际调用权限。`);
     lines.push(...(data.warnings || []));
   } else if (data.modes) {
-    lines.push(...data.modes.map(mode => `${mode.active ? '*' : ' '} ${mode.command ?? mode.id}  ${mode.name}  ${mode.kind}`));
+    lines.push(...data.modes.map(mode => `${mode.active ? '*' : ' '} ${mode.id}  ${mode.name}  ${mode.kind}`));
   } else if (data.definition) {
-    lines.push(`${data.definition.name} (${modeId(data.definition)}) · ${data.active ? '当前已配置' : '定义预览'}`, `来源：${data.source} · 定义版本：${data.definition_version || VERSION}`); levels(data.definition);
+    lines.push(`${data.definition.name} (${data.definition.id}) · ${data.active ? '当前已配置' : '定义预览'}`, `来源：${data.source} · 定义版本：${data.definition_version || VERSION}`); levels(data.definition);
   } else if (data.dispatch_role) {
     lines.push(`${data.mode_name} · ${data.level}`, `主组合：${pair(data.primary)} · 备用：${pair(data.fallback)}`, `职责：${data.requested_role} → 委派角色：${data.dispatch_role}`, `权限契约：${data.permission_contract}`, `原因：${data.reason_codes.join('、')}`);
   } else if (data.catalog) {

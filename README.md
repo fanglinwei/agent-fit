@@ -1,39 +1,36 @@
 # Subagent Delegation
 
-为 Codex 配置子智能体的模型选择规则。适用于研究、写作、数据分析、规划、开发与审查。
+为 Codex 安装可配置的子代理委派规则：根据任务难度选择模型与推理强度，明确职责、验证与失败处理。适用于研究、写作、数据分析、规划、开发与审查。
 
 - **low / mid / fire（经济 / 适中 / 性能）**：按 L1–L4 任务难度分配模型与推理强度。
 - **自定义档位**：命名自己的配置，逐级设置主模型和备用组合。
 - **CLI + 本地网页**：网页操作执行同一个命令行工具。
 - **可检查、可恢复**：查看规则与潜在覆盖，查询模型目录，撤销本工具改动。
+- **委派有边界**：独占写入、禁止递归委派、最小充分验证；备用模型与重试遵循原授权和预算。
 
 需要 **Node.js 22+** 和支持独立角色 TOML 的 Codex。当前在 macOS、Codex CLI **0.156.1** 验证配置接口；其他客户端的加载行为需要核验。
 
-## 文档与开发
+## 快速开始
 
-- [完整使用说明](docs/usage.md)：命令、备用策略、JSON、冲突处理、迁移与卸载。
-- [Skill](adapters/codex/skills/subagent-model-selection/SKILL.md)：保持简洁的委派流程。
-- [验收与兼容边界](docs/implementation-review.md)：版本记录、验证结果和未验证范围。
+终端命令为 `sub-d`，npm 包名为 `subagent-delegation`。
 
-## 安装
+按“安装 → 配置 → 重启 Codex → 查询或调整”的流程使用：
 
-日常命令使用 `sub-d`（Subagent Delegation），原命令 `subagent-delegation` 继续可用。npm 包名保持 `subagent-delegation`。
-
-默认智能体为 Codex，日常命令无需添加 `--agent codex`；显式指定仍然可用。
-
-从 npm registry 安装命令工具：
-
-```sh
-npm install -g subagent-delegation
-```
-
-安装并显式配置，一行完成：
+从 npm registry 安装并配置适中档位：
 
 ```sh
 npm install -g subagent-delegation && sub-d setup --mode mid
 ```
 
 **npm 安装本身不修改 Codex。配置部署变化后，请重启 Codex。**
+
+也可在项目根目录构建并安装本地包：
+
+```sh
+npm pack
+npm install -g ./subagent-delegation-0.5.0.tgz
+sub-d setup --mode mid
+```
 
 指定独立的配置目录，并先预览：
 
@@ -42,39 +39,23 @@ sub-d setup --codex-home "/path/to/codex-home" --dry-run
 sub-d setup --codex-home "/path/to/codex-home"
 ```
 
-也可下载或本地构建 `.tgz` 后安装：
-
-```sh
-npm install -g ./subagent-delegation-0.3.0.tgz
-npm exec --package=./subagent-delegation-0.3.0.tgz -- sub-d status --details
-```
-
-也可从 [GitHub Release v0.3.0](https://github.com/fanglinwei/subagent-delegation/releases/tag/v0.3.0) 下载安装包，或使用 `npm install -g github:fanglinwei/subagent-delegation#v0.3.0`。
-
-## 升级到 0.3.0
-
-```sh
-npm install -g subagent-delegation@0.3.0
-sub-d setup --dry-run
-sub-d setup
-```
-
-`setup` 保留已有档位、自定义定义和首次恢复基线。若使用独立目录，两次 setup 都添加原来的 `--codex-home`。升级部署后重启 Codex。旧脚本中的 `economy / balanced / performance` 或中文档位参数需改为 `low / mid / fire`；旧安装记录仍可读取与恢复。
+默认目标为 `CODEX_HOME` 或 `~/.codex`，`--codex-home` 优先。当前仅支持 Codex，日常命令可省略 `--agent codex`。
 
 ## 日常使用
 
 ```sh
 # 查看已配置档位、角色、规则与覆盖诊断
 sub-d status --details
+sub-d mode list
 
 # 切换档位；完成后重启 Codex
 sub-d mode set low
 sub-d mode set mid
 sub-d mode set fire
 
-# 查看完整定义、解释指定任务等级的选择
+# 查看完整定义、解释指定任务等级的选择；不调用 AI
 sub-d mode show fire
-sub-d explain --level L4 --role task_review
+sub-d explain --level L4 --role task_delegate
 
 # 账号与模型目录检查，不发起推理
 sub-d models check
@@ -83,11 +64,11 @@ sub-d models check
 sub-d serve --open
 ```
 
-网页显示完整产品名称 **Subagent Delegation**；桌面采用侧栏、等级配置表和变更预览，移动端按等级折叠。网页绑定启动时的 Codex home。编辑先成为草稿，点击保存或应用后才执行 CLI；配置版本变化时拒绝旧表单写入。
+网页提供档位配置、委派规则、模型检查和恢复四个页面，只监听 `127.0.0.1`，绑定启动时的 Codex home。编辑先成为草稿，点击保存或应用后才执行对应 CLI 命令；配置版本变化时拒绝旧表单写入。更换目标目录需重新启动服务。
 
 ## 档位
 
-命令名称为 `low`（经济）、`mid`（适中，首次配置默认）、`fire`（性能）。内置档位仅接受这三个名称。旧安装记录仍可读取和恢复；历史内部 id 不作为命令参数。
+内置档位 ID 为 `low`（经济）、`mid`（适中，首次配置默认）、`fire`（性能），命令参数与存储值一致。
 
 | 任务等级 | 经济 | 适中 | 性能 |
 | --- | --- | --- | --- |
@@ -96,11 +77,18 @@ sub-d serve --open
 | L3：复杂分析或关键复核 | Sol 6.1 / medium | Sol 6.1 / high | Astra / low |
 | L4：困难推理或深层歧义 | Sol 6.1 / high | Sol 6.1 / high | Astra / low |
 
-模型完整 id 为 `gpt-6-luna`、`gpt-6.1-sol`、`gpt-6-astra`。这些是可编辑的委派预设，**不是账号权限或能力保证**。¹ 经济模式的 L2 只适合容易核验的产出，复杂部分必须提高任务等级。
+模型完整 id 为 `gpt-6-luna`、`gpt-6.1-sol`、`gpt-6-astra`。这些是委派预设，**不是账号权限或能力保证**；需要修改时先复制为自定义档位。¹ 经济模式的 L2 只适合容易核验的产出，复杂部分必须提高任务等级。
 
-任务等级与权限职责分开。三个固定角色用于扫描、产出、复核；用户指定模型、继承要求或组合不匹配时使用未固定模型的 `task_delegate`，保留原职责限制。
+任务等级与权限职责分开：
 
-## 自定义与恢复
+| 角色 | 职责与模型配置 |
+| --- | --- |
+| `task_scan` | 只读取证，固定为当前档位的 L1 组合 |
+| `task_execute` | 独占范围内执行或产出，固定为 L2 组合 |
+| `task_review` | 独立复核，固定为 L3 组合 |
+| `task_delegate` | 不固定模型或推理强度，用于 L4、用户指定、继承要求或固定组合不匹配，保留原职责 |
+
+## 自定义档位
 
 ```sh
 sub-d mode create "我的研究方案" --from mid
@@ -108,19 +96,41 @@ sub-d mode configure "我的研究方案" \
   --level L4 --model gpt-6-astra --effort low \
   --fallback-model gpt-6.1-sol --fallback-effort high
 sub-d mode set "我的研究方案"
+```
 
+自定义档位以来源档位的完整快照创建，独立保存 L1–L4 的主模型、推理强度和备用组合，沿用相同的委派权限规则。修改内置方案时先复制为自定义档位。完整定义批量配置见[使用说明](docs/usage.md#自定义档位)。
+
+## 恢复与卸载
+
+```sh
 # 先预览，再撤销本工具的配置；恢复后重启 Codex
 sub-d restore --dry-run
 sub-d restore
+
+# 如需卸载命令工具，在恢复后执行
+npm uninstall -g subagent-delegation
 ```
 
-恢复保留安装前内容及管理区块之外的用户修改，清除本工具新增的角色、Skill、档位与记录。文件漂移、符号链接、缺失或损坏的恢复基线会阻止覆盖；旧版 0.1.0 没有安装前基线，不能自动恢复。
+恢复保留安装前内容及管理区块之外的用户修改，清除本工具新增的角色、Skill、档位与记录。文件漂移、符号链接、缺失或损坏的恢复基线会阻止覆盖。
 
 ## 规则如何生效
 
-安装后的 AGENTS 管理区块要求 **Codex 启动时读取 Skill，并在每次子智能体创建、重新委派或模型切换前检查 Skill 与当前档位**。Skill 保留用户选择优先、独占写入、禁止递归委派、只读 Git、最小充分验证和 PARTIAL 返回规则。
+安装后的 AGENTS 管理区块要求 **Codex 启动时读取 Skill，并在每次子智能体创建、重新委派或模型切换前检查 Skill 与当前档位**。
 
-这是宿主读取后遵守的指令约束。工具不注入委派拦截器，不承诺绕过用户或项目权限，也不把配置文件存在当作运行生效。`models check` 的目录结果不证明调用权限；当前客户端的 `--verify` 因无法证明严格工具隔离而返回 `PROBE_ISOLATION_UNSUPPORTED`，不会发起推理。
+Skill 安装于 `skills/subagent-delegation`，也可通过 `$subagent-delegation` 显式调用。全部档位共用以下委派规则：
+
+- **按需委派**：先核对授权、用户指定模型、预算与宿主限制；按独立产出、判断或并行收益决定是否委派，遵循用户明确要求。
+- **等级与职责分开**：按难度和验证需求选择 L1–L4，再选择扫描、执行或复核职责；不凭领域、文件数或任务长度升级。L4、指定模型、继承要求或固定组合不匹配时使用 `task_delegate`。
+- **范围明确、写入独占**：派发目标、允许动作、来源、范围与验收；共享产出指定唯一负责人，不覆盖他人修改。子代理不递归委派，不自行更换模型或渠道，不修改生产、共享环境、第三方系统及代理配置；最终设计、共享裁决、集成和完成声明由主代理负责。
+- **验证充分、结果可复核**：完成直接相关的最小充分验证后返回；异常、未知退出状态或部分结果标为 `PARTIAL`，说明证据、未覆盖范围与阻塞。前提失效只阻断受影响部分，继续独立工作。
+- **备用有条件、重试有上限**：区分认证、权限、额度、临时故障和能力不足。仅在用户选择、原预算、宿主能力及原验收允许时使用备用；写入任务先确认旧子代理停止。每任务最多三次委派，同一组合最多额外一次，累计重试等待不超过 30 秒；不静默替换用户强制指定的模型。
+
+规则由 Codex 读取并遵循，实际生效取决于宿主加载与运行行为；用户和项目权限规则继续适用。`models check` 查询账号与模型目录，实际调用权限和模型身份需要可信运行证据确认。模型检查的完整边界见[使用说明](docs/usage.md#模型检查)。
+
+## 更多文档
+
+- [完整使用说明](docs/usage.md)：命令参数、备用策略、JSON、冲突处理、恢复与卸载。
+- [Skill](adapters/codex/skills/subagent-delegation/SKILL.md)：完整委派流程。
 
 ## 开发验证
 
@@ -130,7 +140,7 @@ npm test
 npm pack
 ```
 
-浏览器验证方法见[使用说明](docs/usage.md#开发验证)。唯一运行依赖为 [smol-toml](https://github.com/squirrelchat/smol-toml)（BSD-3-Clause）；无安装时自动配置或遥测。
+浏览器验证方法见[使用说明](docs/usage.md#开发验证)。唯一运行依赖为 [smol-toml](https://github.com/squirrelchat/smol-toml)（BSD-3-Clause）。
 
 ## License
 

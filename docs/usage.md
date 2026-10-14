@@ -1,8 +1,8 @@
 # 使用说明
 
-`subagent-delegation` 0.3.0。首版支持 Codex；Node.js 22+。命令、网页和生成的 Skill 使用同一套档位数据。
+`subagent-delegation` 0.5.0。首版支持 Codex；Node.js 22+。命令、网页和生成的 Skill 使用同一套档位数据。
 
-短命令为 `sub-d`，与原命令 `subagent-delegation` 完全等价。升级到 0.3.0 后执行 `sub-d setup --dry-run` 检查，再执行 `sub-d setup` 更新部署；保留当前档位、自定义定义和首次恢复基线。指定独立 home 时两次命令都需带原路径，完成后重启 Codex。npm 包名仍为 `subagent-delegation`。
+终端命令为 `sub-d`，npm 包名为 `subagent-delegation`。内测版仅支持当前配置格式，不提供旧版本兼容、升级或迁移。更换版本前先用原版本 `restore`，再安装新版本并 `setup`；独立 home 全程使用原路径。
 
 ## 安装与配置
 
@@ -22,7 +22,9 @@ npm install -g subagent-delegation && sub-d setup --mode mid
 
 目标目录优先级为 `--codex-home PATH`、`CODEX_HOME`、用户 `~/.codex`。空格路径需要 shell 引号。命令不会设置主代理模型、全局子代理默认、供应商、审批、沙箱、并发或子代理启用开关。
 
-首次 setup 默认适中；已安装时保留当前选择。setup 也用于安全升级。npm 安装没有 postinstall 配置动作。`--dry-run` 不创建目标 home、锁或状态文件。
+Skill 名称为 `subagent-delegation`，调用为 `$subagent-delegation`，安装目录为 `skills/subagent-delegation`。npm 安装命令获取已发布版本；当前内测开发代码通过 `npm pack` 构建本地包。
+
+首次 setup 默认适中；同版本重复 setup 保留当前选择与首次恢复基线。npm 安装没有 postinstall 配置动作。`--dry-run` 不创建目标 home、锁或状态文件。
 
 所有配置部署变化都提示：**配置已写入，请重启 Codex 后使用新委派规则。** 运行中的任务继续使用原上下文；工具不自动重启、停止任务或保证动态加载。
 
@@ -32,7 +34,7 @@ npm install -g subagent-delegation && sub-d setup --mode mid
 
 | 命令 | 用途 |
 | --- | --- |
-| `setup [--mode MODE]` | 首次配置或升级，保留无关文件 |
+| `setup [--mode MODE]` | 首次配置或同版本重新配置，保留无关文件 |
 | `mode set MODE` | 切换已安装 home 的档位 |
 | `mode list` | 列出内置、自定义及当前选择 |
 | `mode show MODE` | 查看四级主/备用、来源与定义版本，不激活 |
@@ -46,7 +48,7 @@ npm install -g subagent-delegation && sub-d setup --mode mid
 | `serve [--port PORT] [--open]` | 前台启动本地设置页面 |
 | `--help` / `--version` | 帮助及工具版本，可带 --json，不接受 home 参数 |
 
-`MODE` 使用 `low`（经济）、`mid`（适中，首次配置默认）、`fire`（性能）；内置档位仅接受这三个名称，中文用于说明含义。旧安装记录中的历史内部 id 仅供读取与恢复，不作为命令参数。自定义档位可使用内部 id 或唯一名称。职责为 `task_scan`、`task_execute`、`task_review`、`task_delegate`，explain 省略职责时默认 task_delegate。默认 explain 使用当前有效档位；未安装时需明确 `--mode mid` 等内置预览。
+`MODE` 使用 `low`（经济）、`mid`（适中，首次配置默认）、`fire`（性能）；命令、JSON id、状态记录和网页使用同一值，中文用于说明含义。自定义档位可使用内部 id 或唯一名称。职责为 `task_scan`、`task_execute`、`task_review`、`task_delegate`，explain 省略职责时默认 task_delegate。默认 explain 使用当前有效档位；未安装时需明确 `--mode mid` 等内置预览。
 
 名称以 `-` 开头时，在全部选项后使用 `--`：
 
@@ -68,13 +70,13 @@ sub-d explain --level L4 --role task_review
 
 详细查询分开呈现已配置值、预设值、潜在覆盖与运行未验证。检查相关项目及祖先目录，不扫描全电脑；不输出账号凭据、私有指令、完整 TOML 或认证记录。范围外注册路径与未确定的 profile 只报告候选及未检查原因，不跟随任意文件。
 
-同一档位重复切换不重写；仅保存非活动定义不要求重启。配置版本与 CLI 版本不同，先 setup 升级，不能直接跨版本切换。
+同一档位重复切换不重写；仅保存非活动定义不要求重启。配置版本或格式不匹配时，读取与写入都会被拒绝，不做自动转换。
 
 无需全局安装的 npm 查询，以及本地包查询：
 
 ```sh
-npm exec --package=subagent-delegation@0.3.0 -- sub-d status --details
-npm exec --package="/path/to/subagent-delegation-0.3.0.tgz" -- sub-d status --details
+npm exec --package=subagent-delegation@0.5.0 -- sub-d status --details
+npm exec --package="/path/to/subagent-delegation-0.5.0.tgz" -- sub-d status --details
 ```
 
 ## 任务等级与委派职责
@@ -97,7 +99,9 @@ npm exec --package="/path/to/subagent-delegation-0.3.0.tgz" -- sub-d status --de
 
 等级与职责互相独立。例如经济模式下复杂产出升为 L3 时，不能继续用固定 Luna 的 task_execute 覆盖选择；应使用 task_delegate 请求 Sol/medium，同时保留范围内产出的权限契约。继承需核对宿主全局默认，省略参数不证明继承。
 
-AGENTS 管理入口要求启动时读取 Skill，每次创建、重新委派或模型变化前按 Skill 检查。用户选择、预算、宿主和项目规则优先，工具不自动授权委派。主代理保留最终设计、共享裁决、Git 写操作、集成、关键验证及完成声明。子代理禁止递归、写 Git、外部环境和代理配置改动、图像生成；独占写入、局部适配/阻断、最小充分验证及 PARTIAL 返回在全部档位保留。
+AGENTS 管理入口要求启动时读取 Skill，每次创建、重新委派或模型变化前按 Skill 检查。用户选择、预算、宿主和项目规则优先，工具不自动授权委派。主代理保留最终设计、共享裁决、集成、关键验证及完成声明。子代理禁止递归、外部环境和代理配置改动；独占写入、局部适配/阻断、最小充分验证及 PARTIAL 返回在全部档位保留。
+
+本工具不额外限制 Git 操作或图像生成，也不设置 `features.image_generation`。实际工具能力与操作授权遵循宿主、用户和项目规则。
 
 ## 备用与模型不可用
 
@@ -111,7 +115,7 @@ AGENTS 管理入口要求启动时读取 Skill，每次创建、重新委派或�
 
 Astra 不可用：先区分认证、权限、额度、临时故障或能力不支持。允许备用且全部条件满足才用已配置 Sol/high；用户强制只用 Astra、预算不允许或旧 worker 停止未知时，受影响部分 BLOCKED，继续其他独立工作。缺资料或工具故障先补前提，不能靠强模型掩盖。
 
-每任务最多三次父代理发起的委派，同一组合最多额外一次；累计等待不超过 30 秒并遵守 Retry-After。宿主已重试或次数未知时不追加。异常或部分结果标 PARTIAL，不自动撤销其他人的修改。完整分类见 [失败处理](../adapters/codex/skills/subagent-model-selection/references/failure-policy.md)。
+每任务最多三次父代理发起的委派，同一组合最多额外一次；累计等待不超过 30 秒并遵守 Retry-After。宿主已重试或次数未知时不追加。异常或部分结果标 PARTIAL，不自动撤销其他人的修改。完整分类见 [失败处理](../adapters/codex/skills/subagent-delegation/references/failure-policy.md)。
 
 ## 自定义档位
 
@@ -123,7 +127,7 @@ sub-d mode configure "我的研究方案" \
 sub-d mode set "我的研究方案"
 ```
 
-新建自定义档位不能命名为 `low`、`mid`、`fire`。若旧配置已有同名自定义档位，使用 `mode list` 显示的 custom-* id 选择；low、mid、fire 始终指向内置档位，原自定义配置保留。
+自定义名称不能与内置档位的 id、中文名或现有自定义名称/id 重复；自定义档位可按名称或 custom-* id 选择。
 
 名称 trim + Unicode NFC 归一化，1–80 个码点，不能含控制字符、无效 Unicode 或与既有名称/id 混淆。名称只用于显示与查找，不拼文件路径；内部 id 为 UUID。模型 1–200、effort 1–40 个码点，拒绝无效 Unicode、控制字符和首尾空白。目录未知不等于标识无效。
 
@@ -162,7 +166,7 @@ setup、切换、活动自定义部署实际改变后，解锁再查询所选 ho
 
 分别查看：目录是否完整、effort 是否支持、账号实际请求权限、可信实际身份。目录列出模型不证明请求成功；目录缺项仍 unknown。桌面会话、启动参数、profile 与 CLI 上下文匹配未核验，检查结果不能冒充桌面账号能力。
 
-**0.3.0 的实际推理门禁继续关闭。** 已核验的 Codex CLI 0.156.1 无法证明禁用全部工具/委派及限定外部读取，因此 `--verify` 返回 exit 1、`PROBE_ISOLATION_UNSUPPORTED`，不创建线程或发送推理。没有有效当前档位且无显式目标时先报 `PROBE_TARGET_REQUIRED`。未来只有宿主强制隔离得到验证才能启用；页面仍保留显式额度确认，不默认调用。
+**0.5.0 的实际推理门禁继续关闭。** 已核验的 Codex CLI 0.156.1 无法证明禁用全部工具/委派及限定外部读取，因此 `--verify` 返回 exit 1、`PROBE_ISOLATION_UNSUPPORTED`，不创建线程或发送推理。没有有效当前档位且无显式目标时先报 `PROBE_TARGET_REQUIRED`。未来只有宿主强制隔离得到验证才能启用；页面仍保留显式额度确认，不默认调用。
 
 ## 本地网页
 
@@ -205,13 +209,14 @@ JSON stdout 只有统一 envelope：
 - `RULES_SHADOWED`：非空 home AGENTS.override.md 遮蔽入口。工具不改 override；用户自行合并原规则并停用 override，或选择未遮蔽 home。
 - `MANAGED_FILE_DRIFT` / `MANAGED_RULES_DRIFT`：人工改动、删除或 chmod；保留用户内容，核对后重新操作，无 force 覆盖开关。
 - `BUSY`：有写入锁或读取持续变化。先确认其他命令已停止；不要自动删除锁。进程崩溃后可能需人工核对锁与残留。
-- `VERSION_MISMATCH`：先用当前工具 setup 升级；禁止旧工具降级覆盖。
-- `RESTORE_METADATA_INVALID` / `RESTORE_BASELINE_UNAVAILABLE`：恢复记录损坏或旧版没有原始基线，使用原备份或人工核对，不猜测恢复。
+- `VERSION_MISMATCH`：配置版本与当前工具不一致；用原版本 restore 后再重新配置，当前工具不迁移或覆盖。
+- `STATE_INVALID`：状态格式、路径或档位引用不受支持，保持文件不变。
+- `RESTORE_METADATA_INVALID`：恢复记录缺失或损坏，使用原备份或人工核对，不猜测恢复。
 - `MODEL_ACCESS_UNKNOWN` / `MODEL_NOT_LISTED`：权限未知；不能当作可用或不可用的最终证明。
 
 配置文件采用逐文件原子替换、共同独占锁、完整观察复读、状态最后写入和普通失败回退。回退不覆盖并发编辑，残留单独报告。多文件在进程崩溃/断电时并非一个原子事务；不要在应用期间手工修改管理文件。
 
-## 恢复、迁移与卸载
+## 恢复与卸载
 
 ```sh
 sub-d restore --dry-run
@@ -221,16 +226,11 @@ npm uninstall -g subagent-delegation
 
 restore 后重启 Codex。它不会卸载 npm 工具、删除整个 home、清理账号或重启应用。npm 卸载也不会代做 restore。
 
-首次新版 setup 记录受影响文件的原存在状态与普通权限，仅允许接管同内容公开工具资产；AGENTS 只记录管理区块与校验元数据，不保存完整私有正文、config 或认证文件。切换/升级保留首次基线，新路径追加原值，退场路径保留原始恢复记录。
+首次 setup 记录受影响文件的原存在状态与普通权限，仅允许接管同内容公开工具资产；AGENTS 只记录管理区块与校验元数据，不保存完整私有正文、config 或认证文件。同版本档位切换与自定义配置保留首次基线。
 
 恢复清理本工具新增 Skill、四角色、规则区块、当前档位、全部自定义与元数据；保留用户原文件和后续标记外正文。只非递归删除本工具创建的空目录，home 与无关文件保留。冲突先完整预检，失败不猜测删除。
 
-0.1.0 升级为 schema 2 时标 `legacy_unavailable`：摘要不能重建安装前内容，不把迁移当天配置冒充原始基线。旧 Python 命令现在是 Node setup 兼容入口，需要 Node 22+ 和已安装依赖：
-
-```sh
-npm ci --ignore-scripts
-python3 install.py --codex-home "/path/to/codex-home" --dry-run
-```
+工具统一使用 Node.js 22+ 和 npm，不需要 Python；安装与配置入口为 `sub-d setup`。
 
 ## 开发验证
 
@@ -240,7 +240,7 @@ npm test
 npm pack
 ```
 
-原十项 Python 保护测试保存在测试 fixture 上，同时 CLI 用例检查新的兼容入口。可在具备 Python 3.11+ 时运行 `python3 -m unittest discover -s tests -v`。
+`npm test` 验证安装、档位、查询、恢复和本地服务；安装保护用例覆盖用户配置保留、冲突、符号链接、失败回退及输出脱敏。
 
 浏览器集成脚本不安装额外依赖；使用开发环境已存在的 Playwright 和 Chrome：
 
@@ -248,4 +248,4 @@ npm pack
 PLAYWRIGHT_MODULE=/path/to/playwright CHROME_PATH=/path/to/chrome npm run test:browser
 ```
 
-跨平台 API 设计不代替实机验收；Linux/Windows、其他 Codex 客户端及真实账号推理仍需单独验证。兼容依据和五轮审查见 [实施验收记录](implementation-review.md)。
+跨平台 API 设计不代替实机验收；Linux/Windows、其他 Codex 客户端及真实账号推理仍需单独验证。当前验证结果与边界见 [实施验收记录](implementation-review.md)。
