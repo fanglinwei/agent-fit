@@ -13,6 +13,7 @@ test('web action whitelist always uses argv and one full stdin, rejecting arbitr
   const cmd = actionCommand({ action: 'create', params: { name: '-my `mode`', expectRevision: 'current' } }, env);
   assert.deepEqual(cmd.argv.slice(-2), ['--', '-my `mode`']);
   assert.ok(cmd.argv.includes('--codex-home=/fake home'));
+  assert.ok(!cmd.argv.some(arg => arg.startsWith('--agent')));
 });
 
 test('loopback service performs real packaged CLI and protects host/origin/session/revision', async t => {
@@ -34,11 +35,11 @@ test('loopback service performs real packaged CLI and protects host/origin/sessi
   let result = await (await action({ action: 'status', params: { details: true } })).json();
   assert.equal(result.report.data.installation, 'not_installed');
   let revision = result.report.data.configuration_revision;
-  result = await (await action({ action: 'setup', params: { mode: 'balanced', dryRun: true, expectRevision: revision } })).json();
+  result = await (await action({ action: 'setup', params: { mode: 'mid', dryRun: true, expectRevision: revision } })).json();
   assert.equal(result.report.data.result, 'preview');
-  result = await (await action({ action: 'setup', params: { mode: 'balanced', expectRevision: revision } })).json();
+  result = await (await action({ action: 'setup', params: { mode: 'mid', expectRevision: revision } })).json();
   assert.equal(result.exit_code, 0, JSON.stringify(result)); assert.equal(result.report.data.restart.required, true);
-  result = await (await action({ action: 'set', params: { mode: 'economy', expectRevision: revision } })).json();
+  result = await (await action({ action: 'set', params: { mode: 'low', expectRevision: revision } })).json();
   assert.equal(result.exit_code, 1); assert.equal(result.report.errors[0].code, 'CONFIG_CHANGED');
   result = await (await action({ action: 'status' })).json(); revision = result.report.data.configuration_revision;
   result = await (await action({ action: 'restore', params: { expectRevision: revision } })).json();

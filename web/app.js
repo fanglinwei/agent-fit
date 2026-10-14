@@ -37,7 +37,12 @@ function displayValue(value) { return value === null || value === undefined ? '�
 class ActionError extends Error {
   constructor(code, message, response = null) { super(message); this.code = code; this.response = response; }
 }
+function modeCommand(selector) {
+  return state.modes.find(mode => mode.id === selector)?.command ?? selector;
+}
 async function request(action, params = {}, allowPartial = false) {
+  if (params.mode) params = { ...params, mode: modeCommand(params.mode) };
+  if (params.from) params = { ...params, from: modeCommand(params.from) };
   let response, payload;
   try {
     response = await fetch('/api/actions', { method: 'POST', credentials: 'same-origin', headers: { 'Content-Type': 'application/json', 'X-Delegation-Token': state.bootstrap.csrf_token }, body: JSON.stringify({ action, params }) });
@@ -85,7 +90,7 @@ async function readBatch(preferred) {
     if (!status || !Array.isArray(listing?.modes)) throw new ActionError('COMMAND_RESULT_INVALID', '配置查询缺少状态或档位列表。');
     const active = typeof status.mode === 'object' ? status.mode?.id : status.installation?.mode;
     const selected = listing.modes.some(mode => mode.id === preferred) ? preferred : active ?? listing.modes.find(mode => mode.id === 'balanced')?.id ?? listing.modes[0]?.id;
-    const shown = selected ? (await request('show', { mode: selected }, true)).report.data : null;
+    const shown = selected ? (await request('show', { mode: listing.modes.find(mode => mode.id === selected)?.command ?? selected }, true)).report.data : null;
     const revision = status.configuration_revision;
     if (revision && revision === listing.configuration_revision && (!shown || revision === shown.configuration_revision)) {
       if (shown && (!shown.definition?.levels || LEVELS.some(level => !shown.definition.levels[level]))) throw new ActionError('COMMAND_RESULT_INVALID', '档位报告缺少完整 L1–L4 定义。');
@@ -135,11 +140,13 @@ async function refresh({ selected = state.selected, compare = false, preserve = 
 }
 
 function commandArguments(action, params) {
+  if (params.mode) params = { ...params, mode: modeCommand(params.mode) };
+  if (params.from) params = { ...params, from: modeCommand(params.from) };
   const args = [];
   if (['set', 'create', 'configure'].includes(action)) args.push('mode', action);
   else if (action === 'models') args.push('models', 'check');
   else args.push(action);
-  args.push('--agent=codex', `--codex-home=${state.bootstrap?.home ?? ''}`, '--json');
+  args.push(`--codex-home=${state.bootstrap?.home ?? ''}`, '--json');
   if (params.expectRevision) args.push(`--expect-revision=${params.expectRevision}`);
   if (params.dryRun) args.push('--dry-run');
   if (action === 'setup' && params.mode) args.push(`--mode=${params.mode}`);
@@ -154,7 +161,7 @@ function commandArguments(action, params) {
   if (action === 'create') args.push('--', params.name);
   return args;
 }
-function commandText(argv) { return ['subagent-delegation', ...argv.map(value => "'" + String(value).replaceAll("'", "'\\''") + "'")].join(' '); }
+function commandText(argv) { return ['sub-d', ...argv.map(value => "'" + String(value).replaceAll("'", "'\\''") + "'")].join(' '); }
 function nextWrite() {
   if (!state.saved) return null;
   const params = { mode: state.selected, expectRevision: state.revision };
@@ -280,12 +287,15 @@ function showTab(tab) {
   history.replaceState(null, '', `#${state.tab}`);
 }
 function renderModePicker() {
+  const focusedMode = $('mode-radios').contains(document.activeElement) ? document.activeElement.id : null;
   const isCustom = state.modes.find(mode => mode.id === state.selected)?.kind === 'custom';
-  const radios = state.modes.filter(mode => mode.kind !== 'custom').map(mode => ({ value: mode.id, label: mode.name }));
+  const descriptions = { economy: '简单任务，优先节省', balanced: '日常任务，兼顾质量', performance: '复杂任务，优先质量', custom: '自行设置模型与备用' };
+  const radios = state.modes.filter(mode => mode.kind !== 'custom').map(mode => ({ value: mode.id, label: `${mode.name} · ${mode.command ?? mode.id}` }));
   radios.push({ value: 'custom', label: '自定义' });
-  replace('mode-radios', radios.map(option => node('label', {}, node('input', { type: 'radio', name: 'mode', value: option.value, checked: option.value === 'custom' ? isCustom : state.selected === option.value, disabled: state.busy || !state.connected, on: { change: () => { if (option.value !== 'custom') selectMode(option.value); else { const target = state.modes.find(mode => mode.kind === 'custom'); if (target) selectMode(target.id); else { renderModePicker(); createMode(); } } } } }), option.label)));
+  replace('mode-radios', radios.map(option => node('label', {}, node('input', { id: `mode-${option.value}`, type: 'radio', name: 'mode', value: option.value, 'aria-label': option.label, 'aria-describedby': `mode-${option.value}-note`, checked: option.value === 'custom' ? isCustom : state.selected === option.value, disabled: state.busy || !state.connected, on: { change: () => { if (option.value !== 'custom') selectMode(option.value); else { const target = state.modes.find(mode => mode.kind === 'custom'); if (target) selectMode(target.id); else { renderModePicker(); createMode(); } } } } }), node('span', { class: 'mode-name' }, option.label), node('span', { id: `mode-${option.value}-note`, class: 'mode-description' }, descriptions[option.value] ?? '查看模型分配'))));
   $('custom-picker').hidden = !isCustom;
   replace('custom-mode', state.modes.filter(mode => mode.kind === 'custom').map(mode => node('option', { value: mode.id, selected: mode.id === state.selected }, mode.name)));
+  if (focusedMode) $(focusedMode)?.focus();
 }
 function evidence(pair) {
   if (!state.models) return '可用性未确认 · 尚未检查账号与目录';
@@ -318,8 +328,9 @@ function renderLevels() {
     const summary = node('summary', { on: { click: event => { if (desktop.matches) event.preventDefault(); } } }, node('span', { class: 'level-code' }, level), node('span', { class: 'level-name' }, LEVEL_LABELS[index]), node('span', { id: `${level}-changed`, class: 'tag', hidden: true }, '已修改'), node('span', { class: 'level-example' }, LEVEL_EXAMPLES[index]), node('span', { id: `${level}-summary`, class: 'level-summary' }, pairText(pair)));
     const fields = node('div', { class: 'level-fields' });
     if (custom()) fields.append(node('div', { class: 'field-grid' }, field(level, 'model', pair.model), field(level, 'effort', pair.effort)));
-    else fields.append(node('div', { class: 'field-grid' }, node('div', {}, node('p', { class: 'muted' }, '主模型'), node('p', { class: 'readonly-value' }, pair.model)), node('div', {}, node('p', { class: 'muted' }, '推理强度'), node('p', { class: 'readonly-value' }, pair.effort))));
-    fields.append(node('p', { id: `${level}-evidence`, class: 'evidence' }, evidence(pair)), node('p', { id: `${level}-error`, class: 'field-error', hidden: true }));
+    else fields.append(node('div', { class: 'field-grid' }, node('div', {}, node('p', { class: 'muted' }, '主模型'), node('p', { class: 'readonly-value model-value' }, pair.model)), node('div', {}, node('p', { class: 'muted' }, '推理强度'), node('p', { class: 'readonly-value effort-value' }, pair.effort))));
+    fields.append(node('p', { id: `${level}-error`, class: 'field-error', hidden: true }));
+    const modelEvidence = node('details', { class: 'model-evidence' }, node('summary', {}, '可用性证据'), node('p', { id: `${level}-evidence`, class: 'evidence' }, evidence(pair)));
     const fallbackFields = node('div', { id: `${level}-fallback-fields`, class: 'field-grid', hidden: !pair.fallback });
     const fallbackDetails = node('details', { class: 'fallback' }, node('summary', { id: `${level}-fallback-summary` }, `备用：${pairText(pair.fallback)}`));
     if (custom()) {
@@ -332,8 +343,8 @@ function renderLevels() {
         state.preview = null; updateLevelSummary(level); renderChanges(); renderControls(); renderPreview();
       } } }), '启用一个备用组合'), fallbackFields);
     } else fallbackDetails.append(node('p', { class: 'muted' }, pairText(pair.fallback)));
-    fields.append(fallbackDetails);
-    $('levels').append(node('details', { id: `level-${level}`, class: 'level', open: desktop.matches || index === 0 }, summary, fields));
+    fields.append(node('div', { class: 'level-meta' }, modelEvidence, fallbackDetails));
+    $('levels').append(node('details', { id: `level-${level}`, class: `level${custom() ? '' : ' readonly'}`, open: desktop.matches || index === 0 }, summary, fields));
     updateLevelSummary(level);
   });
 }
@@ -351,11 +362,12 @@ function renderChanges() {
   const setup = installed() === 'not_installed' || installed() === 'legacy';
   const old = dirty() || current() ? state.saved : activeMode();
   const changes = LEVELS.filter(level => setup || !same(old?.levels?.[level], state.draft.levels[level]));
-  $('changes-count').textContent = changes.length ? `${setup ? '将配置' : '变化涉及'} ${changes.length} 个任务等级` : '尚未修改';
+  $('changes-count').textContent = changes.length ? `${setup ? '将配置' : '变化涉及'} ${changes.length} 个任务等级` : current() ? '尚未修改' : '模型组合不变，将切换档位';
   replace('change-list', changes.map(level => {
     const before = old?.levels?.[level]; const after = state.draft.levels[level];
-    return node('div', { class: 'change-item' }, node('h4', {}, `${level} · ${LEVEL_LABELS[LEVELS.indexOf(level)]}`), before ? node('p', { class: 'change-before' }, `已保存：${pairText(before)}`) : node('p', { class: 'change-before' }, '尚未配置'), node('p', { class: 'change-after' }, `将使用：${pairText(after)}`), !same(before?.fallback, after.fallback) || setup ? node('p', {}, `备用：${pairText(before?.fallback)} → ${pairText(after.fallback)}`) : null);
+    return node('div', { class: 'change-item' }, node('h4', {}, `${level} · ${LEVEL_LABELS[LEVELS.indexOf(level)]}`), before ? node('p', { class: 'change-before' }, `已保存：${pairText(before)}`) : null, node('p', { class: 'change-after' }, `将使用：${pairText(after)}`), !same(before?.fallback, after.fallback) || setup ? node('p', {}, before ? `备用：${pairText(before.fallback)} → ${pairText(after.fallback)}` : `备用：${pairText(after.fallback)}`) : null);
   }));
+  if (!changes.length) replace('change-list', node('div', { class: 'empty-changes' }, node('span', { 'aria-hidden': true }, '✓'), node('p', {}, current() ? '没有待应用的变更' : `将切换至「${state.saved.name}」`), node('p', {}, current() ? '选择其他档位，或复制一份自定义配置。' : '模型组合与当前档位相同。')));
   $('save-note').textContent = state.stale ? '草稿来自旧版本，请刷新后比较。' : dirty() && !current() && !setup ? '保存后仍需单独设为当前档位。' : dirty() && current() ? '一次保存完整四级，并同步写入已配置档位。' : setup ? '点击配置后才写入绑定的 Codex home。' : !current() ? '此操作将切换磁盘记录的已配置档位。' : '修改自定义定义，或选择另一个档位。';
   const operation = nextWrite();
   $('command').textContent = operation ? commandText(commandArguments(operation.action, operation.params)) : '尚未选择配置动作。';
@@ -364,6 +376,7 @@ function renderChanges() {
 function renderControls() {
   const blocked = state.busy || writeBlocked();
   const operation = nextWrite();
+  $('draft-label').hidden = !operation;
   $('apply').textContent = state.busy ? '请等待操作完成…' : installed() === 'not_installed' ? '配置 Codex' : installed() === 'legacy' ? '升级并配置 Codex' : dirty() ? current() ? '保存并应用' : '保存档位' : !current() && state.saved ? '设为当前档位' : '无修改';
   $('apply').disabled = blocked || !operation;
   $('preview').disabled = blocked || !operation;
@@ -427,7 +440,7 @@ function renderModels() {
   const catalogue = data.catalog?.models ?? [];
   const pairs = data.checked_pairs ?? [];
   const statusLabels = { complete: '目录读取完整', incomplete: '目录读取未完成', not_checked: '尚未检查', passed: '目录检查完成', unknown: '未确认', not_requested: '未请求', supported: '支持', incompatible: '不支持', unavailable: '本次不可用', succeeded: '本次请求成功', success: '本次请求成功', failed: '本次请求失败', verified: '本次请求成功', unverified: '未确认' };
-  const contents = [node('p', {}, `账号状态：${statusLabels[data.account?.status] ?? data.account?.status ?? '未确认'}；${statusLabels[data.catalog?.status] ?? '目录状态未确认'}`), node('p', { class: 'muted' }, '目录列出、参数支持、实际请求成功和实际模型身份是不同证据。实际身份没有可信 metadata 时保持未确认。'), node('p', { class: 'muted' }, `检查开始版本：${data.configuration_revision ?? '未确认'}；组合来源版本：${data.source_revision ?? '未确认'}`)];
+  const contents = [node('p', {}, `账号状态：${statusLabels[data.account?.status] ?? data.account?.status ?? '未确认'}；${statusLabels[data.catalog?.status] ?? '目录状态未确认'}`), node('p', { class: 'muted' }, '目录列出、参数支持、实际请求成功和实际模型身份是不同证据。实际身份没有可信 metadata 时保持未确认。')];
   if (data.configuration_changed !== false || data.context?.context_match !== 'matched') contents.push(node('p', { class: 'muted' }, '账号/供应商上下文或配置版本未确认，结果不能证明当前配置的调用权限。'));
   if (catalogue.length) {
     const table = node('table', {}, node('caption', {}, '目录与参数建议'), node('thead', {}, node('tr', {}, ['模型标识', '目录记录', '支持的推理强度'].map(text => node('th', { scope: 'col' }, text)))), node('tbody', {}, catalogue.map(model => node('tr', {}, node('td', {}, model.model ?? model.id), node('td', {}, model.display_name ?? '目录列出'), node('td', {}, (model.supported_reasoning_efforts ?? []).join('、') || '未确认')))));
@@ -437,12 +450,13 @@ function renderModels() {
     const table = node('table', {}, node('caption', {}, '本次检查的模型组合'), node('thead', {}, node('tr', {}, ['模型 / 推理强度', '参数支持', '该次请求', '实际身份'].map(text => node('th', { scope: 'col' }, text)))), node('tbody', {}, pairs.map(pair => node('tr', {}, node('td', {}, pairText(pair), node('p', { class: 'muted' }, pair.reason_code ?? '')), node('td', {}, statusLabels[pair.parameter_support] ?? pair.parameter_support ?? '未确认'), node('td', {}, statusLabels[pair.request_status] ?? pair.request_status ?? '未确认', node('p', { class: 'muted' }, `权限：${statusLabels[pair.access] ?? pair.access ?? '未确认'}`)), node('td', {}, pair.actual_model ? `${pair.actual_model} / ${pair.actual_effort ?? '未确认'}` : '未确认')))));
     contents.push(node('div', { class: 'table-wrap' }, table));
   }
-  if (data.diagnostics?.length) contents.push(node('details', { class: 'technical' }, node('summary', {}, '检查诊断'), node('ul', {}, data.diagnostics.map(item => node('li', {}, `${item.code}：${item.message ?? item.status ?? '未确认'}`)))));
+  contents.push(node('details', { class: 'technical' }, node('summary', {}, '检查诊断与配置版本'), node('p', {}, `检查开始版本：${data.configuration_revision ?? '未确认'}；组合来源版本：${data.source_revision ?? '未确认'}`), data.diagnostics?.length ? node('ul', {}, data.diagnostics.map(item => node('li', {}, `${item.code}：${item.message ?? item.status ?? '未确认'}`))) : node('p', { class: 'muted' }, '未返回额外诊断。')));
   contents.push(node('details', { class: 'technical' }, node('summary', {}, '本次检查的终端命令与结果'), node('pre', {}, commandText(state.models.command?.argv ?? [])), node('p', { class: 'muted' }, `退出码：${state.models.exit_code}`)));
   replace('models-result', contents);
 }
 function render() {
   const active = activeMode();
+  $('configured').dataset.state = installed();
   $('versions').textContent = `工具 ${state.bootstrap?.cli_version ?? '未知'} · 已安装配置 ${state.status?.configuration_version ?? state.status?.installation?.version ?? '未安装'}`;
   $('configured').textContent = installed() === 'legacy' ? '旧版安装，档位未记录' : active ? `已配置：${active.name}` : '尚未配置本工具';
   $('runtime').hidden = installed() !== 'installed';
@@ -467,8 +481,8 @@ async function createMode() {
     source.addEventListener('change', () => { preview.hidden = true; });
     const valid = () => {
       const normalized = name.value.trim().normalize('NFC');
-      if (!validText(normalized, 80) || state.modes.some(mode => mode.id === normalized || mode.name === normalized)) {
-        error.textContent = '名称须为唯一的 1–80 个字符，不能包含控制字符。'; error.hidden = false; name.focus(); return false;
+      if (!validText(normalized, 80) || state.modes.some(mode => mode.id === normalized || mode.name === normalized || mode.command === normalized)) {
+        error.textContent = '名称须为唯一的 1–80 个字符，不能与内置命令同名或包含控制字符。'; error.hidden = false; name.focus(); return false;
       }
       return true;
     };

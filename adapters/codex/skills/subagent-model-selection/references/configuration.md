@@ -2,7 +2,7 @@
 
 本工具只管理四个 task_* 角色、此 Skill、当前档位及 AGENTS.md 中带 subagent-delegation 标记的区块。AGENTS 启动入口明确引用绑定 home 的 Skill；每次委派前必须按 Skill 检查。指令约束不等于宿主拦截器，原生 Skill 选择器发现与实际运行生效另行核验。
 
-- setup 首次默认 balanced；mode set 切换，mode create/configure 保存自定义档位。
+- setup 首次默认 mid；内置档位命令为 low、mid、fire；mode set 切换，mode create/configure 保存自定义档位。
 - status --details 查看规则、磁盘角色及潜在覆盖；mode show 与 explain 只预览，不委派。
 - models check 只查询账号与目录，目录不证明调用权限；--verify 只有宿主可强制隔离工具、委派及外部副作用时才能运行。
 - restore 仅撤销可证明归属的改动，保留安装前内容和管理区块之外的用户修改；旧版缺基线时拒绝猜测恢复。

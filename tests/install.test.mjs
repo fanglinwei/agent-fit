@@ -57,16 +57,16 @@ test('mode switches share immutable baseline and synchronize roles, mode record 
   const { home } = await fixture(); await mutate(home, 'setup');
   const baseline = await fs.readFile(path.join(home, '.subagent-delegation/restore.json'));
   const initial = await readSnapshot(home), instance = initial.state.instance_id;
-  for (const mode of ['economy', 'performance', 'balanced']) {
+  for (const [mode, id] of [['low', 'economy'], ['fire', 'performance'], ['mid', 'balanced']]) {
     const report = await mutate(home, 'set', { mode });
     assert.equal(report.result, 'applied'); assert.equal(report.restart.required, true);
     const snapshot = await readSnapshot(home);
-    assert.equal(snapshot.mode.id, mode); assert.equal(snapshot.state.instance_id, instance); assert.equal(snapshot.diagnostics.filter(item => item.status === 'fail').length, 0);
+    assert.equal(snapshot.mode.id, id); assert.equal(snapshot.state.instance_id, instance); assert.equal(snapshot.diagnostics.filter(item => item.status === 'fail').length, 0);
     assert.deepEqual(await fs.readFile(path.join(home, '.subagent-delegation/restore.json')), baseline);
     for (const role of (await statusReport(home)).roles) assert.equal(role.matches_mode, true);
-    assert.equal(JSON.parse(await fs.readFile(path.join(home, 'skills/subagent-model-selection/references/current-mode.json'), 'utf8')).id, mode);
+    assert.equal(JSON.parse(await fs.readFile(path.join(home, 'skills/subagent-model-selection/references/current-mode.json'), 'utf8')).id, id);
   }
-  assert.equal((await mutate(home, 'set', { mode: 'balanced' })).result, 'unchanged');
+  assert.equal((await mutate(home, 'set', { mode: 'mid' })).result, 'unchanged');
 });
 
 test('managed content, deletion, mode and rule drift stop all writes', async () => {
@@ -77,7 +77,7 @@ test('managed content, deletion, mode and rule drift stop all writes', async () 
     async home => fs.writeFile(path.join(home, 'AGENTS.md'), (await fs.readFile(path.join(home, 'AGENTS.md'), 'utf8')).replace('## AI 子代理模型选择与委派', '## User edit')),
   ]) {
     const { home } = await fixture(); await mutate(home, 'setup'); await edit(home); const before = await tree(home);
-    await assert.rejects(mutate(home, 'set', { mode: 'economy' }), DelegationError); assert.deepEqual(await tree(home), before);
+    await assert.rejects(mutate(home, 'set', { mode: 'low' }), DelegationError); assert.deepEqual(await tree(home), before);
   }
 });
 
@@ -94,7 +94,7 @@ test('different existing files, conflicting role files and registrations cannot 
 
 test('matching own explicit registrations and public existing assets are allowed', async () => {
   const { home } = await fixture(); await fs.mkdir(path.join(home, 'agents'), { recursive: true });
-  const { files } = await renderPayload(resolveHome(home), resolveDefinition('balanced'));
+  const { files } = await renderPayload(resolveHome(home), resolveDefinition('mid'));
   await fs.writeFile(path.join(home, 'agents/task-scan.toml'), files.get('agents/task-scan.toml')); await fs.chmod(path.join(home, 'agents/task-scan.toml'), 0o644);
   await fs.writeFile(path.join(home, 'config.toml'), '[agents.task_scan]\nconfig_file = "agents/task-scan.toml"\n');
   await mutate(home, 'setup'); assert.equal((await readSnapshot(home)).state.file_modes['agents/task-scan.toml'], 0o644);
@@ -130,7 +130,7 @@ test('rollback preserves concurrent edits and continues restoring other safe fil
   const { home } = await fixture(); await mutate(home, 'setup'); const before = await tree(home);
   let edited;
   setTestHooks({ async beforeWrite(relative, change, count) { if (count === 3) { edited = 'agents/task-execute.toml'; await fs.appendFile(path.join(home, edited), '\n# concurrent user edit\n'); throw new Error('Simulated write failure'); } } });
-  await assert.rejects(mutate(home, 'set', { mode: 'performance' }), error => { assert.equal(error.details.report.configuration_status, 'partial'); assert.equal(error.details.report.restart.required, null); assert.ok(error.details.report.rollback_failures.includes(path.join(resolveHome(home), edited))); return true; });
+  await assert.rejects(mutate(home, 'set', { mode: 'fire' }), error => { assert.equal(error.details.report.configuration_status, 'partial'); assert.equal(error.details.report.restart.required, null); assert.ok(error.details.report.rollback_failures.includes(path.join(resolveHome(home), edited))); return true; });
   const after = await tree(home); assert.ok((await fs.readFile(path.join(home, edited), 'utf8')).includes('concurrent user edit'));
   for (const relative of Object.keys(before)) if (relative !== edited) assert.deepEqual(after[relative], before[relative]);
 });
@@ -138,13 +138,13 @@ test('rollback preserves concurrent edits and continues restoring other safe fil
 test('rollback failure is reported while remaining safe files are rolled back', async () => {
   const { home } = await fixture(); await mutate(home, 'setup'); const before = await tree(home); let failed;
   setTestHooks({ beforeWrite(relative, change, count) { if (count === 3) throw new Error('Fail'); }, beforeRollback(relative) { if (relative === 'agents/task-review.toml') { failed = relative; throw new Error('Rollback fail'); } } });
-  await assert.rejects(mutate(home, 'set', { mode: 'performance' }), error => error.details.report.configuration_status === 'partial');
+  await assert.rejects(mutate(home, 'set', { mode: 'fire' }), error => error.details.report.configuration_status === 'partial');
   const after = await tree(home); for (const relative of Object.keys(before)) if (relative !== failed) assert.deepEqual(after[relative], before[relative]);
 });
 
 test('existing lock blocks status and writes; read commands never delete it', async () => {
   const { home } = await fixture(); await mutate(home, 'setup'); await fs.writeFile(path.join(home, '.subagent-delegation/install.lock'), ''); const before = await tree(home);
-  await rejectsCode(statusReport(home), 'BUSY'); await rejectsCode(mutate(home, 'set', { mode: 'economy' }), 'BUSY'); assert.deepEqual(await tree(home), before);
+  await rejectsCode(statusReport(home), 'BUSY'); await rejectsCode(mutate(home, 'set', { mode: 'low' }), 'BUSY'); assert.deepEqual(await tree(home), before);
 });
 
 test('revision observes private config, override, chmod, and discovery directory; optimistic stale write is rejected', async () => {
@@ -156,13 +156,13 @@ test('revision observes private config, override, chmod, and discovery directory
   ]) { await change(); const next = (await readSnapshot(home)).configuration_revision; assert.notEqual(next, revision); revision = next; }
   const { home: home2 } = await fixture(); await mutate(home2, 'setup'); const source = (await readSnapshot(home2)).configuration_revision;
   await fs.writeFile(path.join(home2, 'agents/other.toml'), 'name = "other"\n'); const before = await tree(home2);
-  await rejectsCode(mutate(home2, 'set', { mode: 'performance', expectRevision: source }), 'CONFIG_CHANGED'); assert.deepEqual(await tree(home2), before);
+  await rejectsCode(mutate(home2, 'set', { mode: 'fire', expectRevision: source }), 'CONFIG_CHANGED'); assert.deepEqual(await tree(home2), before);
 });
 
 test('lock re-read detects a newly created role directory entry before any write', async () => {
   const { home } = await fixture(); await mutate(home, 'setup'); const before = await tree(home);
   setTestHooks({ async afterLock() { await fs.writeFile(path.join(home, 'agents/new.toml'), 'name = "unrelated"\n'); } });
-  await rejectsCode(mutate(home, 'set', { mode: 'economy' }), 'CONFIG_CHANGED'); const after = await tree(home);
+  await rejectsCode(mutate(home, 'set', { mode: 'low' }), 'CONFIG_CHANGED'); const after = await tree(home);
   for (const relative of Object.keys(before)) assert.deepEqual(after[relative], before[relative]); assert.ok(after['agents/new.toml']);
 });
 
@@ -183,7 +183,7 @@ test('legacy schema 1 migrates ownership without inventing a restoration baselin
 test('all modifying actions enforce version gates, and setup rejects downgrading', async () => {
   const { home } = await fixture(); await mutate(home, 'setup'); const target = path.join(home, '.subagent-delegation/state.json'); let state = JSON.parse(await fs.readFile(target, 'utf8'));
   state.version = '0.1.9'; await fs.writeFile(target, JSON.stringify(state));
-  for (const action of ['set', 'create', 'configure']) await rejectsCode(mutate(home, action, { mode: 'economy', name: 'test' }), 'VERSION_MISMATCH');
+  for (const action of ['set', 'create', 'configure']) await rejectsCode(mutate(home, action, { mode: 'low', name: 'test' }), 'VERSION_MISMATCH');
   await mutate(home, 'setup'); state = JSON.parse(await fs.readFile(target, 'utf8')); assert.equal(state.version, VERSION);
   state.version = '99.0.0'; await fs.writeFile(target, JSON.stringify(state)); await rejectsCode(mutate(home, 'setup'), 'VERSION_TOO_OLD');
 });
@@ -192,14 +192,14 @@ test('override shadowing blocks deployments but restore remains available', asyn
   const { home } = await fixture(); await fs.mkdir(home); await fs.writeFile(path.join(home, 'AGENTS.override.md'), 'User override\n'); const before = await tree(home);
   await rejectsCode(mutate(home, 'setup'), 'RULES_SHADOWED'); assert.deepEqual(await tree(home), before);
   await fs.unlink(path.join(home, 'AGENTS.override.md')); await mutate(home, 'setup'); await fs.writeFile(path.join(home, 'AGENTS.override.md'), 'User override\n');
-  await rejectsCode(mutate(home, 'set', { mode: 'economy' }), 'RULES_SHADOWED'); assert.equal((await mutate(home, 'restore')).result, 'applied'); assert.equal(await fs.readFile(path.join(home, 'AGENTS.override.md'), 'utf8'), 'User override\n');
+  await rejectsCode(mutate(home, 'set', { mode: 'low' }), 'RULES_SHADOWED'); assert.equal((await mutate(home, 'restore')).result, 'applied'); assert.equal(await fs.readFile(path.join(home, 'AGENTS.override.md'), 'utf8'), 'User override\n');
 });
 
 test('blank home override follows host Unicode whitespace semantics', async () => {
   const { home } = await fixture(); await fs.mkdir(home);
   const override = path.join(home, 'AGENTS.override.md'); await fs.writeFile(override, '\n\t \u0085');
   assert.equal((await mutate(home, 'setup')).result, 'applied');
-  await fs.writeFile(override, '\ufeff'); await rejectsCode(mutate(home, 'set', { mode: 'economy' }), 'RULES_SHADOWED');
+  await fs.writeFile(override, '\ufeff'); await rejectsCode(mutate(home, 'set', { mode: 'low' }), 'RULES_SHADOWED');
   assert.equal((await mutate(home, 'restore')).result, 'applied');
   assert.equal(await fs.readFile(override, 'utf8'), '\ufeff');
 });
@@ -208,13 +208,13 @@ test('recursive host role discovery catches same-name collisions and new entries
   const { home } = await fixture(); await fs.mkdir(path.join(home, 'agents/nested'), { recursive: true }); await fs.writeFile(path.join(home, 'agents/nested/conflict.toml'), 'name = "task_review"\n');
   await rejectsCode(mutate(home, 'setup'), 'ROLE_NAME_CONFLICT'); await fs.unlink(path.join(home, 'agents/nested/conflict.toml')); await mutate(home, 'setup');
   const before = await tree(home); setTestHooks({ async afterLock() { await fs.writeFile(path.join(home, 'agents/nested/user.toml'), 'name = "user"\n'); } });
-  await rejectsCode(mutate(home, 'set', { mode: 'performance' }), 'CONFIG_CHANGED'); const after = await tree(home); for (const relative of Object.keys(before)) assert.deepEqual(after[relative], before[relative]);
+  await rejectsCode(mutate(home, 'set', { mode: 'fire' }), 'CONFIG_CHANGED'); const after = await tree(home); for (const relative of Object.keys(before)) assert.deepEqual(after[relative], before[relative]);
 });
 
 test('dry-run rechecks the complete observed snapshot before producing preview', async () => {
   const { home } = await fixture(); await mutate(home, 'setup'); const before = await tree(home);
   setTestHooks({ async beforePreview() { await fs.writeFile(path.join(home, 'config.toml'), 'model = "user-change"\n'); } });
-  await rejectsCode(mutate(home, 'set', { mode: 'economy', dryRun: true }), 'CONFIG_CHANGED'); const after = await tree(home); for (const relative of Object.keys(before)) assert.deepEqual(after[relative], before[relative]);
+  await rejectsCode(mutate(home, 'set', { mode: 'low', dryRun: true }), 'CONFIG_CHANGED'); const after = await tree(home); for (const relative of Object.keys(before)) assert.deepEqual(after[relative], before[relative]);
 });
 
 test('signals before first write cancel without changes and signals after writes trigger complete rollback', async () => {
@@ -222,7 +222,7 @@ test('signals before first write cancel without changes and signals after writes
     setTestHooks();
     const { home } = await fixture(); await mutate(home, 'setup'); const before = await tree(home); const listeners = process.listenerCount('SIGINT');
     setTestHooks({ beforeWrite(relative, change, written) { if (written === count) process.emit('SIGINT'); } });
-    await assert.rejects(mutate(home, 'set', { mode: 'performance' }), error => error.code === 'CANCELED' && error.details.report.configuration_status === (count ? 'rolled_back' : 'not_written'));
+    await assert.rejects(mutate(home, 'set', { mode: 'fire' }), error => error.code === 'CANCELED' && error.details.report.configuration_status === (count ? 'rolled_back' : 'not_written'));
     assert.deepEqual(await tree(home), before); assert.equal(process.listenerCount('SIGINT'), listeners);
   }
 });
@@ -232,11 +232,11 @@ test('stable installed mode data is read from its owned deployed snapshot instea
   current.version = '0.1.9'; current.levels.L1.model = 'historical-installed-model'; const bytes = Buffer.from(JSON.stringify(current)); await fs.writeFile(target, bytes);
   const stateTarget = path.join(home, '.subagent-delegation/state.json'); const state = JSON.parse(await fs.readFile(stateTarget, 'utf8')); state.version = '0.1.9'; state.files['skills/subagent-model-selection/references/current-mode.json'] = createHash('sha256').update(bytes).digest('hex'); await fs.writeFile(stateTarget, JSON.stringify(state));
   assert.equal((await readSnapshot(home)).mode.levels.L1.model, 'historical-installed-model'); assert.equal((await statusReport(home)).mode.levels.L1.model, 'historical-installed-model');
-  for (const selector of ['balanced', '适中', ' 适中 ']) {
+  for (const selector of ['mid', undefined]) {
     const shown = await showReport(home, selector);
     assert.equal(shown.definition.levels.L1.model, 'historical-installed-model'); assert.equal(shown.definition_version, '0.1.9');
   }
-  await mutate(home, 'setup'); assert.equal((await readSnapshot(home)).mode.levels.L1.model, resolveDefinition('balanced').levels.L1.model);
+  await mutate(home, 'setup'); assert.equal((await readSnapshot(home)).mode.levels.L1.model, resolveDefinition('mid').levels.L1.model);
 });
 
 test('protected JSON rejects duplicate keys instead of silently accepting the final occurrence', async () => {
@@ -259,20 +259,20 @@ test('committed lock cleanup failure preserves applied report and restart remind
 test('late edit after temporary write is preserved at the final atomic replacement check', async () => {
   const { home } = await fixture(); await mutate(home, 'setup'); const before = await tree(home); let edited;
   setTestHooks({ async beforeAtomicCommit(relative) { if (!edited) { edited = relative; await fs.writeFile(path.join(home, relative), 'late user edit'); } } });
-  await assert.rejects(mutate(home, 'set', { mode: 'performance' }), error => error.code === 'CONFIG_CHANGED' && error.details.report.configuration_status === 'not_written');
+  await assert.rejects(mutate(home, 'set', { mode: 'fire' }), error => error.code === 'CONFIG_CHANGED' && error.details.report.configuration_status === 'not_written');
   const after = await tree(home); assert.equal(await fs.readFile(path.join(home, edited), 'utf8'), 'late user edit'); for (const relative of Object.keys(before)) if (relative !== edited) assert.deepEqual(after[relative], before[relative]);
 });
 
 test('late rollback edit survives and other safe files still roll back', async () => {
   const { home } = await fixture(); await mutate(home, 'setup'); const before = await tree(home); let edited;
   setTestHooks({ beforeWrite(relative, change, count) { if (count === 0) edited = relative; if (count === 3) throw new Error('Fail'); }, async beforeRollback(relative) { if (relative === edited) await fs.writeFile(path.join(home, relative), 'late rollback user edit'); } });
-  await assert.rejects(mutate(home, 'set', { mode: 'performance' }), error => error.details.report.configuration_status === 'partial');
+  await assert.rejects(mutate(home, 'set', { mode: 'fire' }), error => error.details.report.configuration_status === 'partial');
   const after = await tree(home); assert.equal(await fs.readFile(path.join(home, edited), 'utf8'), 'late rollback user edit'); for (const relative of Object.keys(before)) if (relative !== edited) assert.deepEqual(after[relative], before[relative]);
 });
 
 test('concurrent edit after a completed write prevents a false applied report and keeps user content', async () => {
   const { home } = await fixture(); await mutate(home, 'setup'); const before = await tree(home); let edited;
   setTestHooks({ async afterWrite(relative) { if (!edited) { edited = relative; await fs.appendFile(path.join(home, relative), '\n# concurrent after-write user edit\n'); } } });
-  await assert.rejects(mutate(home, 'set', { mode: 'performance' }), error => error.details.report.configuration_status === 'partial' && error.details.report.restart.required === null);
+  await assert.rejects(mutate(home, 'set', { mode: 'fire' }), error => error.details.report.configuration_status === 'partial' && error.details.report.restart.required === null);
   const after = await tree(home); assert.ok((await fs.readFile(path.join(home, edited), 'utf8')).includes('concurrent after-write user edit')); for (const relative of Object.keys(before)) if (relative !== edited) assert.deepEqual(after[relative], before[relative]);
 });

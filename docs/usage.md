@@ -1,21 +1,23 @@
 # 使用说明
 
-`subagent-delegation` 0.2.0。首版支持 Codex；Node.js 22+。命令、网页和生成的 Skill 使用同一套档位数据。
+`subagent-delegation` 0.3.0。首版支持 Codex；Node.js 22+。命令、网页和生成的 Skill 使用同一套档位数据。
+
+短命令为 `sub-d`，与原命令 `subagent-delegation` 完全等价。升级到 0.3.0 后执行 `sub-d setup --dry-run` 检查，再执行 `sub-d setup` 更新部署；保留当前档位、自定义定义和首次恢复基线。指定独立 home 时两次命令都需带原路径，完成后重启 Codex。npm 包名仍为 `subagent-delegation`。
 
 ## 安装与配置
 
-GitHub 安装需要 Git；本地 `.tgz` 安装只需 Node/npm。
+推荐 npm registry 安装；GitHub 安装另外需要 Git，本地 `.tgz` 安装只需 Node/npm。
 
 ```sh
-npm install -g github:fanglinwei/subagent-delegation
-subagent-delegation setup --agent codex --mode balanced --dry-run
-subagent-delegation setup --agent codex --mode balanced
+npm install -g subagent-delegation
+sub-d setup --mode mid --dry-run
+sub-d setup --mode mid
 ```
 
 一行安装并配置：
 
 ```sh
-npm install -g github:fanglinwei/subagent-delegation && subagent-delegation setup --agent codex --mode balanced
+npm install -g subagent-delegation && sub-d setup --mode mid
 ```
 
 目标目录优先级为 `--codex-home PATH`、`CODEX_HOME`、用户 `~/.codex`。空格路径需要 shell 引号。命令不会设置主代理模型、全局子代理默认、供应商、审批、沙箱、并发或子代理启用开关。
@@ -26,7 +28,7 @@ npm install -g github:fanglinwei/subagent-delegation && subagent-delegation setu
 
 ## 命令表
 
-业务命令支持 `--agent codex` 和 `--codex-home PATH`。省略 agent 时默认 codex。除 serve 外都支持 `--json`；写命令支持 `--dry-run` 和 `--expect-revision REV`。
+默认智能体为 Codex；省略 `--agent` 与显式指定 `--agent codex` 等价。业务命令支持 `--codex-home PATH`。除 serve 外都支持 `--json`；写命令支持 `--dry-run` 和 `--expect-revision REV`。
 
 | 命令 | 用途 |
 | --- | --- |
@@ -34,7 +36,7 @@ npm install -g github:fanglinwei/subagent-delegation && subagent-delegation setu
 | `mode set MODE` | 切换已安装 home 的档位 |
 | `mode list` | 列出内置、自定义及当前选择 |
 | `mode show MODE` | 查看四级主/备用、来源与定义版本，不激活 |
-| `mode create NAME [--from MODE]` | 复制完整定义，默认从 balanced，不自动激活 |
+| `mode create NAME [--from MODE]` | 复制完整定义，默认从 mid，不自动激活 |
 | `mode configure MODE --level Lx --model M --effort E` | 修改自定义一个等级 |
 | `mode configure MODE --definition-stdin` | stdin 一次保存完整四级 |
 | `status [--details] [--project PATH]` | 模式、角色、完整性、规则与覆盖诊断 |
@@ -44,34 +46,35 @@ npm install -g github:fanglinwei/subagent-delegation && subagent-delegation setu
 | `serve [--port PORT] [--open]` | 前台启动本地设置页面 |
 | `--help` / `--version` | 帮助及工具版本，可带 --json，不接受 home 参数 |
 
-`MODE` 可用内置 id、中文别名、自定义 id 或唯一名称。职责为 `task_scan`、`task_execute`、`task_review`、`task_delegate`，explain 省略职责时默认 task_delegate。默认 explain 使用当前有效档位；未安装时需明确 `--mode balanced` 等内置预览。
+`MODE` 使用 `low`（经济）、`mid`（适中，首次配置默认）、`fire`（性能）；内置档位仅接受这三个名称，中文用于说明含义。旧安装记录中的历史内部 id 仅供读取与恢复，不作为命令参数。自定义档位可使用内部 id 或唯一名称。职责为 `task_scan`、`task_execute`、`task_review`、`task_delegate`，explain 省略职责时默认 task_delegate。默认 explain 使用当前有效档位；未安装时需明确 `--mode mid` 等内置预览。
 
 名称以 `-` 开头时，在全部选项后使用 `--`：
 
 ```sh
-subagent-delegation mode create --agent codex -- '-我的档位'
+sub-d mode create -- '-我的档位'
 ```
 
 ## 查询与切换
 
 ```sh
-subagent-delegation status --agent codex
-subagent-delegation status --agent codex --details --json
-subagent-delegation status --agent codex --project "/path/to/project" --details
-subagent-delegation mode list --agent codex
-subagent-delegation mode show performance --agent codex
-subagent-delegation mode set economy --agent codex
-subagent-delegation explain --agent codex --level L4 --role task_review
+sub-d status
+sub-d status --details --json
+sub-d status --project "/path/to/project" --details
+sub-d mode list
+sub-d mode show fire
+sub-d mode set low
+sub-d explain --level L4 --role task_review
 ```
 
 详细查询分开呈现已配置值、预设值、潜在覆盖与运行未验证。检查相关项目及祖先目录，不扫描全电脑；不输出账号凭据、私有指令、完整 TOML 或认证记录。范围外注册路径与未确定的 profile 只报告候选及未检查原因，不跟随任意文件。
 
 同一档位重复切换不重写；仅保存非活动定义不要求重启。配置版本与 CLI 版本不同，先 setup 升级，不能直接跨版本切换。
 
-npm 形式查询本地包：
+无需全局安装的 npm 查询，以及本地包查询：
 
 ```sh
-npm exec --package="/path/to/subagent-delegation-0.2.0.tgz" -- subagent-delegation status --agent codex --details
+npm exec --package=subagent-delegation@0.3.0 -- sub-d status --details
+npm exec --package="/path/to/subagent-delegation-0.3.0.tgz" -- sub-d status --details
 ```
 
 ## 任务等级与委派职责
@@ -113,12 +116,14 @@ Astra 不可用：先区分认证、权限、额度、临时故障或能力不�
 ## 自定义档位
 
 ```sh
-subagent-delegation mode create "我的研究方案" --agent codex --from performance
-subagent-delegation mode configure "我的研究方案" --agent codex \
+sub-d mode create "我的研究方案" --from fire
+sub-d mode configure "我的研究方案" \
   --level L4 --model gpt-6-astra --effort low \
   --fallback-model gpt-6.1-sol --fallback-effort high
-subagent-delegation mode set "我的研究方案" --agent codex
+sub-d mode set "我的研究方案"
 ```
+
+新建自定义档位不能命名为 `low`、`mid`、`fire`。若旧配置已有同名自定义档位，使用 `mode list` 显示的 custom-* id 选择；low、mid、fire 始终指向内置档位，原自定义配置保留。
 
 名称 trim + Unicode NFC 归一化，1–80 个码点，不能含控制字符、无效 Unicode 或与既有名称/id 混淆。名称只用于显示与查找，不拼文件路径；内部 id 为 UUID。模型 1–200、effort 1–40 个码点，拒绝无效 Unicode、控制字符和首尾空白。目录未知不等于标识无效。
 
@@ -129,7 +134,7 @@ subagent-delegation mode set "我的研究方案" --agent codex
 四级一次保存的 stdin 格式：
 
 ```sh
-subagent-delegation mode configure "我的研究方案" --agent codex --definition-stdin <<'JSON'
+sub-d mode configure "我的研究方案" --definition-stdin <<'JSON'
 {
   "levels": {
     "L1": {"model": "gpt-6-luna", "effort": "high", "fallback": {"model": "gpt-6.1-sol", "effort": "medium"}},
@@ -146,9 +151,9 @@ JSON
 ## 模型检查
 
 ```sh
-subagent-delegation models check --agent codex
-subagent-delegation models check --agent codex --model gpt-6-astra --effort low --json
-subagent-delegation models check --agent codex --verify
+sub-d models check
+sub-d models check --model gpt-6-astra --effort low --json
+sub-d models check --verify
 ```
 
 setup、切换、活动自定义部署实际改变后，解锁再查询所选 home 的账号及模型目录；失败不撤销合法配置。查询和定义保存、restore、dry-run、无变化操作不会附带检查。
@@ -157,18 +162,20 @@ setup、切换、活动自定义部署实际改变后，解锁再查询所选 ho
 
 分别查看：目录是否完整、effort 是否支持、账号实际请求权限、可信实际身份。目录列出模型不证明请求成功；目录缺项仍 unknown。桌面会话、启动参数、profile 与 CLI 上下文匹配未核验，检查结果不能冒充桌面账号能力。
 
-**0.2.0 的实际推理门禁关闭。** 已核验的 Codex CLI 0.156.1 无法证明禁用全部工具/委派及限定外部读取，因此 `--verify` 返回 exit 1、`PROBE_ISOLATION_UNSUPPORTED`，不创建线程或发送推理。没有有效当前档位且无显式目标时先报 `PROBE_TARGET_REQUIRED`。未来只有宿主强制隔离得到验证才能启用；页面仍保留显式额度确认，不默认调用。
+**0.3.0 的实际推理门禁继续关闭。** 已核验的 Codex CLI 0.156.1 无法证明禁用全部工具/委派及限定外部读取，因此 `--verify` 返回 exit 1、`PROBE_ISOLATION_UNSUPPORTED`，不创建线程或发送推理。没有有效当前档位且无显式目标时先报 `PROBE_TARGET_REQUIRED`。未来只有宿主强制隔离得到验证才能启用；页面仍保留显式额度确认，不默认调用。
 
 ## 本地网页
 
 ```sh
-subagent-delegation serve --agent codex --codex-home "/path/to/codex-home" --open
-subagent-delegation serve --agent codex --port 17321
+sub-d serve --codex-home "/path/to/codex-home" --open
+sub-d serve --port 17321
 ```
 
 只监听 `127.0.0.1`。默认端口 0 自动分配，指定端口允许 1024–65535；占用即失败。`--open` 打开浏览器，失败时手动复制终端 URL；Ctrl+C 等待正在执行的 CLI 安全完成后停止服务。
 
 服务绑定一个 home 和启动 cwd。换 home 时重新启动。四页入口为档位、委派规则、模型检查、恢复。先编辑草稿，再保存/应用；自定义四级由一个 stdin 命令事务提交。未保存的非活动定义不能直接激活。取消只清除草稿；已创建的档位会保留。
+
+桌面左侧导航切换页面，上方选择档位，中央查看或编辑 L1–L4 模型分配，右侧核对变更并应用或预览。手机使用顶部导航，变更确认放在模型配置下方。可用性证据和备用条件按需展开；仅选择档位不会写入配置，应用后仍需重启 Codex。
 
 页面通过白名单动作实际 spawn 本包 CLI，显示命令与结果；不直接写配置、不执行任意 shell。HTTP 使用精确 Host/Origin、会话 Cookie、随机 CSRF token、CSP；不支持远程监听、CORS、CDN、守护进程或自动排队。
 
@@ -207,8 +214,8 @@ JSON stdout 只有统一 envelope：
 ## 恢复、迁移与卸载
 
 ```sh
-subagent-delegation restore --agent codex --dry-run
-subagent-delegation restore --agent codex
+sub-d restore --dry-run
+sub-d restore
 npm uninstall -g subagent-delegation
 ```
 

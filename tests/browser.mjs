@@ -20,6 +20,12 @@ try {
  const errors=[]; page.on('pageerror', e=>errors.push(e.message));
  await page.goto(service.url);
  await page.waitForFunction(()=>document.querySelector('#apply').disabled===false);
+ assert.match(await page.locator('#command').textContent(),/^sub-d /);
+ assert.doesNotMatch(await page.locator('#command').textContent(),/--agent/);
+ assert.match(await page.locator('#command').textContent(),/--mode=mid/);
+ assert.equal(await page.locator('#mode-economy').getAttribute('aria-label'),'经济 · low');
+ assert.equal(await page.locator('#mode-balanced').getAttribute('aria-label'),'适中 · mid');
+ assert.equal(await page.locator('#mode-performance').getAttribute('aria-label'),'性能 · fire');
  await page.locator('#refresh').focus(); await page.keyboard.press('Shift+Tab');
  assert.equal(await page.locator(':focus').getAttribute('href'),'#main');
  await page.keyboard.press('Enter'); assert.equal(await page.locator(':focus').getAttribute('id'),'main');
@@ -29,6 +35,21 @@ try {
  console.log('installed',await page.locator('#configured').innerText());
  assert.match(await page.locator('#result').innerText(),/重启 Codex/);
  if (process.env.BROWSER_ARTIFACT_DIR) await page.screenshot({path:path.join(process.env.BROWSER_ARTIFACT_DIR,'desktop.png'),fullPage:true});
+ await page.getByRole('radio',{name:'适中 · mid',exact:true}).focus();
+ await page.keyboard.press('ArrowRight');
+ await page.waitForFunction(()=>document.querySelector('#editing-title').textContent.includes('性能'));
+ assert.equal(await page.locator(':focus').getAttribute('id'),'mode-performance');
+ assert.match(await page.locator('#configured').innerText(),/适中/);
+ assert.match(await page.locator('#command').textContent(),/'fire'/);
+ assert.equal(await page.locator('.level').count(),4);
+ await page.locator('#preview').click();
+ await page.waitForSelector('#preview-area:not([hidden])');
+ assert.match(await page.locator('#preview-files').innerText(),/更新/);
+ assert.match(await page.locator('#configured').innerText(),/适中/);
+ await page.locator('#close-preview').click();
+ assert.equal(await page.locator(':focus').getAttribute('id'),'preview');
+ await page.locator('#cancel-selection').click();
+ await page.waitForFunction(()=>document.querySelector('#editing-title').textContent.includes('适中'));
  await page.locator('#new-mode').click();
  await page.getByRole('button',{name:'预览创建',exact:true}).focus(); await page.keyboard.press('Enter');
  assert.equal(await page.locator(':focus').getAttribute('id'),'new-name');
@@ -41,6 +62,7 @@ try {
  await page.waitForSelector('#L4-model');
  assert.match(await page.locator('#editing-title').innerText(),/实验\/方案/);
  assert.match(await page.locator('#configured').innerText(),/适中/);
+ assert.match(await page.locator('#change-list').innerText(),/将切换至「实验\/方案」/);
  await page.locator('#L4-model').fill(' ');
  await page.locator('#apply').click();
  assert.equal(await page.locator(':focus').getAttribute('id'),'error');
@@ -54,7 +76,7 @@ try {
  await page.waitForFunction(()=>document.querySelector('#configured').textContent.includes('实验/方案'));
  assert.match(await page.locator('#result').innerText(),/重启 Codex/);
  await page.locator('#L4-model').fill('my-updated');
- const change=spawnSync(process.execPath,[cli,'mode','set','economy','--codex-home',home,'--json'],{encoding:'utf8'});
+ const change=spawnSync(process.execPath,[cli,'mode','set','low','--codex-home',home,'--json'],{encoding:'utf8'});
  assert.equal(change.status,0,change.stdout);
  await page.locator('#apply').click();
  await page.waitForFunction(()=>!document.querySelector('#error').hidden);
@@ -65,6 +87,17 @@ try {
  assert.equal(await page.locator('#L4-model').inputValue(),'my-updated');
  await page.locator('#apply').click();
  await page.waitForFunction(()=>document.querySelector('#apply').textContent==='设为当前档位'&&!document.querySelector('#apply').disabled);
+ await page.locator('a[href="#models"]').click();
+ await page.locator('#check-models').click();
+ await page.waitForFunction(()=>document.querySelector('#check-models').disabled===false&&!document.querySelector('#error').hidden);
+ assert.match(await page.locator('#models-result').innerText(),/没有取得模型目录/);
+ await page.setViewportSize({width:375,height:1000});
+ assert.equal(await page.evaluate(()=>document.documentElement.scrollWidth>innerWidth),false,'model report overflow at 375');
+ await page.getByText('检查诊断与配置版本',{exact:true}).click();
+ assert.equal(await page.evaluate(()=>document.documentElement.scrollWidth>innerWidth),false,'expanded diagnostics overflow at 375');
+ await page.setViewportSize({width:1440,height:1100});
+ await page.locator('#refresh').click();
+ await page.waitForFunction(()=>document.querySelector('#error').hidden&&!document.querySelector('#refresh').disabled);
  await page.locator('a[href="#rules"]').click();
  await page.locator('#explain-level').selectOption('L4');
  await page.locator('#explain-role').selectOption('task_review');
@@ -85,14 +118,19 @@ try {
    await page.keyboard.press('Escape');
    await page.setViewportSize({width,height:1000});
    await page.waitForTimeout(50);
-   const overflow=await page.evaluate(()=>document.documentElement.scrollWidth>innerWidth);
-   assert.equal(overflow,false,`overflow at${width}`);
+   for(const tab of ['modes','rules','models','restore']) {
+     await page.locator(`a[href="#${tab}"]`).click();
+     const overflow=await page.evaluate(()=>document.documentElement.scrollWidth>innerWidth);
+     assert.equal(overflow,false,`overflow at${width} in ${tab}`);
+     assert.equal(await page.locator(`#${tab}`).isVisible(),true);
+   }
  }
+ await page.locator('a[href="#modes"]').click();
  await page.setViewportSize({width:390,height:1100});
  await page.evaluate(()=>document.documentElement.style.fontSize='200%');
  assert.equal(await page.evaluate(()=>document.documentElement.scrollWidth>innerWidth),false,'overflow with enlarged text');
  await page.evaluate(()=>document.documentElement.style.fontSize='');
  if (process.env.BROWSER_ARTIFACT_DIR) await page.screenshot({path:path.join(process.env.BROWSER_ARTIFACT_DIR,'mobile.png'),fullPage:true});
  assert.deepEqual(errors,[]);
- console.log('BROWSER_PASS',service.url,'responsive widths375,768,1280,1440, runtime errors0');
+ console.log('BROWSER_PASS',service.url,'all four pages at widths375,768,1280,1440, runtime errors0');
 } finally {await browser?.close();await service.close();await rm(dir,{recursive:true,force:true});}

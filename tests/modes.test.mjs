@@ -1,6 +1,19 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { safeToml, BUILTINS, ROLES, renderPayload, explainSelection, validateDefinition, resolveDefinition } from '../lib/codex.mjs';
+import { safeToml, BUILTINS, ROLES, renderPayload, explainSelection, validateDefinition, resolveDefinition, resolveStoredDefinition } from '../lib/codex.mjs';
+
+test('low/mid/fire resolve existing presets without changing stored ids or custom definitions', () => {
+  for (const [command, id] of [['low', 'economy'], ['mid', 'balanced'], ['fire', 'performance']]) {
+    assert.deepEqual(resolveDefinition(command), resolveStoredDefinition(id));
+  }
+  for (const retired of ['economy', 'balanced', 'performance', '经济', '适中', '性能']) {
+    assert.throws(() => resolveDefinition(retired), error => error.code === 'MODE_NOT_FOUND');
+  }
+  const custom = { ...resolveDefinition('mid'), id: 'custom-existing', name: 'low', kind: 'custom' };
+  assert.equal(resolveDefinition('low', [custom]).kind, 'builtin');
+  assert.equal(resolveDefinition(custom.id, [custom]).kind, 'custom');
+  assert.throws(() => resolveDefinition('economy', [custom]), error => error.code === 'MODE_NOT_FOUND');
+});
 
 test('all builtin primary/fallback tables render roles and current data consistently', async () => {
   const expected = [
@@ -30,7 +43,7 @@ test('all builtin primary/fallback tables render roles and current data consiste
 });
 
 test('role selection cannot expand original permission contract', () => {
-  const economy = resolveDefinition('economy');
+  const economy = resolveDefinition('low');
   const hard = explainSelection({ definition: economy, level: 'L3', role: 'task_execute' });
   assert.equal(hard.dispatch_role, 'task_delegate'); assert.equal(hard.permission_contract, 'scoped_output');
   assert.equal(hard.primary.model, 'gpt-6.1-sol');
