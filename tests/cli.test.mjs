@@ -18,10 +18,12 @@ test('help/version and strict argument errors never require a home', () => {
   assert.equal(run('/not-a-home', ['--version']).report.data.cli_version, VERSION);
   assert.match(run('/not-a-home', ['--help']).report.data.help, /mode configure/);
   assert.match(run('/not-a-home', ['--help']).report.data.help, /^sub-d /);
-  for (const args of [['setup', '--agent', 'other'], ['setup', '--bogus'], ['mode', 'bad'], ['mode', 'configure', 'a', '--definition-stdin', '--level', 'L1'], ['models', 'check', '--model', 'x'], ['serve', '--port', '80'], ['setup', '--mode', 'mid', '--mode', 'low']]) {
+  for (const args of [['setup', '--agent', 'other'], ['setup', '--bogus'], ['mode', 'bad'], ['mode', 'configure', 'a', '--definition-stdin', '--level', 'L1'], ['models', 'check', '--model', 'x'], ['serve', '--port', '80'], ['setup', '--mode', 'official', '--mode', 'cut']]) {
     assert.throws(() => parseCommand(args), e => e.exitCode === 2);
   }
   assert.equal(parseCommand(['mode', 'create', '--agent', 'codex', '--', '-named']).options.name, '-named');
+  assert.equal(parseCommand(['models', 'check', '--verify', '--discover', '--expect-catalog=' + 'a'.repeat(64)]).options.discover, true);
+  for (const args of [['models', 'check', '--discover'], ['models', 'check', '--verify', '--discover', '--model=x', '--effort=high'], ['models', 'check', '--verify', '--discover', '--expect-catalog=bad']]) assert.throws(() => parseCommand(args), { exitCode: 2 });
 });
 
 test('real CLI supports setup/switch/custom whole stdin/status/explain/restore with restart results', async t => {
@@ -31,9 +33,9 @@ test('real CLI supports setup/switch/custom whole stdin/status/explain/restore w
   assert.deepEqual(run(home, ['setup', '--agent', 'codex', '--dry-run']).report, dry.report);
   await assert.rejects(readFile(path.join(home, 'AGENTS.md')));
   assert.equal(run(home, ['explain', '--level', 'L1']).status, 1);
-  assert.equal(run(home, ['explain', '--mode', 'mid', '--level', 'L1']).status, 0);
+  assert.equal(run(home, ['explain', '--mode', 'official', '--level', 'L1']).status, 0);
   let result = run(home, ['setup']); assert.equal(result.status, 0, result.stdout); assert.equal(result.report.data.restart.required, true);
-  for (const id of ['low', 'mid', 'fire']) {
+  for (const id of ['cut', 'official', 'high', 'fire']) {
     result = run(home, ['mode', 'set', id]); assert.equal(result.status, 0, result.stdout);
     assert.equal(result.report.data.mode.id, id); assert.match(result.report.data.restart.message, /重启 Codex/);
     assert.equal(run(home, ['status']).report.data.mode.id, id);
@@ -42,7 +44,7 @@ test('real CLI supports setup/switch/custom whole stdin/status/explain/restore w
     assert.equal(JSON.parse(await readFile(path.join(home, '.subagent-delegation/state.json'), 'utf8')).mode, id);
     assert.equal(JSON.parse(await readFile(path.join(home, 'skills/subagent-delegation/references/current-mode.json'), 'utf8')).id, id);
   }
-  assert.deepEqual(run(home, ['mode', 'list']).report.data.modes.map(mode => mode.id), ['low', 'mid', 'fire']);
+  assert.deepEqual(run(home, ['mode', 'list']).report.data.modes.map(mode => mode.id), ['cut', 'official', 'high', 'fire']);
   result = run(home, ['mode', 'create', '我的任务', '--from', 'fire']); assert.equal(result.status, 0); assert.equal(result.report.data.restart.required, false);
   const definition = { levels: structuredClone(BUILTINS[1].levels) }; definition.levels.L4 = { model: 'my-model', effort: 'high', fallback: null };
   result = run(home, ['mode', 'configure', '我的任务', '--definition-stdin'], JSON.stringify(definition)); assert.equal(result.status, 0, result.stdout);
@@ -62,16 +64,16 @@ test('retired builtin names fail across CLI selectors without changing configura
   const dir = await mkdtemp(path.join(os.tmpdir(), 'delegation-retired-')); t.after(() => rm(dir, { recursive: true, force: true }));
   const home = path.join(dir, 'home'); assert.equal(run(home, ['setup']).status, 0);
   const revision = run(home, ['status']).report.data.configuration_revision;
-  for (const name of ['economy', 'balanced', 'performance']) {
+  for (const name of ['low', 'mid', 'economy', 'balanced', 'performance']) {
     for (const args of [['setup', '--mode', name], ['mode', 'set', name], ['mode', 'show', name], ['mode', 'create', 'invalid-source', '--from', name], ['explain', '--mode', name, '--level', 'L1']]) {
       const result = run(home, args);
       assert.equal(result.status, 2, result.stdout); assert.equal(result.report.errors[0].code, 'MODE_NOT_FOUND');
     }
   }
   assert.equal(run(home, ['status']).report.data.configuration_revision, revision);
-  assert.equal(run(home, ['mode', 'list']).report.data.modes.length, 3);
+  assert.equal(run(home, ['mode', 'list']).report.data.modes.length, 4);
   assert.equal(run(home, ['explain', '--level', 'L1']).status, 0);
-  for (const args of [['mode', 'list'], ['mode', 'show', 'mid'], ['status']]) {
+  for (const args of [['mode', 'list'], ['mode', 'show', 'official'], ['status']]) {
     const output = spawnSync(process.execPath, [CLI, ...args, '--codex-home', home], { encoding: 'utf8', env: { ...process.env, PATH: '/nonexistent' } });
     assert.equal(output.status, 0); assert.doesNotMatch(output.stdout, /economy|balanced|performance/);
   }
@@ -84,10 +86,10 @@ test('real CLI JSON errors redact malformed private config and reject stale revi
   let result = run(home, ['setup']); assert.equal(result.status, 1); assert.ok(!`${result.stdout}${result.stderr}`.includes('TEST_ONLY_NOT_REAL'));
   await writeFile(path.join(home, 'config.toml'), 'model = "user"\n');
   result = run(home, ['setup']); assert.equal(result.status, 0);
-  result = run(home, ['mode', 'set', 'low', '--expect-revision', 'old']); assert.equal(result.status, 1); assert.equal(result.report.errors[0].code, 'CONFIG_CHANGED');
-  assert.equal(run(home, ['status']).report.data.mode.id, 'mid');
-  assert.equal(run(home, ['mode', 'configure', 'mid', '--definition-stdin'], '{broken').status, 2);
-  assert.equal(run(home, ['mode', 'configure', 'mid', '--definition-stdin'], ' '.repeat(65537)).status, 2);
+  result = run(home, ['mode', 'set', 'cut', '--expect-revision', 'old']); assert.equal(result.status, 1); assert.equal(result.report.errors[0].code, 'CONFIG_CHANGED');
+  assert.equal(run(home, ['status']).report.data.mode.id, 'official');
+  assert.equal(run(home, ['mode', 'configure', 'official', '--definition-stdin'], '{broken').status, 2);
+  assert.equal(run(home, ['mode', 'configure', 'official', '--definition-stdin'], ' '.repeat(65537)).status, 2);
   const roleFile = path.join(home, 'agents/task-scan.toml');
   await writeFile(roleFile, await readFile(roleFile, 'utf8') + '\n# changed\n');
   result = run(home, ['status']); assert.equal(result.status, 1); assert.equal(result.report.data.integrity, 'drifted');

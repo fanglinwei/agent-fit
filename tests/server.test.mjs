@@ -31,18 +31,30 @@ test('loopback service performs real packaged CLI and protects host/origin/sessi
   });
   assert.equal(badHostStatus, 403);
   assert.equal((await action({ action: 'status' }, { ...headers, 'X-Delegation-Token': 'wrong' })).status, 403);
+  assert.equal((await action({ action: 'account', params: { operation: 'login', method: 'apiKey', apiKey: 'test-private-key' } }, { ...headers, Origin: 'https://evil.example' })).status, 403);
+  assert.equal((await action({ action: 'account', params: { operation: 'status', apiKey: 'test-private-key' } })).status, 400);
+  assert.equal((await action({ action: 'account', params: { operation: 'login', method: 'unsupported' } })).status, 400);
+  assert.equal((await action({ action: 'account', params: { operation: 'login', method: 'apiKey', apiKey: 'test-private-key', home: '/other' } })).status, 400);
+  assert.equal((await action({ action: 'history', params: { id: '../../auth.json', cursor: 'x' } })).status, 400);
   assert.equal((await action({ action: 'setup', params: { codexHome: '/other', expectRevision: 'x' } })).status, 400);
   let result = await (await action({ action: 'status', params: { details: true } })).json();
   assert.equal(result.report.data.installation, 'not_installed');
   let revision = result.report.data.configuration_revision;
-  result = await (await action({ action: 'setup', params: { mode: 'mid', dryRun: true, expectRevision: revision } })).json();
+  result = await (await action({ action: 'setup', params: { mode: 'official', dryRun: true, expectRevision: revision } })).json();
   assert.equal(result.report.data.result, 'preview');
-  result = await (await action({ action: 'setup', params: { mode: 'mid', expectRevision: revision } })).json();
+  result = await (await action({ action: 'setup', params: { mode: 'official', expectRevision: revision } })).json();
   assert.equal(result.exit_code, 0, JSON.stringify(result)); assert.equal(result.report.data.restart.required, true);
-  result = await (await action({ action: 'set', params: { mode: 'low', expectRevision: revision } })).json();
+  result = await (await action({ action: 'set', params: { mode: 'cut', expectRevision: revision } })).json();
   assert.equal(result.exit_code, 1); assert.equal(result.report.errors[0].code, 'CONFIG_CHANGED');
   result = await (await action({ action: 'status' })).json(); revision = result.report.data.configuration_revision;
   result = await (await action({ action: 'restore', params: { expectRevision: revision } })).json();
   assert.equal(result.exit_code, 0); assert.equal(result.report.data.mode, null);
   assert.equal((await fetch(service.url + '/not-in-static-list')).status, 404);
+});
+
+test('provider availability is a validated models action with an optional pinned catalogue',()=>{
+ const params={verify:true,discover:true,expectRevision:'stable',expectCatalog:'a'.repeat(64)};
+ const result=actionCommand({action:'models',params},{home:'/tmp/home',project:'/tmp'});
+ assert.ok(result.argv.includes('--discover'));assert.ok(result.argv.includes('--expect-catalog='+'a'.repeat(64)));
+ for(const params of [{discover:true},{verify:true,discover:true,model:'x',effort:'high'},{verify:true,discover:true,expectCatalog:'bad'},{verify:true,discover:'true'}])assert.throws(()=>actionCommand({action:'models',params},{home:'/tmp',project:'/tmp'}));
 });

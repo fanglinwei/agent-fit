@@ -1,6 +1,6 @@
 {
   "name": "subagent-delegation",
-  "version": "0.5.0",
+  "version": "0.6.0",
   "description": "Local Codex subagent delegation profiles, safe configuration and restore.",
   "type": "module",
   "license": "MIT",

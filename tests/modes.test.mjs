@@ -2,13 +2,13 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import { safeToml, BUILTINS, ROLES, renderPayload, explainSelection, validateDefinition, resolveDefinition } from '../lib/codex.mjs';
 
-test('builtin ids are low/mid/fire and other names are not aliases', () => {
-  assert.deepEqual(BUILTINS.map(mode => mode.id), ['low', 'mid', 'fire']);
-  for (const id of ['low', 'mid', 'fire']) assert.equal(resolveDefinition(id).id, id);
-  for (const name of ['economy', 'balanced', 'performance', '经济', '适中', '性能']) {
+test('builtin ids are cut/official/high/fire and other names are not aliases', () => {
+  assert.deepEqual(BUILTINS.map(mode => mode.id), ['cut', 'official', 'high', 'fire']);
+  for (const id of ['cut', 'official', 'high', 'fire']) assert.equal(resolveDefinition(id).id, id);
+  for (const name of ['low', 'mid', 'economy', 'balanced', 'performance', '经济', '官方', '高级', '全开']) {
     assert.throws(() => resolveDefinition(name), error => error.code === 'MODE_NOT_FOUND');
   }
-  const custom = { ...resolveDefinition('mid'), id: 'custom-example', name: '我的档位', kind: 'custom' };
+  const custom = { ...resolveDefinition('official'), id: 'custom-example', name: '我的档位', kind: 'custom' };
   assert.equal(resolveDefinition(custom.id, [custom]).id, custom.id);
   assert.equal(resolveDefinition(custom.name, [custom]).id, custom.id);
 });
@@ -16,11 +16,24 @@ test('builtin ids are low/mid/fire and other names are not aliases', () => {
 test('all builtin primary/fallback tables render roles and current data consistently', async () => {
   const expected = [
     ['gpt-6-luna/high', 'gpt-6-luna/high', 'gpt-6.1-sol/medium', 'gpt-6.1-sol/high'],
-    ['gpt-6-luna/high', 'gpt-6.1-sol/medium', 'gpt-6.1-sol/high', 'gpt-6.1-sol/high'],
-    ['gpt-6-luna/high', 'gpt-6.1-sol/high', 'gpt-6-astra/low', 'gpt-6-astra/low'],
+    ['gpt-6-luna/high', 'gpt-6.1-sol/medium', 'gpt-6.1-sol/high', 'gpt-6.1-sol/xhigh'],
+    ['gpt-6-luna/max', 'gpt-6.1-sol/ultra', 'gpt-6-astra/ultra', 'gpt-6-astra/ultra'],
+    ['gpt-6-astra/ultra', 'gpt-6-astra/ultra', 'gpt-6-astra/ultra', 'gpt-6-astra/ultra'],
+  ];
+  const backups = [
+    ['gpt-6.1-sol/medium', 'gpt-6.1-sol/medium', 'gpt-6-sol/medium', 'gpt-6-sol/high'],
+    ['gpt-6.1-sol/medium', 'gpt-6-sol/medium', 'gpt-6-sol/high', 'gpt-6-sol/xhigh'],
+    ['gpt-6.1-sol/high', 'gpt-6-sol/ultra', 'gpt-6.1-sol/ultra', 'gpt-6.1-sol/ultra'],
+    [null, null, null, null],
   ];
   for (const [index, mode] of BUILTINS.entries()) {
     assert.deepEqual(Object.values(mode.levels).map(v => `${v.model}/${v.effort}`), expected[index]);
+    assert.deepEqual(Object.values(mode.levels).map(v => v.fallback ? `${v.fallback.model}/${v.fallback.effort}` : null), backups[index]);
+    for (const [level, value] of Object.entries(mode.levels)) {
+      const selection = explainSelection({ definition: mode, level });
+      assert.deepEqual(selection.fallback, value.fallback);
+      assert.deepEqual(selection.fallback_conditions, value.fallback ? mode.fallback_conditions : []);
+    }
     const { files, block } = await renderPayload('/test/home with spaces', mode);
     const current = JSON.parse(files.get('skills/subagent-delegation/references/current-mode.json'));
     assert.equal(current.id, mode.id);
@@ -44,7 +57,7 @@ test('all builtin primary/fallback tables render roles and current data consiste
 });
 
 test('role selection cannot expand original permission contract', () => {
-  const low = resolveDefinition('low');
+  const low = resolveDefinition('cut');
   const hard = explainSelection({ definition: low, level: 'L3', role: 'task_execute' });
   assert.equal(hard.dispatch_role, 'task_delegate'); assert.equal(hard.permission_contract, 'scoped_output');
   assert.equal(hard.primary.model, 'gpt-6.1-sol');
@@ -69,4 +82,18 @@ test('rendered paths are data escaped and distinct per home', async () => {
   assert.notEqual(a.block.toString(), b.block.toString());
   const data = JSON.parse(a.block.toString().split('```json\n')[1].split('\n```')[0]);
   assert.equal(data.skill, '/test/`quote<>"/skills/subagent-delegation/SKILL.md');
+});
+
+
+test('fire requires session verification and describes an unpinned user or parent fallback', () => {
+  const explained = explainSelection({ definition: resolveDefinition('fire'), level: 'L1', role: 'task_scan' });
+  assert.equal(explained.verification.required, true);
+  assert.equal(explained.verification.scope, 'session');
+  assert.equal(explained.verification.on_failure.selection, 'user_or_parent');
+  assert.equal(explained.verification.on_failure.dispatch_role, 'task_delegate');
+  assert.equal(explained.permission_contract, 'readonly_evidence');
+  assert.equal(explained.fallback, null);
+  assert.equal(explainSelection({ definition: resolveDefinition('high'), level: 'L3' }).verification, null);
+  const custom = { ...resolveDefinition('fire'), kind: 'custom', id: 'custom-test' };
+  assert.equal(explainSelection({ definition: custom, level: 'L1' }).verification, null);
 });

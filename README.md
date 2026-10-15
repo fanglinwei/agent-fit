@@ -1,14 +1,16 @@
 # Subagent Delegation
 
+此工作副本包含尚未发布的四档修改；重新安装时使用本地打包产物。
+
 为 Codex 安装可配置的子代理委派规则：根据任务难度选择模型与推理强度，明确职责、验证与失败处理。适用于研究、写作、数据分析、规划、开发与审查。
 
-- **low / mid / fire（经济 / 适中 / 性能）**：按 L1–L4 任务难度分配模型与推理强度。
+- **cut / official / high / fire（经济 / 官方 / 高级 / 全开）**：按 L1–L4 任务难度分配模型与推理强度。
 - **自定义档位**：命名自己的配置，逐级设置主模型和备用组合。
 - **CLI + 本地网页**：网页操作执行同一个命令行工具。
 - **可检查、可恢复**：查看规则与潜在覆盖，查询模型目录，撤销本工具改动。
 - **委派有边界**：独占写入、禁止递归委派、最小充分验证；备用模型与重试遵循原授权和预算。
 
-需要 **Node.js 22+** 和支持独立角色 TOML 的 Codex。当前在 macOS、Codex CLI **0.156.1** 验证配置接口；其他客户端的加载行为需要核验。
+需要 **Node.js 22+** 和支持独立角色 TOML 的 Codex。当前在 macOS、Codex CLI **0.162.1** 验证账号与模型检查接口；其他客户端的加载行为需要核验。
 
 ## 快速开始
 
@@ -16,10 +18,10 @@
 
 按“安装 → 配置 → 重启 Codex → 查询或调整”的流程使用：
 
-从 npm registry 安装并配置适中档位：
+从 npm registry 安装并配置官方档位：
 
 ```sh
-npm install -g subagent-delegation && sub-d setup --mode mid
+npm install -g subagent-delegation && sub-d setup --mode official
 ```
 
 **npm 安装本身不修改 Codex。配置部署变化后，请重启 Codex。**
@@ -28,8 +30,8 @@ npm install -g subagent-delegation && sub-d setup --mode mid
 
 ```sh
 npm pack
-npm install -g ./subagent-delegation-0.5.0.tgz
-sub-d setup --mode mid
+npm install -g ./subagent-delegation-0.6.0.tgz
+sub-d setup --mode official
 ```
 
 指定独立的配置目录，并先预览：
@@ -49,8 +51,9 @@ sub-d status --details
 sub-d mode list
 
 # 切换档位；完成后重启 Codex
-sub-d mode set low
-sub-d mode set mid
+sub-d mode set cut
+sub-d mode set official
+sub-d mode set high
 sub-d mode set fire
 
 # 查看完整定义、解释指定任务等级的选择；不调用 AI
@@ -59,6 +62,8 @@ sub-d explain --level L4 --role task_delegate
 
 # 账号与模型目录检查，不发起推理
 sub-d models check
+# 第三方供应商 Responses 可用性检查，可能消耗额度
+sub-d models check --verify --discover
 
 # 启动本地设置页；Ctrl+C 停止
 sub-d serve --open
@@ -68,16 +73,22 @@ sub-d serve --open
 
 ## 档位
 
-内置档位 ID 为 `low`（经济）、`mid`（适中，首次配置默认）、`fire`（性能），命令参数与存储值一致。
+内置档位 ID 为 `cut`（经济）、`official`（官方，首次配置默认）、`high`（高级）、`fire`（全开），命令参数与存储值一致。
 
-| 任务等级 | 经济 | 适中 | 性能 |
-| --- | --- | --- | --- |
-| L1：窄范围、容易核验 | Luna / high | Luna / high | Luna / high |
-| L2：明确目标的多步产出 | Luna / high¹ | Sol 6.1 / medium | Sol 6.1 / high |
-| L3：复杂分析或关键复核 | Sol 6.1 / medium | Sol 6.1 / high | Astra / low |
-| L4：困难推理或深层歧义 | Sol 6.1 / high | Sol 6.1 / high | Astra / low |
+| 任务等级 | cut（经济） | official（官方） | high（高级） | fire（全开，验证通过后） |
+| --- | --- | --- | --- | --- |
+| L1：窄范围、容易核验 | Luna / high | Luna / high | Luna / max | Astra / ultra |
+| L2：明确目标的多步产出 | Luna / high¹ | Sol 6.1 / medium | Sol 6.1 / ultra | Astra / ultra |
+| L3：复杂分析或关键复核 | Sol 6.1 / medium | Sol 6.1 / high | Astra / ultra | Astra / ultra |
+| L4：困难推理或深层歧义 | Sol 6.1 / high | Sol 6.1 / xhigh | Astra / ultra | Astra / ultra |
 
 模型完整 id 为 `gpt-6-luna`、`gpt-6.1-sol`、`gpt-6-astra`。这些是委派预设，**不是账号权限或能力保证**；需要修改时先复制为自定义档位。¹ 经济模式的 L2 只适合容易核验的产出，复杂部分必须提高任务等级。
+
+`official` 是依据 [OpenAI 官方建议](https://learn.chatgpt.com/docs/agent-configuration/subagents#choosing-models-and-reasoning) 制定的本地映射，官方没有固定 L1–L4 表。`high` 各模型使用最高受支持的 effort；预设写入不证明账号可调用。
+
+`fire` 每个会话首次委派前须实际验证 Astra/ultra，并核对可信运行 metadata 与当前会话上下文。模型、effort、供应商或账号变化后重验，不保存跨会话验证缓存。目录查询和口头确认不能代替验证；`models check --verify` 使用不执行工具的独立 Responses 请求，核对供应商返回的模型与推理强度。
+
+检查失败、未完成或最高组合不可用时，使用用户明确指定的模型与推理强度；未另行指定时继承父代理当前实际组合。通过 `task_delegate` 保留原职责，并核对全局子代理默认与角色覆盖；无法确认父代理组合时阻断该委派。不自动切换 high，不绕过原预算、能力和权限规则。fire 的继承备用是运行时选择，静态 fallback 为 null。
 
 任务等级与权限职责分开：
 
@@ -91,7 +102,7 @@ sub-d serve --open
 ## 自定义档位
 
 ```sh
-sub-d mode create "我的研究方案" --from mid
+sub-d mode create "我的研究方案" --from official
 sub-d mode configure "我的研究方案" \
   --level L4 --model gpt-6-astra --effort low \
   --fallback-model gpt-6.1-sol --fallback-effort high
@@ -125,7 +136,7 @@ Skill 安装于 `skills/subagent-delegation`，也可通过 `$subagent-delegatio
 - **验证充分、结果可复核**：完成直接相关的最小充分验证后返回；异常、未知退出状态或部分结果标为 `PARTIAL`，说明证据、未覆盖范围与阻塞。前提失效只阻断受影响部分，继续独立工作。
 - **备用有条件、重试有上限**：区分认证、权限、额度、临时故障和能力不足。仅在用户选择、原预算、宿主能力及原验收允许时使用备用；写入任务先确认旧子代理停止。每任务最多三次委派，同一组合最多额外一次，累计重试等待不超过 30 秒；不静默替换用户强制指定的模型。
 
-规则由 Codex 读取并遵循，实际生效取决于宿主加载与运行行为；用户和项目权限规则继续适用。`models check` 查询账号与模型目录，实际调用权限和模型身份需要可信运行证据确认。模型检查的完整边界见[使用说明](docs/usage.md#模型检查)。
+规则由 Codex 读取并遵循，实际生效取决于宿主加载与运行行为；用户和项目权限规则继续适用。`models check` 查询账号与模型目录，实际调用权限和模型身份需要可信运行证据确认。第三方供应商从自身 `/models` 获取候选，再通过自身 `/responses` 验证；网页在批量调用前确认数量与费用，结果按配置目录保存。模型检查的完整边界见[使用说明](docs/usage.md#模型检查)。
 
 ## 更多文档
 

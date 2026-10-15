@@ -17,11 +17,11 @@ mode configure MODE --level L1|L2|L3|L4 --model MODEL --effort EFFORT
 mode configure MODE --definition-stdin [--dry-run]
 status [--details] [--project PATH]
 explain --level L1|L2|L3|L4 [--mode MODE] [--role ROLE]
-models check [--verify] [--model MODEL --effort EFFORT]
+models check [--verify] [--discover] [--expect-catalog HASH] [--model MODEL --effort EFFORT]
 restore [--dry-run]
 serve [--port PORT] [--open]
 
-内置档位：low（经济）、mid（适中，首次配置默认）、fire（性能）。
+内置档位：cut（经济）、official（官方，首次配置默认）、high（高级）、fire（全开）。
 省略 --agent 时默认使用 codex；也可显式指定 --agent codex。
 目标目录支持 --codex-home PATH；默认 CODEX_HOME 或 ~/.codex。
 查询及写命令支持 --json；写命令支持 --expect-revision REV。
@@ -29,8 +29,8 @@ serve [--port PORT] [--open]
 配置部署改变后，请重启 Codex。目录检查不证明模型调用权限。
 完整说明：https://github.com/fanglinwei/subagent-delegation/blob/main/docs/usage.md`;
 
-const strings = ['agent', 'codex-home', 'mode', 'from', 'level', 'model', 'effort', 'fallback-model', 'fallback-effort', 'expect-revision', 'role', 'project', 'port'];
-const booleans = ['dry-run', 'json', 'details', 'clear-fallback', 'definition-stdin', 'verify', 'open', 'help', 'version'];
+const strings = ['agent', 'codex-home', 'mode', 'from', 'level', 'model', 'effort', 'fallback-model', 'fallback-effort', 'expect-revision', 'role', 'project', 'port', 'expect-catalog'];
+const booleans = ['dry-run', 'json', 'details', 'clear-fallback', 'definition-stdin', 'verify', 'discover', 'open', 'help', 'version'];
 const optionTypes = Object.fromEntries([...strings.map(k => [k, { type: 'string' }]), ...booleans.map(k => [k, { type: 'boolean' }])]);
 const common = ['agent', 'codex-home', 'json'];
 const write = [...common, 'dry-run', 'expect-revision'];
@@ -38,7 +38,7 @@ const commands = {
   setup: [...write, 'mode'], set: write, list: common, show: common,
   create: [...write, 'from'], configure: [...write, 'level', 'model', 'effort', 'fallback-model', 'fallback-effort', 'clear-fallback', 'definition-stdin'],
   status: [...common, 'details', 'project'], explain: [...common, 'level', 'mode', 'role'],
-  models: [...common, 'verify', 'model', 'effort'], restore: write,
+  models: [...common, 'discover', 'expect-catalog', 'verify', 'model', 'effort', 'expect-revision'], restore: write,
   serve: ['agent', 'codex-home', 'port', 'open'],
 };
 
@@ -73,6 +73,7 @@ export function parseCommand(argv) {
   if (values.role !== undefined && !Object.hasOwn(ROLES, values.role)) throw argumentError('委派角色无效。');
   if (action === 'explain' && !values.level) throw argumentError('explain 需要 --level。');
   if (action === 'models' && Boolean(values.model) !== Boolean(values.effort)) throw argumentError('--model 与 --effort 必须成对。');
+  if (action === 'models' && (values.discover && (!values.verify || values.model) || values['expect-catalog'] && (!values.discover || !/^[a-f0-9]{64}$/.test(values['expect-catalog'])))) throw argumentError('--discover 需要 --verify，且不能同时指定模型；目录版本须为 SHA-256。');
   if (action === 'models' && values.model) validatePair({ model: values.model, effort: values.effort });
   if (action === 'configure') {
     const fields = ['level', 'model', 'effort', 'fallback-model', 'fallback-effort', 'clear-fallback'];
@@ -123,9 +124,9 @@ function emit(data, errors, json) {
 
 function renderHuman(data) {
   const lines = [];
-  const pair = value => value ? `${value.model} / ${value.effort}` : '无';
+  const pair = value => value ? `${value.model} / ${value.effort ?? '供应商默认参数'}` : '无';
   const levels = definition => {
-    for (const [level, value] of Object.entries(definition.levels || {})) lines.push(`${level}  ${pair(value)}  备用：${pair(value.fallback)}`);
+    for (const [level, value] of Object.entries(definition.levels || {})) lines.push(`${level}  ${pair(value)}  备用：${definition.kind === 'builtin' && definition.id === 'fire' ? '用户指定，否则继承父代理' : pair(value.fallback)}`);
   };
   if (data.installation) {
     lines.push(`Codex home：${data.home}`, `工具 ${data.cli_version} · 配置 ${data.configuration_version || '未安装'}`, `状态：${data.installation} · 完整性：${data.integrity}`, `已配置档位：${data.mode?.name || '无'}${data.mode ? ` (${data.mode.id})` : ''}`, `恢复基线：${data.restoration.status}`);
@@ -135,6 +136,7 @@ function renderHuman(data) {
       for (const role of data.roles) lines.push(`${role.name}  ${role.configured_model || '未固定'} / ${role.configured_effort || '未固定'}`);
       lines.push(...data.rules.summary.map(rule => `- ${rule}`), '', '相关配置与检查范围：', ...JSON.stringify({ related_config: data.related_config, inspection: data.inspection }, null, 2).split('\n'));
     }
+    if (data.verification?.required) lines.push('fire：每个会话首次委派前须实际验证；失败时使用用户指定组合，否则继承父代理模型与推理强度。');
     lines.push(...data.warnings);
   } else if (data.result) {
     lines.push(`操作：${data.action} · ${data.result} · ${data.configuration_status}`, `Codex home：${data.home}`, `档位：${data.mode?.name || '无'} · 变化文件：${data.changed_files?.length || 0}`);
@@ -150,9 +152,13 @@ function renderHuman(data) {
     lines.push(`${data.definition.name} (${data.definition.id}) · ${data.active ? '当前已配置' : '定义预览'}`, `来源：${data.source} · 定义版本：${data.definition_version || VERSION}`); levels(data.definition);
   } else if (data.dispatch_role) {
     lines.push(`${data.mode_name} · ${data.level}`, `主组合：${pair(data.primary)} · 备用：${pair(data.fallback)}`, `职责：${data.requested_role} → 委派角色：${data.dispatch_role}`, `权限契约：${data.permission_contract}`, `原因：${data.reason_codes.join('、')}`);
+    if (data.verification?.required) lines.push('先完成本会话实际验证；失败时使用 task_delegate，采用用户指定组合，否则继承父代理模型与推理强度。');
   } else if (data.catalog) {
     lines.push(`账号状态：${data.account.status} · 目录：${data.catalog.status} (${data.catalog.models.length} 个模型)`);
+    if (data.catalog.source) lines.push(`目录来源：${data.catalog.source}`);
+    if (data.availability) lines.push(`可调用：${data.availability.available} · 不可用：${data.availability.unavailable} · 未确认：${data.availability.unconfirmed}`);
     for (const value of data.checked_pairs) lines.push(`${pair(value)} · 参数：${value.parameter_support} · 调用权限：${value.access} · ${value.reason_code}`);
+    if (data.history) lines.push(data.history.status === 'saved' ? `检查记录已保存：${data.history.id}` : '检查结果未保存：MODEL_HISTORY_UNAVAILABLE；请核对记录目录权限。');
   } else lines.push(JSON.stringify(data, null, 2));
   for (const item of data.diagnostics || []) lines.push(`${item.code} [${item.status}] ${item.message}`);
   if (data.runtime_verification) lines.push(`运行生效：${data.runtime_verification}`);
@@ -206,16 +212,16 @@ async function main() {
       }
       data = { configuration_revision: shown.configuration_revision, diagnostics: shown.diagnostics, source: shown.source, definition_version: shown.definition_version, ...explainSelection({ definition: shown.definition, level: options.level, role: options.role || 'task_delegate' }) };
     } else if (action === 'models') {
-      const { checkAccountModels } = await import('../lib/models.mjs');
-      data = await checkAccountModels({ home, verify: Boolean(options.verify), target: options.model ? { model: options.model, effort: options.effort } : undefined });
+      const { recordedModelCheck } = await import('../lib/model-history.mjs');
+      data = await recordedModelCheck({ home, verify: Boolean(options.verify), discover: Boolean(options.discover), expectCatalog: options.expectCatalog, target: options.model ? { model: options.model, effort: options.effort } : undefined, expectRevision: options.expectRevision });
       code = data.exit_code || 0; delete data.exit_code;
     } else {
       data = await installer.mutate(home, action, options);
       const target = data.post_check_target; delete data.post_check_target;
       if (target && data.result === 'applied') {
         try {
-          const { checkAccountModels } = await import('../lib/models.mjs');
-          const checked = await checkAccountModels({ home, selection: target });
+          const { recordedModelCheck } = await import('../lib/model-history.mjs');
+          const checked = await recordedModelCheck({ home, selection: target });
           data.post_check = { ...checked, status: checked.exit_code === 3 ? 'failed' : checked.exit_code ? 'incomplete' : 'passed' };
           delete data.post_check.exit_code;
         } catch { data.post_check = { status: 'failed', source_revision: data.revision_after, diagnostics: [{ code: 'MODEL_CHECK_FAILED', status: 'unknown', message: '配置已写入，账号目录检查未完成。' }] }; }

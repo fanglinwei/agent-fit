@@ -9,7 +9,7 @@
   ],
   "modes": [
     {
-      "id": "low",
+      "id": "cut",
       "name": "经济",
       "levels": {
         "L1": {
@@ -31,18 +31,24 @@
         "L3": {
           "model": "gpt-6.1-sol",
           "effort": "medium",
-          "fallback": null
+          "fallback": {
+            "model": "gpt-6-sol",
+            "effort": "medium"
+          }
         },
         "L4": {
           "model": "gpt-6.1-sol",
           "effort": "high",
-          "fallback": null
+          "fallback": {
+            "model": "gpt-6-sol",
+            "effort": "high"
+          }
         }
       }
     },
     {
-      "id": "mid",
-      "name": "适中",
+      "id": "official",
+      "name": "官方",
       "levels": {
         "L1": {
           "model": "gpt-6-luna",
@@ -55,52 +61,90 @@
         "L2": {
           "model": "gpt-6.1-sol",
           "effort": "medium",
-          "fallback": null
+          "fallback": {
+            "model": "gpt-6-sol",
+            "effort": "medium"
+          }
         },
         "L3": {
           "model": "gpt-6.1-sol",
           "effort": "high",
-          "fallback": null
+          "fallback": {
+            "model": "gpt-6-sol",
+            "effort": "high"
+          }
         },
         "L4": {
           "model": "gpt-6.1-sol",
-          "effort": "high",
-          "fallback": null
+          "effort": "xhigh",
+          "fallback": {
+            "model": "gpt-6-sol",
+            "effort": "xhigh"
+          }
+        }
+      }
+    },
+    {
+      "id": "high",
+      "name": "高级",
+      "levels": {
+        "L1": {
+          "model": "gpt-6-luna",
+          "effort": "max",
+          "fallback": {
+            "model": "gpt-6.1-sol",
+            "effort": "high"
+          }
+        },
+        "L2": {
+          "model": "gpt-6.1-sol",
+          "effort": "ultra",
+          "fallback": {
+            "model": "gpt-6-sol",
+            "effort": "ultra"
+          }
+        },
+        "L3": {
+          "model": "gpt-6-astra",
+          "effort": "ultra",
+          "fallback": {
+            "model": "gpt-6.1-sol",
+            "effort": "ultra"
+          }
+        },
+        "L4": {
+          "model": "gpt-6-astra",
+          "effort": "ultra",
+          "fallback": {
+            "model": "gpt-6.1-sol",
+            "effort": "ultra"
+          }
         }
       }
     },
     {
       "id": "fire",
-      "name": "性能",
+      "name": "全开",
       "levels": {
         "L1": {
-          "model": "gpt-6-luna",
-          "effort": "high",
-          "fallback": {
-            "model": "gpt-6.1-sol",
-            "effort": "medium"
-          }
+          "model": "gpt-6-astra",
+          "effort": "ultra",
+          "fallback": null
         },
         "L2": {
-          "model": "gpt-6.1-sol",
-          "effort": "high",
+          "model": "gpt-6-astra",
+          "effort": "ultra",
           "fallback": null
         },
         "L3": {
           "model": "gpt-6-astra",
-          "effort": "low",
-          "fallback": {
-            "model": "gpt-6.1-sol",
-            "effort": "high"
-          }
+          "effort": "ultra",
+          "fallback": null
         },
         "L4": {
           "model": "gpt-6-astra",
-          "effort": "low",
-          "fallback": {
-            "model": "gpt-6.1-sol",
-            "effort": "high"
-          }
+          "effort": "ultra",
+          "fallback": null
         }
       }
     }

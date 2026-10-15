@@ -226,8 +226,63 @@ main { max-width: 1360px; margin: auto; padding: 38px 36px 0; }
 .verify-options label { display: flex; align-items: center; gap: 9px; min-height: 40px; font-weight: 400; margin: 0; }
 .verify-options legend { margin-bottom: 5px; }
 #verify-pair { grid-template-columns: minmax(0, 1.4fr) minmax(0, 1fr); margin-top: 16px; }
-#models-time { margin-top: 20px; }
-#models-result { margin-top: 16px; }
+#models-time { margin: 8px 0 22px; }
+.model-status { display: flex; flex-wrap: wrap; gap: 10px; }
+.account-surface { margin-bottom: 22px; }
+.account-actions { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 18px; }
+.account-actions button, #account-refresh, #history-refresh { font-size: 12px; }
+#account-login:not(:empty) { margin-top: 18px; padding-top: 14px; border-top: 1px solid var(--line); font-size: 13px; }
+.auth-link { display: inline-block; padding: 8px 0; margin-right: 16px; }
+.device-code { display: inline-block; margin-left: 8px; padding: 3px 8px; background: var(--edited); font-size: 16px; font-weight: 600; }
+.model-history { margin-top: 22px; }
+.history-record { border-top: 1px solid var(--line); margin-top: 12px; }
+.history-record summary { font-size: 13px; padding: 12px 0; }
+.history-record li { font-size: 12px; overflow-wrap: anywhere; }
+.history-record button { font-size: 12px; margin-top: 12px; }
+#models-auth-note { margin-bottom: 14px; max-width: 90ch; }
+.model-status span { padding: 5px 10px; border: 1px solid var(--line); border-radius: 6px; background: var(--surface); font-size: 12px; }
+.models-workspace { display: grid; grid-template-columns: minmax(0, 1fr) minmax(290px, .68fr); gap: 22px; align-items: start; }
+.models-workspace > .surface { margin-top: 0; }
+.models-workspace #verify-form { position: sticky; top: 22px; border-top: 3px solid var(--blue); }
+.models-workspace #verify-pair { grid-template-columns: 1fr; gap: 14px; }
+.catalogue-heading { display: flex; flex-wrap: wrap; align-items: baseline; justify-content: space-between; gap: 8px; }
+.catalogue-heading .muted { font-size: 12px; }
+.model-search { margin-top: 20px; }
+#catalog-count { margin-top: 12px; font-size: 12px; }
+#catalog-list { max-height: 520px; overflow-y: auto; padding: 6px; }
+.catalog-model { display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 14px; align-items: center; border-bottom: 1px solid var(--line); padding: 18px 0; }
+.catalog-model h3 { font-size: 14px; }
+.catalog-model .path { margin-top: 3px; font-size: 12px; }
+.catalog-model button { font-size: 12px; }
+.effort-tags, .effort-options { display: flex; gap: 6px; flex-wrap: wrap; margin-top: 10px; }
+.effort-tags span { padding: 2px 7px; border-radius: 4px; background: var(--canvas); font-size: 11px; color: var(--muted); }
+.effort-options button { min-height: 36px; padding: 5px 10px; font-size: 12px; }
+.effort-options button[aria-pressed=true] { color: var(--blue); background: var(--edited); border-color: var(--blue); }
+#verify-support { margin-top: 12px; }
+#verify-summary { margin-top: 20px; }
+#verify-summary h3 { font-size: 13px; }
+.verify-combinations { list-style: none; padding: 0; }
+.verify-combinations li { padding: 9px 0; border-bottom: 1px solid var(--line); overflow-wrap: anywhere; font-size: 13px; }
+#verify-form > button { width: 100%; }
+.model-empty { padding: 26px 0; color: var(--muted); font-size: 13px; }
+.model-outcome { border-left: 3px solid var(--warning); padding: 14px 18px; margin-bottom: 22px; background: var(--surface); font-size: 13px; max-width: 80ch; }
+.model-outcome h3 { font-size: 14px; margin-bottom: 5px; }
+#models-result { margin-top: 20px; }
+#models-result > p { max-width: 72ch; font-size: 12px; }
+.checked-model { padding: 12px 0; border-top: 1px solid var(--line); }
+.checked-model dl { grid-template-columns: minmax(80px, .6fr) minmax(0, 1fr); gap: 5px 12px; margin: 8px 0; font-size: 12px; }
+.checked-model dt { font-size: 12px; }
+@media (max-width: 1100px) {
+  .models-workspace { grid-template-columns: 1fr; }
+  .models-workspace #verify-form { position: static; }
+  .model-catalogue { display: flex; flex-direction: column; }
+  #catalog-list { max-height: 420px; }
+}
+@media (max-width: 767px) {
+  #models > .section-heading { flex-direction: column; gap: 14px; }
+  .catalog-model { gap: 8px; }
+  .checked-model dd { margin-bottom: 0; }
+}
 .table-wrap { overflow-x: auto; margin-top: 22px; }
 table { border-collapse: collapse; width: 100%; font-size: 12px; text-align: left; }
 caption { text-align: left; font-weight: 600; margin-bottom: 12px; }

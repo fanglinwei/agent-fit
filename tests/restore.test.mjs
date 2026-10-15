@@ -37,7 +37,7 @@ test('first baseline restores exact AGENTS bytes and original mode across multip
   for (const original of [null, '', 'user', 'user\n', 'user\r\n', 'user\n\n']) {
     const { home } = await fixture(); await fs.mkdir(home);
     if (original !== null) { await fs.writeFile(path.join(home, 'AGENTS.md'), original); await fs.chmod(path.join(home, 'AGENTS.md'), 0o640); }
-    const before = await tree(home); await mutate(home, 'setup'); await mutate(home, 'set', { mode: 'low' }); await mutate(home, 'set', { mode: 'fire' });
+    const before = await tree(home); await mutate(home, 'setup'); await mutate(home, 'set', { mode: 'cut' }); await mutate(home, 'set', { mode: 'fire' });
     const preview = await mutate(home, 'restore', { dryRun: true }); assert.equal(preview.result, 'preview'); assert.ok(preview.changed_files.includes('.subagent-delegation/restore.json'));
     const report = await mutate(home, 'restore'); assert.equal(report.result, 'applied'); assert.equal(report.restart.required, true); assert.equal(report.post_check.status, 'not_requested'); assert.match(report.restart.message, /原配置已恢复/);
     assert.deepEqual(await tree(home), before); assert.equal((await statusReport(home)).installation, 'not_installed'); assert.equal(report.revision_after, (await readSnapshot(home)).configuration_revision);
@@ -47,7 +47,7 @@ test('first baseline restores exact AGENTS bytes and original mode across multip
 
 test('existing same public assets and rule block are restored with their original permissions', async () => {
   const { home } = await fixture(); await fs.mkdir(path.join(home, 'agents'), { recursive: true });
-  const payload = await renderPayload(resolveHome(home), resolveDefinition('mid'));
+  const payload = await renderPayload(resolveHome(home), resolveDefinition('official'));
   const role = 'agents/task-scan.toml'; await fs.writeFile(path.join(home, role), payload.files.get(role)); await fs.chmod(path.join(home, role), 0o644);
   await fs.writeFile(path.join(home, 'AGENTS.md'), Buffer.concat([Buffer.from('user\n\n'), payload.block, Buffer.from('\nOriginal suffix\n')])); await fs.chmod(path.join(home, 'AGENTS.md'), 0o640);
   const before = await tree(home); await mutate(home, 'setup'); await mutate(home, 'set', { mode: 'fire' }); await mutate(home, 'restore'); assert.deepEqual(await tree(home), before);
@@ -85,7 +85,7 @@ test('missing, corrupt or chmod-changed baseline blocks restore and every mutati
     async home => fs.chmod(path.join(home, '.subagent-delegation/restore.json'), 0o644),
   ]) {
     const { home } = await fixture(); await mutate(home, 'setup'); await edit(home); const before = await tree(home);
-    for (const action of ['restore', 'setup', 'set', 'create', 'configure']) await assert.rejects(mutate(home, action, { mode: 'low', name: 'test' }), error => error.code === 'RESTORE_METADATA_INVALID');
+    for (const action of ['restore', 'setup', 'set', 'create', 'configure']) await assert.rejects(mutate(home, action, { mode: 'cut', name: 'test' }), error => error.code === 'RESTORE_METADATA_INVALID');
     assert.deepEqual(await tree(home), before);
   }
 });
@@ -149,7 +149,7 @@ test('restore deletes metadata after managed files, status sees BUSY during tran
 test('restore and reinstall changes instance id to defeat ABA stale revisions', async () => {
   const { home } = await fixture(); await mutate(home, 'setup'); const first = await readSnapshot(home); await mutate(home, 'restore'); await mutate(home, 'setup'); const second = await readSnapshot(home);
   assert.notEqual(first.state.instance_id, second.state.instance_id); assert.notEqual(first.configuration_revision, second.configuration_revision);
-  await assert.rejects(mutate(home, 'set', { mode: 'low', expectRevision: first.configuration_revision }), error => error.code === 'CONFIG_CHANGED');
+  await assert.rejects(mutate(home, 'set', { mode: 'cut', expectRevision: first.configuration_revision }), error => error.code === 'CONFIG_CHANGED');
 });
 
 test('new lock after committed restore preserves success and removes signal listeners even when final observation is BUSY', async () => {
