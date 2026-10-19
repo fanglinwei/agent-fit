@@ -1,0 +1,118 @@
+{
+  "schema_version": 1,
+  "acceptance": "action、完整组合、计数和原职责契约一致；理由须表达适用规则；blocked 不提供可派发组合/角色。表述无需逐字一致。",
+  "cases": [
+    {
+      "id": "F01",
+      "action": "blocked",
+      "primary_or_fallback": null,
+      "delegations_used_after": 1,
+      "allowed_dispatch_roles": [],
+      "basis": "相邻等级没有不同组合，且没有有用的重试理由"
+    },
+    {
+      "id": "F02",
+      "action": "blocked",
+      "primary_or_fallback": null,
+      "delegations_used_after": 3,
+      "allowed_dispatch_roles": [],
+      "basis": "拆分不重置三次总预算"
+    },
+    {
+      "id": "F03",
+      "action": "blocked",
+      "primary_or_fallback": null,
+      "delegations_used_after": 1,
+      "allowed_dispatch_roles": [],
+      "basis": "停止状态未知不得建立第二个同范围写入者"
+    },
+    {
+      "id": "F04",
+      "action": "blocked",
+      "primary_or_fallback": null,
+      "delegations_used_after": 1,
+      "allowed_dispatch_roles": [],
+      "basis": "认证故障不切备用"
+    },
+    {
+      "id": "F05",
+      "action": "blocked",
+      "primary_or_fallback": null,
+      "delegations_used_after": 1,
+      "allowed_dispatch_roles": [],
+      "basis": "额度限制不以备用绕过"
+    },
+    {
+      "id": "F06",
+      "action": "blocked",
+      "primary_or_fallback": null,
+      "delegations_used_after": 1,
+      "allowed_dispatch_roles": [],
+      "basis": "无法分类不自动重试或切换"
+    },
+    {
+      "id": "F07",
+      "action": "use_fallback",
+      "primary_or_fallback": {
+        "model": "gpt-6-sol",
+        "effort": "medium"
+      },
+      "delegations_used_after": 2,
+      "allowed_dispatch_roles": [
+        "task_delegate"
+      ],
+      "basis": "自定义已选择且配置备用时复用默认接续规则"
+    },
+    {
+      "id": "F08",
+      "action": "blocked",
+      "primary_or_fallback": null,
+      "delegations_used_after": 1,
+      "allowed_dispatch_roles": [],
+      "basis": "无候选时不借其他档位或 fire 继承规则"
+    },
+    {
+      "id": "F09",
+      "action": "retry_primary",
+      "primary_or_fallback": {
+        "model": "gpt-6.1-sol",
+        "effort": "medium"
+      },
+      "delegations_used_after": 2,
+      "allowed_dispatch_roles": [
+        "task_execute",
+        "task_delegate"
+      ],
+      "basis": "具体方法修正允许有限重试原组合"
+    },
+    {
+      "id": "F10",
+      "action": "upgrade",
+      "primary_or_fallback": {
+        "model": "gpt-6.1-sol",
+        "effort": "high"
+      },
+      "delegations_used_after": 2,
+      "allowed_dispatch_roles": [
+        "task_delegate"
+      ],
+      "basis": "质量失败选择更高等级主组合而非本级可用性备用"
+    },
+    {
+      "id": "F11",
+      "action": "blocked",
+      "primary_or_fallback": null,
+      "delegations_used_after": 1,
+      "allowed_dispatch_roles": [],
+      "basis": "明确模型锁定优先于备用"
+    },
+    {
+      "id": "F12",
+      "action": "blocked",
+      "primary_or_fallback": null,
+      "delegations_used_after": 1,
+      "allowed_dispatch_roles": [],
+      "basis": "不能提前重试或通过切备用规避三十秒等待上限"
+    }
+  ]
+}

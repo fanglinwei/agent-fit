@@ -1,0 +1,6 @@
+interface:
+  display_name: "Agent Fit"
+  short_description: "Choose subagent models by task difficulty, scope, and budget"
+  default_prompt: "Use $agent-fit to choose models and reasoning effort for authorized delegation while respecting my model preferences and budget."
+policy:
+  allow_implicit_invocation: true

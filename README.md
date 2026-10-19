@@ -1,138 +1,147 @@
-# Subagent Delegation
+# Agent Fit
 
-为 Codex 安装可配置的子代理委派规则：根据任务难度选择模型与推理强度，明确职责、验证与失败处理。适用于研究、写作、数据分析、规划、开发与审查。
+**为 Codex 子任务匹配模型与推理强度。**
 
-- **low / mid / fire（经济 / 适中 / 性能）**：按 L1–L4 任务难度分配模型与推理强度。
-- **自定义档位**：命名自己的配置，逐级设置主模型和备用组合。
-- **CLI + 本地网页**：网页操作执行同一个命令行工具。
-- **可检查、可恢复**：查看规则与潜在覆盖，查询模型目录，撤销本工具改动。
-- **委派有边界**：独占写入、禁止递归委派、最小充分验证；备用模型与重试遵循原授权和预算。
+Agent Fit 将任务复杂度、模型档位和委派职责放进一套可查询、可配置、可恢复的规则中。先判断是否值得委派，再为需要委派的任务选择模型、推理强度和备用组合，适用于研究、写作、数据分析、规划、开发与审查。
 
-需要 **Node.js 22+** 和支持独立角色 TOML 的 Codex。当前在 macOS、Codex CLI **0.156.1** 验证配置接口；其他客户端的加载行为需要核验。
+[快速开始](#快速开始) · [四种档位](#四种档位) · [作用域](#按会话项目或全局配置) · [完整文档](docs/usage.md) · [更新记录](https://github.com/fanglinwei/agent-fit/releases)
+
+## 功能特色
+
+- **四种资源策略**：`cut / official / high / fire`，按 L1–L4 的推理需求配置模型与 effort；也可复制成自己的档位，设置每级主组合和备用。
+- **同级任务候选**：在复杂度等级内区分机械处理、有界扫描、深度处理、复杂推理等任务，查询对应的完整组合；任务类型与委派职责分别配置。
+- **会话、项目、全局三层作用域**：优先级为会话 > 项目 > 全局。聊天切换默认仅影响当前聊天，项目按 Git worktree 隔离，已开始任务沿用原快照。
+- **CLI 与本地配置页面**：查看和编辑档位、浏览委派路由与选择依据、管理账号授权、预览和执行恢复。网页操作复用 CLI，只监听 `127.0.0.1`。
+- **配置与模型检测分开**：安装、切档和保存配置只处理本地文件。需要时手动查询目录或验证模型，网页检测前确认主组合和费用。
+- **可检查、可恢复**：提供状态诊断、职责核对、配置冲突保护及首次安装前的恢复基线；保留无关配置和管理区块之外的修改。
+
+当前面向 **Codex**，需要 **Node.js 22+** 和支持独立角色 TOML 的 Codex 客户端。已在 macOS 与 Codex CLI 0.162.1 验证相关配置和账号接口，其他环境的验证范围见[实施验收记录](docs/implementation-review.md)。项目处于内测阶段，只处理当前格式与版本的配置。
 
 ## 快速开始
 
-终端命令为 `sub-d`，npm 包名为 `subagent-delegation`。
-
-按“安装 → 配置 → 重启 Codex → 查询或调整”的流程使用：
-
-从 npm registry 安装并配置适中档位：
+安装命令行工具，预览并应用官方档位：
 
 ```sh
-npm install -g subagent-delegation && sub-d setup --mode mid
+npm install -g agent-fit
+agent-fit setup --mode official --dry-run
+agent-fit setup --mode official
 ```
 
-**npm 安装本身不修改 Codex。配置部署变化后，请重启 Codex。**
+**首次配置完成后重启 Codex。** 安装 npm 包本身不会修改 Codex；`setup` 才会写入 Skill、四个委派角色、AGENTS 管理区块和档位数据。默认目标为 `CODEX_HOME` 或 `~/.codex`，可通过 `--codex-home "/path/to/codex-home"` 指定独立目录。
 
-也可在项目根目录构建并安装本地包：
+打开本地配置页面：
 
 ```sh
-npm pack
-npm install -g ./subagent-delegation-0.5.0.tgz
-sub-d setup --mode mid
+agent-fit serve --open
 ```
 
-指定独立的配置目录，并先预览：
+页面包含**档位配置、委派规则、账号配置、恢复**。委派规则页按等级展示基线与任务候选，点击可查看选择依据和备用条件；预览其他档位不会切换当前配置。编辑先成为草稿，保存或应用时才写入。
 
-```sh
-sub-d setup --codex-home "/path/to/codex-home" --dry-run
-sub-d setup --codex-home "/path/to/codex-home"
-```
+日常全局、项目和会话切档，以及模型与 effort 调整无需重启；后续新任务读取新选择。更新基础 Skill、AGENTS 或角色职责，以及恢复原配置后仍需重启。
 
-默认目标为 `CODEX_HOME` 或 `~/.codex`，`--codex-home` 优先。当前仅支持 Codex，日常命令可省略 `--agent codex`。
+## 四种档位
 
-## 日常使用
-
-```sh
-# 查看已配置档位、角色、规则与覆盖诊断
-sub-d status --details
-sub-d mode list
-
-# 切换档位；完成后重启 Codex
-sub-d mode set low
-sub-d mode set mid
-sub-d mode set fire
-
-# 查看完整定义、解释指定任务等级的选择；不调用 AI
-sub-d mode show fire
-sub-d explain --level L4 --role task_delegate
-
-# 账号与模型目录检查，不发起推理
-sub-d models check
-
-# 启动本地设置页；Ctrl+C 停止
-sub-d serve --open
-```
-
-网页提供档位配置、委派规则、模型检查和恢复四个页面，只监听 `127.0.0.1`，绑定启动时的 Codex home。编辑先成为草稿，点击保存或应用后才执行对应 CLI 命令；配置版本变化时拒绝旧表单写入。更换目标目录需重新启动服务。
-
-## 档位
-
-内置档位 ID 为 `low`（经济）、`mid`（适中，首次配置默认）、`fire`（性能），命令参数与存储值一致。
-
-| 任务等级 | 经济 | 适中 | 性能 |
-| --- | --- | --- | --- |
-| L1：窄范围、容易核验 | Luna / high | Luna / high | Luna / high |
-| L2：明确目标的多步产出 | Luna / high¹ | Sol 6.1 / medium | Sol 6.1 / high |
-| L3：复杂分析或关键复核 | Sol 6.1 / medium | Sol 6.1 / high | Astra / low |
-| L4：困难推理或深层歧义 | Sol 6.1 / high | Sol 6.1 / high | Astra / low |
-
-模型完整 id 为 `gpt-6-luna`、`gpt-6.1-sol`、`gpt-6-astra`。这些是委派预设，**不是账号权限或能力保证**；需要修改时先复制为自定义档位。¹ 经济模式的 L2 只适合容易核验的产出，复杂部分必须提高任务等级。
-
-任务等级与权限职责分开：
-
-| 角色 | 职责与模型配置 |
+| 档位 | 使用方式 |
 | --- | --- |
-| `task_scan` | 只读取证，固定为当前档位的 L1 组合 |
-| `task_execute` | 独占范围内执行或产出，固定为 L2 组合 |
-| `task_review` | 独立复核，固定为 L3 组合 |
-| `task_delegate` | 不固定模型或推理强度，用于 L4、用户指定、继承要求或固定组合不匹配，保留原职责 |
+| `cut` · 经济 | 以较轻组合处理容易核验的任务，复杂部分选择相应等级或任务候选 |
+| `official` · 官方 | 首次配置默认档位；依据官方建议制定的本地映射 |
+| `high` · 高级 | 使用预设模型的最高受支持推理强度 |
+| `fire` · 全开 | 各等级使用 Astra / ultra，委派前须通过当前会话的实际验证 |
+
+```sh
+agent-fit mode list
+agent-fit mode show official
+agent-fit mode set cut
+agent-fit status --details
+```
+
+L1–L4 表示任务的推理需求：从方法明确的执行，到有边界的局部推理、复杂约束权衡和高不确定性推理。模型与 effort 使用档位中保存的完整组合；相邻等级可以共用组合。完整模型表与分级边界见[使用说明](docs/usage.md#任务等级与委派职责)。`official` 是本项目的预设名称，官方没有固定的 L1–L4 对照表。
+
+### 查询同级任务候选
+
+```sh
+# 确定性机械任务
+agent-fit explain --level L1 --task mechanical --role task_execute --json
+
+# 有界扫描与复杂推理
+agent-fit explain --level L1 --task scan --role task_review --json
+agent-fit explain --level L3 --task reasoning --role task_execute --json
+```
+
+`explain` 只查询配置，不调用模型或创建子代理。复杂度、任务类型和职责由主代理判断；返回值包含主组合、备用、权限契约及配置来源。未配置的显式候选会报错，不从其他档位补值。支持的类型和编辑方法见[同级任务候选](docs/usage.md#同级任务候选)。
+
+明确选择 `high / fire` 即授权其展示的最高强度组合，预算和宿主支持仍需满足；`fire` 另外要求当前会话的实际调用和可信身份验证。预览档位不构成选择，模型目录列出也不证明实际可调用。
+
+## 按会话、项目或全局配置
+
+```sh
+# CLI 默认操作全局；此处显式写出作用域
+agent-fit mode set official --scope global
+
+# 仅对指定项目生效
+agent-fit mode set cut --scope project --project "/path/to/project"
+
+# 恢复项目对全局档位的继承
+agent-fit mode clear --scope project --project "/path/to/project"
+```
+
+在 Codex 聊天中用 `$agent-fit` 要求切档时，默认只修改当前会话；明确要求后才修改项目或全局。CLI 操作会话时须绑定目标项目与聊天线程，具体参数见[作用域说明](docs/usage.md#全局项目与会话)。项目和会话配置保存在绑定 home 中，不写入项目仓库。
+
+每次委派保存完整档位快照，重试、质量升级和故障备用沿用该快照。切档影响后续新任务，不改变正在执行的任务，也不重置委派次数。
 
 ## 自定义档位
 
+复制现有档位，再调整所需等级：
+
 ```sh
-sub-d mode create "我的研究方案" --from mid
-sub-d mode configure "我的研究方案" \
-  --level L4 --model gpt-6-astra --effort low \
+agent-fit mode create "我的研究方案" --from official
+agent-fit mode configure "我的研究方案" \
+  --level L3 --model gpt-6-astra --effort low \
   --fallback-model gpt-6.1-sol --fallback-effort high
-sub-d mode set "我的研究方案"
+agent-fit mode set "我的研究方案"
 ```
 
-自定义档位以来源档位的完整快照创建，独立保存 L1–L4 的主模型、推理强度和备用组合，沿用相同的委派权限规则。修改内置方案时先复制为自定义档位。完整定义批量配置见[使用说明](docs/usage.md#自定义档位)。
+复制包含四级基线、同级任务候选及各自备用，不自动激活。CLI 可修改单级基线；网页或完整 JSON 可编辑候选。局部编辑继承来的自定义档位会生成局部副本，避免覆盖其他作用域。详见[自定义档位](docs/usage.md#自定义档位)。
+
+## 账号与模型检查
+
+```sh
+# 查询授权状态与模型目录，不发起推理
+agent-fit models check
+
+# 手动验证当前档位的主模型组合，可能产生费用
+agent-fit models check --verify
+```
+
+网页账号页管理已有授权、登录、取消授权和退出登录；档位页的“检测当前档位主模型”按组合去重，排除备用，并在执行前确认。保存或切换配置不会自动检测模型。
+
+实际验证通过独立 Responses 请求进行，不启动带项目材料的 Codex 任务或工具执行器。请求成功、供应商返回的身份与配置是否生效分别核验；检测结果不代替 `fire` 的会话验证。供应商目录、批量可用性检查和验证边界见[模型检查](docs/usage.md#模型检查)。
+
+## 委派规则如何生效
+
+`setup` 安装的 AGENTS 入口要求 Codex 启动时读取 `skills/agent-fit/SKILL.md`，并在创建、重试或切换子代理模型前重新核对规则与有效档位。主代理仍负责设计、集成、关键验证和最终结论。
+
+共同规则包括先权衡委派收益与协调成本、保留用户授权和预算、区分复杂度与职责、明确独占写入范围、禁止递归委派，以及完成最小充分验证。质量升级与故障备用分别判断，初次派发、重试和接续共用每任务最多三次委派。
+
+这些规则由宿主读取并遵循；工具提供配置与解释，不自动派发任务，也没有宿主级委派拦截器。实际模型身份、能力和成本需要独立证据。完整契约见 [Skill](adapters/codex/skills/agent-fit/SKILL.md)，预设评估方法见[离线校准指南](adapters/codex/skills/agent-fit/references/calibration.md)。
 
 ## 恢复与卸载
 
-```sh
-# 先预览，再撤销本工具的配置；恢复后重启 Codex
-sub-d restore --dry-run
-sub-d restore
+**卸载前先恢复原绑定 home。** 先预览，再执行实际恢复；恢复失败或结果未知时保留工具与恢复记录，停止卸载。
 
-# 如需卸载命令工具，在恢复后执行
-npm uninstall -g subagent-delegation
+```sh
+agent-fit restore --dry-run
+agent-fit restore && npm uninstall -g agent-fit
 ```
 
-恢复保留安装前内容及管理区块之外的用户修改，清除本工具新增的角色、Skill、档位与记录。文件漂移、符号链接、缺失或损坏的恢复基线会阻止覆盖。
+独立 home 的预览和实际恢复都必须传入相同的 `--codex-home`，多个 home 逐一恢复成功后才可卸载。恢复会保留安装前内容、无关文件和管理区块外修改；文件漂移或损坏的恢复基线会阻止覆盖。恢复完成后重启 Codex。
 
-## 规则如何生效
+## 文档与开发
 
-安装后的 AGENTS 管理区块要求 **Codex 启动时读取 Skill，并在每次子智能体创建、重新委派或模型切换前检查 Skill 与当前档位**。
-
-Skill 安装于 `skills/subagent-delegation`，也可通过 `$subagent-delegation` 显式调用。全部档位共用以下委派规则：
-
-- **按需委派**：先核对授权、用户指定模型、预算与宿主限制；按独立产出、判断或并行收益决定是否委派，遵循用户明确要求。
-- **等级与职责分开**：按难度和验证需求选择 L1–L4，再选择扫描、执行或复核职责；不凭领域、文件数或任务长度升级。L4、指定模型、继承要求或固定组合不匹配时使用 `task_delegate`。
-- **范围明确、写入独占**：派发目标、允许动作、来源、范围与验收；共享产出指定唯一负责人，不覆盖他人修改。子代理不递归委派，不自行更换模型或渠道，不修改生产、共享环境、第三方系统及代理配置；最终设计、共享裁决、集成和完成声明由主代理负责。
-- **验证充分、结果可复核**：完成直接相关的最小充分验证后返回；异常、未知退出状态或部分结果标为 `PARTIAL`，说明证据、未覆盖范围与阻塞。前提失效只阻断受影响部分，继续独立工作。
-- **备用有条件、重试有上限**：区分认证、权限、额度、临时故障和能力不足。仅在用户选择、原预算、宿主能力及原验收允许时使用备用；写入任务先确认旧子代理停止。每任务最多三次委派，同一组合最多额外一次，累计重试等待不超过 30 秒；不静默替换用户强制指定的模型。
-
-规则由 Codex 读取并遵循，实际生效取决于宿主加载与运行行为；用户和项目权限规则继续适用。`models check` 查询账号与模型目录，实际调用权限和模型身份需要可信运行证据确认。模型检查的完整边界见[使用说明](docs/usage.md#模型检查)。
-
-## 更多文档
-
-- [完整使用说明](docs/usage.md)：命令参数、备用策略、JSON、冲突处理、恢复与卸载。
-- [Skill](adapters/codex/skills/subagent-delegation/SKILL.md)：完整委派流程。
-
-## 开发验证
+- [完整使用说明](docs/usage.md)：命令、作用域、候选、自定义、账号、检测和恢复。
+- [文档导航](docs/README.md)：规则、实现与研究记录。
+- [实施验收记录](docs/implementation-review.md)：已验证范围及使用边界。
+- [GitHub Releases](https://github.com/fanglinwei/agent-fit/releases)：版本与发布说明。
 
 ```sh
 npm ci --ignore-scripts
@@ -140,7 +149,7 @@ npm test
 npm pack
 ```
 
-浏览器验证方法见[使用说明](docs/usage.md#开发验证)。唯一运行依赖为 [smol-toml](https://github.com/squirrelchat/smol-toml)（BSD-3-Clause）。
+本地打包产物为 `agent-fit-0.7.0.tgz`，可用 `npm install -g ./agent-fit-0.7.0.tgz` 安装。浏览器集成使用已有 Playwright 与 Chrome，运行方法见[开发验证](docs/usage.md#开发验证)。唯一运行依赖为 [smol-toml](https://github.com/squirrelchat/smol-toml)。
 
 ## License
 

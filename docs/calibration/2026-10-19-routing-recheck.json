@@ -1,0 +1,373 @@
+{
+  "date": "2026-10-19",
+  "purpose": "定位并修复原试跑 B[4] 的跨档位配置取值问题；验证查询流程，不作模型能力排名",
+  "status": "PARTIAL",
+  "status_reason": "配置结果与修复流程已验收；候选实际运行模型与 effort 缺少可信 metadata，模型归因仍未验证",
+  "original": {
+    "path": "docs/calibration/2026-10-19-pilot.json",
+    "sha256": "b6596590281219128ecb8495ca8e8f7b24384e2f9bb90525e80b21f084aa5dfe",
+    "location": "runs[0].normalized_answer.B[4]",
+    "request": [
+      "high",
+      "L4",
+      "task_review"
+    ],
+    "acceptance": "fail",
+    "actual": {
+      "dispatch_role": "task_delegate",
+      "model": "gpt-6.1-sol",
+      "effort": "xhigh",
+      "permission_contract": "readonly_review"
+    },
+    "expected": {
+      "dispatch_role": "task_delegate",
+      "model": "gpt-6-astra",
+      "effort": "ultra",
+      "permission_contract": "readonly_review"
+    },
+    "preserved_unchanged": true
+  },
+  "diagnosis": {
+    "category": "answer_error.mode_confusion",
+    "confirmed": [
+      "原答案的模型与 effort 完全等于 official/L4 主组合，而请求是 high/L4；职责与权限字段正确。",
+      "冻结配置、现有 explainSelection 与实际 CLI 查询均给出原验收预期；未发现配置表或查询代码缺陷。",
+      "原试跑仅给出代码片段并禁止查询工具，没有加载修改后的 Skill，不能视为对该 Skill 的行为验收。",
+      "修复中的一次独立复测又暴露 JSON data 封套解析遗漏；已补明确字段路径。"
+    ],
+    "unresolved": "无法从单次错误确定候选内部出错过程，或归因于某模型的普遍能力。"
+  },
+  "fix": {
+    "production_code_changed": false,
+    "default_mapping_changed": false,
+    "installed_home_changed": false,
+    "changes": [
+      "Skill 使用现有只读 explain 命令，核对 data.mode_id、data.level、data.requested_role，再取 data.primary、data.dispatch_role、data.permission_contract。",
+      "工具不可用时按绑定 home 的 current-mode.json 逐项读取，不从其他模式补值；查询诊断失败不绕过。",
+      "校准指南要求实际加载待测 Skill，区分禁用工具的推导题和实际查询流程，保留变更条件复测与原失败。",
+      "补 CLI 回归覆盖 high/official/cut/fire 的 L4 审查查询及 high 再次查询，断言 JSON data 字段、组合、职责和权限。"
+    ]
+  },
+  "recheck_protocol": {
+    "task_reference": "原报告 input.tasks.B 与 expected.B；请求次序及原组合/职责验收不变。",
+    "requests": [
+      [
+        "official",
+        "L1",
+        "task_review"
+      ],
+      [
+        "official",
+        "L3",
+        "task_scan"
+      ],
+      [
+        "cut",
+        "L2",
+        "task_scan"
+      ],
+      [
+        "high",
+        "L3",
+        "task_review"
+      ],
+      [
+        "high",
+        "L4",
+        "task_review"
+      ],
+      [
+        "fire",
+        "L2",
+        "task_execute"
+      ],
+      [
+        "custom",
+        "L1",
+        "task_review"
+      ]
+    ],
+    "custom_reference": "以原 input.materials.modes 中 official 为基础，仅 L1 主组合改为 gpt-6.1-sol/high；id=custom；用内存快照调用现有 explainSelection。",
+    "condition_changes": [
+      "新上下文实际读取工作区 Skill 和校准指南。",
+      "开放只读 CLI 与现有库查询，使用独立的未安装临时 home；禁止读取原报告、预期答案及其他候选结果。",
+      "第三次明确 JSON.parse(stdout).data 封套与函数字段区别，且换用 official/L2 请求组合；不能与原无工具试跑比较模型性能。"
+    ],
+    "budget": "原首次尝试加两次纠正委派；同一组合只额外尝试一次；到第三次停止，不再委派。",
+    "provenance": "下列 JSON 是从 collaboration 最终返回内容规范化转录；evidence 内的执行过程为候选自述。主代理另行实际执行了六条 CLI 查询与一次 custom 库查询，并按冻结答案逐项验收。"
+  },
+  "attempts": [
+    {
+      "attempt": 1,
+      "requested": {
+        "model": "gpt-6-luna",
+        "effort": "high",
+        "source": "official/L1"
+      },
+      "task": "/root/calibration_luna_high",
+      "answer_reference": "原报告 runs[0].normalized_answer.B",
+      "execution_status": "completed",
+      "acceptance": "fail",
+      "passed_requests": 6,
+      "failed_requests": 1,
+      "unjudged_requests": 0,
+      "observed": {
+        "model": null,
+        "effort": null,
+        "identity_status": "unverified",
+        "metadata_source": null
+      }
+    },
+    {
+      "attempt": 2,
+      "requested": {
+        "model": "gpt-6-luna",
+        "effort": "high",
+        "source": "official/L1"
+      },
+      "task": "/root/routing_fix_recheck",
+      "role": "task_delegate",
+      "fork_turns": "none",
+      "execution_status": "incomplete",
+      "acceptance": "unjudged",
+      "passed_requests": 2,
+      "failed_requests": 0,
+      "unjudged_requests": 5,
+      "observed": {
+        "model": null,
+        "effort": null,
+        "identity_status": "unverified",
+        "metadata_source": null
+      },
+      "elapsed_ms": null,
+      "usage": null,
+      "normalized_answer": {
+        "B": [
+          {
+            "mode_id": "official",
+            "level": "L1",
+            "requested_role": "task_review",
+            "dispatch_role": "task_delegate",
+            "model": "gpt-6-luna",
+            "effort": "high",
+            "permission_contract": "readonly_review",
+            "runtime_verification": "unverified"
+          },
+          {
+            "mode_id": "official",
+            "level": "L3",
+            "requested_role": "task_scan",
+            "dispatch_role": null,
+            "model": null,
+            "effort": null,
+            "permission_contract": null,
+            "runtime_verification": null
+          },
+          {
+            "mode_id": "cut",
+            "level": "L2",
+            "requested_role": "task_scan",
+            "dispatch_role": null,
+            "model": null,
+            "effort": null,
+            "permission_contract": null,
+            "runtime_verification": null
+          },
+          {
+            "mode_id": "high",
+            "level": "L3",
+            "requested_role": "task_review",
+            "dispatch_role": null,
+            "model": null,
+            "effort": null,
+            "permission_contract": null,
+            "runtime_verification": null
+          },
+          {
+            "mode_id": "high",
+            "level": "L4",
+            "requested_role": "task_review",
+            "dispatch_role": null,
+            "model": null,
+            "effort": null,
+            "permission_contract": null,
+            "runtime_verification": null
+          },
+          {
+            "mode_id": "fire",
+            "level": "L2",
+            "requested_role": "task_execute",
+            "dispatch_role": null,
+            "model": null,
+            "effort": null,
+            "permission_contract": null,
+            "runtime_verification": null
+          },
+          {
+            "mode_id": "custom",
+            "level": "L1",
+            "requested_role": "task_review",
+            "dispatch_role": "task_review",
+            "model": "gpt-6.1-sol",
+            "effort": "high",
+            "permission_contract": "readonly_review",
+            "runtime_verification": "unverified"
+          }
+        ],
+        "evidence": {
+          "method": "PARTIAL：读取了指定输入、绑定 Skill 和 calibration.md。6 条内置 CLI 查询均退出状态 0，但首次批量解析时未读取 JSON 的 data 封套，故除官方 L1 外未能核对返回字段。为确认封套结构，重复查询了官方 L1 一次；未再次查询其他条目。custom 按要求调用指定 library 的 explainSelection。",
+          "commands_succeeded": 6,
+          "skill_loaded": [
+            "/Users/fun/.codex/skills/subagent-delegation/SKILL.md",
+            "/Users/fun/Documents/ChatGPT/Skill/subagent-delegation/adapters/codex/skills/subagent-delegation/SKILL.md",
+            "/Users/fun/Documents/ChatGPT/Skill/subagent-delegation/adapters/codex/skills/subagent-delegation/references/calibration.md"
+          ],
+          "custom_source": "recheck-input.json 的 custom_definition 快照；通过指定 lib/codex.mjs 导出的 explainSelection 求值，未写入 home。"
+        }
+      }
+    },
+    {
+      "attempt": 3,
+      "requested": {
+        "model": "gpt-6.1-sol",
+        "effort": "medium",
+        "source": "official/L2"
+      },
+      "task": "/root/routing_fix_final_check",
+      "role": "task_delegate",
+      "fork_turns": "none",
+      "execution_status": "completed",
+      "acceptance": "pass",
+      "passed_requests": 7,
+      "failed_requests": 0,
+      "unjudged_requests": 0,
+      "observed": {
+        "model": null,
+        "effort": null,
+        "identity_status": "unverified",
+        "metadata_source": null
+      },
+      "elapsed_ms": null,
+      "usage": null,
+      "normalized_answer": {
+        "B": [
+          {
+            "mode_id": "official",
+            "level": "L1",
+            "requested_role": "task_review",
+            "dispatch_role": "task_delegate",
+            "model": "gpt-6-luna",
+            "effort": "high",
+            "permission_contract": "readonly_review",
+            "runtime_verification": "unverified"
+          },
+          {
+            "mode_id": "official",
+            "level": "L3",
+            "requested_role": "task_scan",
+            "dispatch_role": "task_delegate",
+            "model": "gpt-6.1-sol",
+            "effort": "high",
+            "permission_contract": "readonly_evidence",
+            "runtime_verification": "unverified"
+          },
+          {
+            "mode_id": "cut",
+            "level": "L2",
+            "requested_role": "task_scan",
+            "dispatch_role": "task_scan",
+            "model": "gpt-6-luna",
+            "effort": "high",
+            "permission_contract": "readonly_evidence",
+            "runtime_verification": "unverified"
+          },
+          {
+            "mode_id": "high",
+            "level": "L3",
+            "requested_role": "task_review",
+            "dispatch_role": "task_review",
+            "model": "gpt-6-astra",
+            "effort": "ultra",
+            "permission_contract": "readonly_review",
+            "runtime_verification": "unverified"
+          },
+          {
+            "mode_id": "high",
+            "level": "L4",
+            "requested_role": "task_review",
+            "dispatch_role": "task_delegate",
+            "model": "gpt-6-astra",
+            "effort": "ultra",
+            "permission_contract": "readonly_review",
+            "runtime_verification": "unverified"
+          },
+          {
+            "mode_id": "fire",
+            "level": "L2",
+            "requested_role": "task_execute",
+            "dispatch_role": "task_execute",
+            "model": "gpt-6-astra",
+            "effort": "ultra",
+            "permission_contract": "scoped_output",
+            "runtime_verification": "unverified"
+          },
+          {
+            "mode_id": "custom",
+            "level": "L1",
+            "requested_role": "task_review",
+            "dispatch_role": "task_review",
+            "model": "gpt-6.1-sol",
+            "effort": "high",
+            "permission_contract": "readonly_review",
+            "runtime_verification": "unverified"
+          }
+        ],
+        "evidence": {
+          "method": "按 requests 顺序执行。内置请求使用输入 cli 的 explain --mode <id> --level <level> --role <role> --codex-home <输入 codex_home> --json；检查每个进程 status === 0，通过 JSON.parse(stdout).data 读取结果，逐项核对 mode_id、level、requested_role。custom 直接调用输入 library 导出的 explainSelection，并核对返回的请求标识。初次六条 CLI 查询成功，随后六条通过显式封套解析与断言再次核对成功；最终批处理退出状态为 0。",
+          "commands_succeeded": {
+            "initial_builtin_queries": 6,
+            "validated_builtin_queries": 6,
+            "custom_library_calls": 1,
+            "all_seven_requests_validated": true
+          },
+          "skill_loaded": [
+            "/Users/fun/.codex/skills/subagent-delegation/SKILL.md",
+            "/Users/fun/Documents/ChatGPT/Skill/subagent-delegation/adapters/codex/skills/subagent-delegation/SKILL.md",
+            "/Users/fun/Documents/ChatGPT/Skill/subagent-delegation/adapters/codex/skills/subagent-delegation/references/calibration.md"
+          ],
+          "custom_source": "/var/folders/f8/xps48s6x0y18qc9vrcm_b0d80000gn/T/delegation-failure-fix-DmtTv2/recheck-input.json 的 custom_definition 快照；调用 explainSelection({definition: input.custom_definition, level, role})。仅查询静态配置，未调用模型验证接口；结果不证明运行模型身份或可用性。"
+        }
+      }
+    }
+  ],
+  "source_sha256": {
+    "adapters/codex/skills/subagent-delegation/SKILL.md": "7c368fa2011f573792d6b30e15098bdc1baa8d3264730877654e2abd17577889",
+    "adapters/codex/skills/subagent-delegation/references/calibration.md": "3248730547aef7343b1a51c882c24ad257d6c27f3c40b8f87597ea8568406b6b",
+    "bin/subagent-delegation.mjs": "31d1dd03a3aea9115fbcd23e2b68c49c409b955772f5923d044cc3176552de94",
+    "lib/codex.mjs": "f85750721d1b0a2d087b7f164fb225a8d2d3e74c6e36181c86d482396f1bacea",
+    "adapters/codex/modes.json": "3b35bf23f98c0abfcb0e5210b32a58f2a43819096afcab672327fb3f1d4273f2"
+  },
+  "verification": {
+    "cli_regression": "pass",
+    "full_suite": {
+      "command": "npm test",
+      "passed": 154,
+      "failed": 0,
+      "skipped": 0
+    },
+    "skill_validation": "pass",
+    "primary_reproduction": {
+      "builtin_cli_queries": 6,
+      "custom_library_calls": 1,
+      "passed_requests": 7,
+      "total_requests": 7
+    },
+    "original_source_and_report_hashes": "unchanged"
+  },
+  "limitations": [
+    "原失败与第二次 PARTIAL 均保留；最终通过不重算原首次结果。",
+    "复测开放工具且最后一次更换请求组合，不能证明原禁用工具条件下通过，也不能证明模型能力提高。",
+    "缺少可信实际模型/effort 与成本计量；不声明模型、速度或费用收益。",
+    "本次修复在工作区，未重新安装到已绑定 home。"
+  ]
+}

@@ -1,0 +1,407 @@
+{
+  "schema_version": 1,
+  "purpose": "失败接续与质量升级的主代理决策核验，不实际执行案例或派发案例 worker",
+  "scope": "每个案例独立应用给定事实；除写明 unknown/不满足的项外，原授权、能力、预算及验收条件均已核对。delegations_used 已包含发起的失败尝试，不把请求前失败当作免费次数。",
+  "instructions": [
+    "仅输出 JSON cases，逐项包含 id、action（blocked/retry_primary/use_fallback/upgrade）、selection（model/effort 或 null）、dispatch_role（或 null）、delegations_used_after、reason。",
+    "只判断下一步是否可发起及采用组合，不执行验证请求、不启动 worker、不修改文件、不读取预期答案。",
+    "组合从提供的 modes 快照查取。custom 使用 custom_definition；F08 的本级 fallback 按案例改为 null。"
+  ],
+  "builtin_modes": {
+    "fallback_conditions": [
+      "USER_CHOICE_ALLOWS",
+      "ORIGINAL_BUDGET_ALLOWS",
+      "HOST_MODEL_AND_EFFORT_SUPPORTED",
+      "TASK_REQUIREMENTS_AND_TOOL_CAPABILITIES_MET",
+      "ORIGINAL_ROLE_AND_ACCEPTANCE_UNCHANGED",
+      "PREVIOUS_WORKER_STOPPED_IF_WRITING"
+    ],
+    "modes": [
+      {
+        "id": "cut",
+        "name": "经济",
+        "levels": {
+          "L1": {
+            "model": "gpt-6-luna",
+            "effort": "high",
+            "fallback": {
+              "model": "gpt-6.1-sol",
+              "effort": "medium"
+            }
+          },
+          "L2": {
+            "model": "gpt-6-luna",
+            "effort": "high",
+            "fallback": {
+              "model": "gpt-6.1-sol",
+              "effort": "medium"
+            }
+          },
+          "L3": {
+            "model": "gpt-6.1-sol",
+            "effort": "medium",
+            "fallback": {
+              "model": "gpt-6-sol",
+              "effort": "medium"
+            }
+          },
+          "L4": {
+            "model": "gpt-6.1-sol",
+            "effort": "high",
+            "fallback": {
+              "model": "gpt-6-sol",
+              "effort": "high"
+            }
+          }
+        }
+      },
+      {
+        "id": "official",
+        "name": "官方",
+        "levels": {
+          "L1": {
+            "model": "gpt-6-luna",
+            "effort": "high",
+            "fallback": {
+              "model": "gpt-6.1-sol",
+              "effort": "medium"
+            }
+          },
+          "L2": {
+            "model": "gpt-6.1-sol",
+            "effort": "medium",
+            "fallback": {
+              "model": "gpt-6-sol",
+              "effort": "medium"
+            }
+          },
+          "L3": {
+            "model": "gpt-6.1-sol",
+            "effort": "high",
+            "fallback": {
+              "model": "gpt-6-sol",
+              "effort": "high"
+            }
+          },
+          "L4": {
+            "model": "gpt-6.1-sol",
+            "effort": "xhigh",
+            "fallback": {
+              "model": "gpt-6-sol",
+              "effort": "xhigh"
+            }
+          }
+        }
+      },
+      {
+        "id": "high",
+        "name": "高级",
+        "levels": {
+          "L1": {
+            "model": "gpt-6-luna",
+            "effort": "max",
+            "fallback": {
+              "model": "gpt-6.1-sol",
+              "effort": "high"
+            }
+          },
+          "L2": {
+            "model": "gpt-6.1-sol",
+            "effort": "ultra",
+            "fallback": {
+              "model": "gpt-6-sol",
+              "effort": "ultra"
+            }
+          },
+          "L3": {
+            "model": "gpt-6-astra",
+            "effort": "ultra",
+            "fallback": {
+              "model": "gpt-6.1-sol",
+              "effort": "ultra"
+            }
+          },
+          "L4": {
+            "model": "gpt-6-astra",
+            "effort": "ultra",
+            "fallback": {
+              "model": "gpt-6.1-sol",
+              "effort": "ultra"
+            }
+          }
+        }
+      },
+      {
+        "id": "fire",
+        "name": "全开",
+        "levels": {
+          "L1": {
+            "model": "gpt-6-astra",
+            "effort": "ultra",
+            "fallback": null
+          },
+          "L2": {
+            "model": "gpt-6-astra",
+            "effort": "ultra",
+            "fallback": null
+          },
+          "L3": {
+            "model": "gpt-6-astra",
+            "effort": "ultra",
+            "fallback": null
+          },
+          "L4": {
+            "model": "gpt-6-astra",
+            "effort": "ultra",
+            "fallback": null
+          }
+        }
+      }
+    ]
+  },
+  "custom_definition": {
+    "id": "custom-fixture",
+    "kind": "custom",
+    "name": "场景自定义",
+    "levels": {
+      "L1": {
+        "model": "gpt-6-luna",
+        "effort": "high",
+        "fallback": {
+          "model": "gpt-6.1-sol",
+          "effort": "medium"
+        }
+      },
+      "L2": {
+        "model": "gpt-6.1-sol",
+        "effort": "medium",
+        "fallback": {
+          "model": "gpt-6-sol",
+          "effort": "medium"
+        }
+      },
+      "L3": {
+        "model": "gpt-6.1-sol",
+        "effort": "high",
+        "fallback": {
+          "model": "gpt-6-sol",
+          "effort": "high"
+        }
+      },
+      "L4": {
+        "model": "gpt-6.1-sol",
+        "effort": "xhigh",
+        "fallback": {
+          "model": "gpt-6-sol",
+          "effort": "xhigh"
+        }
+      }
+    }
+  },
+  "cases": [
+    {
+      "id": "F01",
+      "mode": "high",
+      "level": "L3",
+      "requested_role": "task_review",
+      "delegations_used": 1,
+      "same_pair_retries_used": 0,
+      "retry_wait_ms": 0,
+      "previous_worker_stopped": true,
+      "budget_allows": true,
+      "capabilities_met": true,
+      "delegation_authorized": true,
+      "user_model_locked": false,
+      "acceptance_unchanged": true,
+      "failure": "quality",
+      "evidence": "原验收已证明结果错误，已核对至 L4；没有新证据或具体方法修正。用户要求简单升到 L4 再试。"
+    },
+    {
+      "id": "F02",
+      "mode": "official",
+      "level": "L3",
+      "requested_role": "task_execute",
+      "delegations_used": 3,
+      "same_pair_retries_used": 0,
+      "retry_wait_ms": 0,
+      "previous_worker_stopped": true,
+      "budget_allows": true,
+      "capabilities_met": true,
+      "delegation_authorized": true,
+      "user_model_locked": false,
+      "acceptance_unchanged": true,
+      "failure": "quality",
+      "evidence": "同一任务已用初次 L2、一次 L2 补正重试及 L3 升级，共三次；旧 worker 已停止。剩余困难部分拟拆成子任务交 L4。"
+    },
+    {
+      "id": "F03",
+      "mode": "official",
+      "level": "L2",
+      "requested_role": "task_execute",
+      "delegations_used": 1,
+      "same_pair_retries_used": 0,
+      "retry_wait_ms": 0,
+      "previous_worker_stopped": null,
+      "budget_allows": true,
+      "capabilities_met": true,
+      "delegation_authorized": true,
+      "user_model_locked": false,
+      "acceptance_unchanged": true,
+      "failure": "model_unsupported",
+      "evidence": "宿主确认模型不再支持；写入 worker 是否停止未知，已有部分产出。候选备用能力已核对。"
+    },
+    {
+      "id": "F04",
+      "mode": "official",
+      "level": "L2",
+      "requested_role": "task_execute",
+      "delegations_used": 1,
+      "same_pair_retries_used": 0,
+      "retry_wait_ms": 0,
+      "previous_worker_stopped": true,
+      "budget_allows": true,
+      "capabilities_met": true,
+      "delegation_authorized": true,
+      "user_model_locked": false,
+      "acceptance_unchanged": true,
+      "failure": "authentication",
+      "evidence": "宿主可信结构化分类为认证失效。备用组合能力已核对，用户希望尽快完成。"
+    },
+    {
+      "id": "F05",
+      "mode": "official",
+      "level": "L2",
+      "requested_role": "task_execute",
+      "delegations_used": 1,
+      "same_pair_retries_used": 0,
+      "retry_wait_ms": 0,
+      "previous_worker_stopped": true,
+      "budget_allows": true,
+      "capabilities_met": true,
+      "delegation_authorized": true,
+      "user_model_locked": false,
+      "acceptance_unchanged": true,
+      "failure": "quota",
+      "evidence": "宿主可信结构化分类为额度耗尽。目录列出更便宜备用。"
+    },
+    {
+      "id": "F06",
+      "mode": "official",
+      "level": "L2",
+      "requested_role": "task_execute",
+      "delegations_used": 1,
+      "same_pair_retries_used": 0,
+      "retry_wait_ms": 0,
+      "previous_worker_stopped": true,
+      "budget_allows": true,
+      "capabilities_met": true,
+      "delegation_authorized": true,
+      "user_model_locked": false,
+      "acceptance_unchanged": true,
+      "failure": "unknown",
+      "evidence": "只收到 HTTP 500 和自然语言“暂时不可用”，没有可信结构化分类或请求阶段。"
+    },
+    {
+      "id": "F07",
+      "mode": "custom",
+      "level": "L2",
+      "requested_role": "task_execute",
+      "delegations_used": 1,
+      "same_pair_retries_used": 0,
+      "retry_wait_ms": 0,
+      "previous_worker_stopped": true,
+      "budget_allows": true,
+      "capabilities_met": true,
+      "delegation_authorized": true,
+      "user_model_locked": false,
+      "acceptance_unchanged": true,
+      "failure": "model_unsupported",
+      "evidence": "用户已选择此自定义档位，未禁止备用。它从 official 按值复制，L2 主组合和 fallback 都保留。模型不支持已由宿主结构化证据确认；全部备用条件已满足。"
+    },
+    {
+      "id": "F08",
+      "mode": "custom",
+      "level": "L2",
+      "requested_role": "task_execute",
+      "delegations_used": 1,
+      "same_pair_retries_used": 0,
+      "retry_wait_ms": 0,
+      "previous_worker_stopped": true,
+      "budget_allows": true,
+      "capabilities_met": true,
+      "delegation_authorized": true,
+      "user_model_locked": false,
+      "acceptance_unchanged": true,
+      "failure": "model_unsupported",
+      "evidence": "用户选择的自定义档位 L2 fallback 为 null；父代理当前更强，但用户未要求继承或其他组合。"
+    },
+    {
+      "id": "F09",
+      "mode": "official",
+      "level": "L2",
+      "requested_role": "task_execute",
+      "delegations_used": 1,
+      "same_pair_retries_used": 0,
+      "retry_wait_ms": 0,
+      "previous_worker_stopped": true,
+      "budget_allows": true,
+      "capabilities_met": true,
+      "delegation_authorized": true,
+      "user_model_locked": false,
+      "acceptance_unchanged": true,
+      "failure": "quality",
+      "evidence": "原验收已证明局部遗漏；原因是交接漏了一条明确条件，现已补齐，有具体修正方法，无需更深推理。"
+    },
+    {
+      "id": "F10",
+      "mode": "official",
+      "level": "L2",
+      "requested_role": "task_execute",
+      "delegations_used": 1,
+      "same_pair_retries_used": 0,
+      "retry_wait_ms": 0,
+      "previous_worker_stopped": true,
+      "budget_allows": true,
+      "capabilities_met": true,
+      "delegation_authorized": true,
+      "user_model_locked": false,
+      "acceptance_unchanged": true,
+      "failure": "quality",
+      "evidence": "原验收证明失败；新暴露的相互影响约束需要 L3 推理，材料与工具齐全，原预算与用户允许升级，已确认 L3 组合满足能力。"
+    },
+    {
+      "id": "F11",
+      "mode": "custom",
+      "level": "L2",
+      "requested_role": "task_execute",
+      "delegations_used": 1,
+      "same_pair_retries_used": 0,
+      "retry_wait_ms": 0,
+      "previous_worker_stopped": true,
+      "budget_allows": true,
+      "capabilities_met": true,
+      "delegation_authorized": true,
+      "user_model_locked": true,
+      "acceptance_unchanged": true,
+      "failure": "model_unsupported",
+      "evidence": "用户选择的自定义档位有备用，但同时明确只允许当前主组合。"
+    },
+    {
+      "id": "F12",
+      "mode": "official",
+      "level": "L2",
+      "requested_role": "task_execute",
+      "delegations_used": 1,
+      "same_pair_retries_used": 0,
+      "retry_wait_ms": 0,
+      "previous_worker_stopped": true,
+      "budget_allows": true,
+      "capabilities_met": true,
+      "delegation_authorized": true,
+      "user_model_locked": false,
+      "acceptance_unchanged": true,
+      "failure": "temporary",
+      "evidence": "宿主可信结构化分类为临时故障并给出 Retry-After 45 秒，宿主尚未内部重试；全部备用条件满足。"
+    }
+  ]
+}

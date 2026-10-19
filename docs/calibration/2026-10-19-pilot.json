@@ -1,0 +1,887 @@
+{
+  "date": "2026-10-19",
+  "purpose": "当前仓库配置分析任务的探索性试跑；不是代表所有子代理职责的模型基准",
+  "status": "PARTIAL",
+  "input_sha256": "2a89c273a7a141106ca54fadb480f28d12006b347066a72c1bf5f67d93c9bf83",
+  "source_sha256": {
+    "adapters/codex/modes.json": "3b35bf23f98c0abfcb0e5210b32a58f2a43819096afcab672327fb3f1d4273f2",
+    "lib/codex.mjs": "f85750721d1b0a2d087b7f164fb225a8d2d3e74c6e36181c86d482396f1bacea",
+    "lib/install.mjs": "1f9ecb6ef51c41c86eb2e59398150628f866c424e74ba9c85c98079566a59774"
+  },
+  "input": {
+    "purpose": "当前仓库只读分析试跑，回答任务本身，不评价模型排名。",
+    "rules": [
+      "不使用工具、不写文件、不继续委派；仅根据给定材料作答。",
+      "仅返回一个JSON对象，包含A、B、C三个键，不添加Markdown。",
+      "各数组保持输入顺序，配置值不证明实际运行生效。"
+    ],
+    "materials": {
+      "modes": [
+        {
+          "id": "cut",
+          "name": "经济",
+          "levels": {
+            "L1": {
+              "model": "gpt-6-luna",
+              "effort": "high",
+              "fallback": {
+                "model": "gpt-6.1-sol",
+                "effort": "medium"
+              }
+            },
+            "L2": {
+              "model": "gpt-6-luna",
+              "effort": "high",
+              "fallback": {
+                "model": "gpt-6.1-sol",
+                "effort": "medium"
+              }
+            },
+            "L3": {
+              "model": "gpt-6.1-sol",
+              "effort": "medium",
+              "fallback": {
+                "model": "gpt-6-sol",
+                "effort": "medium"
+              }
+            },
+            "L4": {
+              "model": "gpt-6.1-sol",
+              "effort": "high",
+              "fallback": {
+                "model": "gpt-6-sol",
+                "effort": "high"
+              }
+            }
+          }
+        },
+        {
+          "id": "official",
+          "name": "官方",
+          "levels": {
+            "L1": {
+              "model": "gpt-6-luna",
+              "effort": "high",
+              "fallback": {
+                "model": "gpt-6.1-sol",
+                "effort": "medium"
+              }
+            },
+            "L2": {
+              "model": "gpt-6.1-sol",
+              "effort": "medium",
+              "fallback": {
+                "model": "gpt-6-sol",
+                "effort": "medium"
+              }
+            },
+            "L3": {
+              "model": "gpt-6.1-sol",
+              "effort": "high",
+              "fallback": {
+                "model": "gpt-6-sol",
+                "effort": "high"
+              }
+            },
+            "L4": {
+              "model": "gpt-6.1-sol",
+              "effort": "xhigh",
+              "fallback": {
+                "model": "gpt-6-sol",
+                "effort": "xhigh"
+              }
+            }
+          }
+        },
+        {
+          "id": "high",
+          "name": "高级",
+          "levels": {
+            "L1": {
+              "model": "gpt-6-luna",
+              "effort": "max",
+              "fallback": {
+                "model": "gpt-6.1-sol",
+                "effort": "high"
+              }
+            },
+            "L2": {
+              "model": "gpt-6.1-sol",
+              "effort": "ultra",
+              "fallback": {
+                "model": "gpt-6-sol",
+                "effort": "ultra"
+              }
+            },
+            "L3": {
+              "model": "gpt-6-astra",
+              "effort": "ultra",
+              "fallback": {
+                "model": "gpt-6.1-sol",
+                "effort": "ultra"
+              }
+            },
+            "L4": {
+              "model": "gpt-6-astra",
+              "effort": "ultra",
+              "fallback": {
+                "model": "gpt-6.1-sol",
+                "effort": "ultra"
+              }
+            }
+          }
+        },
+        {
+          "id": "fire",
+          "name": "全开",
+          "levels": {
+            "L1": {
+              "model": "gpt-6-astra",
+              "effort": "ultra",
+              "fallback": null
+            },
+            "L2": {
+              "model": "gpt-6-astra",
+              "effort": "ultra",
+              "fallback": null
+            },
+            "L3": {
+              "model": "gpt-6-astra",
+              "effort": "ultra",
+              "fallback": null
+            },
+            "L4": {
+              "model": "gpt-6-astra",
+              "effort": "ultra",
+              "fallback": null
+            }
+          }
+        }
+      ],
+      "ROLES": {
+        "task_scan": "L1",
+        "task_execute": "L2",
+        "task_review": "L3",
+        "task_delegate": null
+      },
+      "explainSelection": "export function explainSelection({ definition, level, role = 'task_delegate' }) {\n  if (!LEVELS.includes(level) || !Object.hasOwn(ROLES, role)) throw argumentError('任务等级或角色无效。');\n  const { model, effort, fallback } = definition.levels[level];\n  const fixed = ROLES[role] && definition.levels[ROLES[role]];\n  const matches = level !== 'L4' && fixed && fixed.model === model && fixed.effort === effort;\n  return {\n    mode_id: definition.id, mode_kind: definition.kind, mode_name: definition.name,\n    level, level_source: 'argument', requested_role: role, dispatch_role: matches ? role : 'task_delegate',\n    primary: { model, effort }, fallback, fallback_conditions: fallback ? FALLBACK_CONDITIONS : [],\n    permission_contract: { task_scan: 'readonly_evidence', task_execute: 'scoped_output', task_review: 'readonly_review', task_delegate: 'bounded_delegate' }[role],\n    reason_codes: ['TASK_LEVEL_ARGUMENT', 'MODE_PRESET', matches ? 'FIXED_ROLE_MATCH' : 'UNPINNED_ROLE_REQUIRED', 'MODEL_ACCESS_UNKNOWN', 'RUNTIME_UNVERIFIED'],\n    verification: verificationRequirement(definition), access: 'unknown', runtime_verification: 'unverified',\n  };\n}",
+      "role_contract_projection": "const roles = Object.entries(ROLES).map(([name, level]) => {\n    const relative = `agents/${name.replaceAll('_', '-')}.toml`, source = path.join(home, relative);\n    const bytes = observedFiles.get(relative).bytes;\n    let role = null;\n    try { if (bytes !== null) role = parseConfig(bytes, source); } catch {}\n    const expected = level && mode?.levels[level];\n    const matches = mode ? role !== null && role.name === name && (expected ? role.model === expected.model && role.model_reasoning_effort === expected.effort : !Object.hasOwn(role, 'model') && !Object.hasOwn(role, 'model_reasoning_effort')) : null;\n    if (state && !matches) diagnostics.push(diagnostic('ROLE_CONTRACT_MISMATCH', 'fail', source, `角色 ${name} 的名称、模型或推理强度与当前档位职责不一致；缺失或无效文件也不能满足职责。`));\n    return { name, task_level: level, source, managed: !!state?.files[relative], configured_name: safeText(role?.name), configured_model: safeText(role?.model), configured_effort: safeText(role?.model_reasoning_effort), expected_model: expected?.model ?? null, expected_effort: expected?.effort ?? null, matches_mode: matches, availability: { status: 'unknown', source: null }, fallback_candidates: expected?.fallback ? [expected.fallback] : [] };\n  });"
+    },
+    "tasks": {
+      "A": "分别列出official、high、fire的L1到L4主组合，按首次出现去重，不计fallback。返回对象，键为模式id，值为[{model,effort}]。",
+      "B": {
+        "instruction": "按explainSelection求以下请求。每项仅返回{dispatch_role,model,effort,permission_contract}。custom以official为基础，仅将L1主组合改为gpt-6.1-sol/high。",
+        "requests": [
+          [
+            "official",
+            "L1",
+            "task_review"
+          ],
+          [
+            "official",
+            "L3",
+            "task_scan"
+          ],
+          [
+            "cut",
+            "L2",
+            "task_scan"
+          ],
+          [
+            "high",
+            "L3",
+            "task_review"
+          ],
+          [
+            "high",
+            "L4",
+            "task_review"
+          ],
+          [
+            "fire",
+            "L2",
+            "task_execute"
+          ],
+          [
+            "custom",
+            "L1",
+            "task_review"
+          ]
+        ]
+      },
+      "C": {
+        "instruction": "仅分析role_contract_projection中的matches与ROLE_CONTRACT_MISMATCH。输入role已是解析结果；null表示文件缺失/无效。installed=true表示state存在且mode=official，false表示state和mode均不存在。每项返回{matches_mode,contract_mismatch}；contract_mismatch只指该语义诊断，不含其他诊断。",
+        "cases": [
+          {
+            "name": "task_scan",
+            "installed": true,
+            "role": {
+              "name": "task_scan",
+              "model": "gpt-6-luna",
+              "model_reasoning_effort": "high"
+            }
+          },
+          {
+            "name": "task_scan",
+            "installed": true,
+            "role": {
+              "name": "task_execute",
+              "model": "gpt-6-luna",
+              "model_reasoning_effort": "high"
+            }
+          },
+          {
+            "name": "task_execute",
+            "installed": true,
+            "role": {
+              "name": "task_execute",
+              "model": "gpt-6.1-sol"
+            }
+          },
+          {
+            "name": "task_delegate",
+            "installed": true,
+            "role": {}
+          },
+          {
+            "name": "task_delegate",
+            "installed": true,
+            "role": {
+              "name": "task_delegate"
+            }
+          },
+          {
+            "name": "task_delegate",
+            "installed": true,
+            "role": {
+              "name": "task_delegate",
+              "model": null
+            }
+          },
+          {
+            "name": "task_delegate",
+            "installed": true,
+            "role": null
+          },
+          {
+            "name": "task_scan",
+            "installed": false,
+            "role": null
+          }
+        ]
+      }
+    }
+  },
+  "expected": {
+    "A": {
+      "official": [
+        {
+          "model": "gpt-6-luna",
+          "effort": "high"
+        },
+        {
+          "model": "gpt-6.1-sol",
+          "effort": "medium"
+        },
+        {
+          "model": "gpt-6.1-sol",
+          "effort": "high"
+        },
+        {
+          "model": "gpt-6.1-sol",
+          "effort": "xhigh"
+        }
+      ],
+      "high": [
+        {
+          "model": "gpt-6-luna",
+          "effort": "max"
+        },
+        {
+          "model": "gpt-6.1-sol",
+          "effort": "ultra"
+        },
+        {
+          "model": "gpt-6-astra",
+          "effort": "ultra"
+        }
+      ],
+      "fire": [
+        {
+          "model": "gpt-6-astra",
+          "effort": "ultra"
+        }
+      ]
+    },
+    "B": [
+      {
+        "dispatch_role": "task_delegate",
+        "model": "gpt-6-luna",
+        "effort": "high",
+        "permission_contract": "readonly_review"
+      },
+      {
+        "dispatch_role": "task_delegate",
+        "model": "gpt-6.1-sol",
+        "effort": "high",
+        "permission_contract": "readonly_evidence"
+      },
+      {
+        "dispatch_role": "task_scan",
+        "model": "gpt-6-luna",
+        "effort": "high",
+        "permission_contract": "readonly_evidence"
+      },
+      {
+        "dispatch_role": "task_review",
+        "model": "gpt-6-astra",
+        "effort": "ultra",
+        "permission_contract": "readonly_review"
+      },
+      {
+        "dispatch_role": "task_delegate",
+        "model": "gpt-6-astra",
+        "effort": "ultra",
+        "permission_contract": "readonly_review"
+      },
+      {
+        "dispatch_role": "task_execute",
+        "model": "gpt-6-astra",
+        "effort": "ultra",
+        "permission_contract": "scoped_output"
+      },
+      {
+        "dispatch_role": "task_review",
+        "model": "gpt-6.1-sol",
+        "effort": "high",
+        "permission_contract": "readonly_review"
+      }
+    ],
+    "C": [
+      {
+        "matches_mode": true,
+        "contract_mismatch": false
+      },
+      {
+        "matches_mode": false,
+        "contract_mismatch": true
+      },
+      {
+        "matches_mode": false,
+        "contract_mismatch": true
+      },
+      {
+        "matches_mode": false,
+        "contract_mismatch": true
+      },
+      {
+        "matches_mode": true,
+        "contract_mismatch": false
+      },
+      {
+        "matches_mode": false,
+        "contract_mismatch": true
+      },
+      {
+        "matches_mode": false,
+        "contract_mismatch": true
+      },
+      {
+        "matches_mode": null,
+        "contract_mismatch": false
+      }
+    ]
+  },
+  "oracle": {
+    "A": "读取同一模式快照的主组合并按首次出现去重",
+    "B": "运行仓库explainSelection，包含custom单级覆盖；不执行候选代码",
+    "C": "主代理根据冻结源码逐条判定，已在派发前确定文件缺失/名称错误/字段存在性等验收要求"
+  },
+  "runs": [
+    {
+      "requested": {
+        "model": "gpt-6-luna",
+        "effort": "high",
+        "source": "official preset candidate; active home unchanged"
+      },
+      "provenance": {
+        "tool": "collaboration.spawn_agent",
+        "task": "/root/calibration_luna_high",
+        "role": "task_delegate",
+        "fork_turns": "none",
+        "result": "completed; normalized transcription of returned JSON"
+      },
+      "observed": {
+        "model": null,
+        "effort": null,
+        "identity_status": "unverified",
+        "metadata_source": null
+      },
+      "attempt": 1,
+      "execution_status": "completed",
+      "elapsed_ms": null,
+      "usage": null,
+      "normalized_answer": {
+        "A": {
+          "official": [
+            {
+              "model": "gpt-6-luna",
+              "effort": "high"
+            },
+            {
+              "model": "gpt-6.1-sol",
+              "effort": "medium"
+            },
+            {
+              "model": "gpt-6.1-sol",
+              "effort": "high"
+            },
+            {
+              "model": "gpt-6.1-sol",
+              "effort": "xhigh"
+            }
+          ],
+          "high": [
+            {
+              "model": "gpt-6-luna",
+              "effort": "max"
+            },
+            {
+              "model": "gpt-6.1-sol",
+              "effort": "ultra"
+            },
+            {
+              "model": "gpt-6-astra",
+              "effort": "ultra"
+            }
+          ],
+          "fire": [
+            {
+              "model": "gpt-6-astra",
+              "effort": "ultra"
+            }
+          ]
+        },
+        "B": [
+          {
+            "dispatch_role": "task_delegate",
+            "model": "gpt-6-luna",
+            "effort": "high",
+            "permission_contract": "readonly_review"
+          },
+          {
+            "dispatch_role": "task_delegate",
+            "model": "gpt-6.1-sol",
+            "effort": "high",
+            "permission_contract": "readonly_evidence"
+          },
+          {
+            "dispatch_role": "task_scan",
+            "model": "gpt-6-luna",
+            "effort": "high",
+            "permission_contract": "readonly_evidence"
+          },
+          {
+            "dispatch_role": "task_review",
+            "model": "gpt-6-astra",
+            "effort": "ultra",
+            "permission_contract": "readonly_review"
+          },
+          {
+            "dispatch_role": "task_delegate",
+            "model": "gpt-6.1-sol",
+            "effort": "xhigh",
+            "permission_contract": "readonly_review"
+          },
+          {
+            "dispatch_role": "task_execute",
+            "model": "gpt-6-astra",
+            "effort": "ultra",
+            "permission_contract": "scoped_output"
+          },
+          {
+            "dispatch_role": "task_review",
+            "model": "gpt-6.1-sol",
+            "effort": "high",
+            "permission_contract": "readonly_review"
+          }
+        ],
+        "C": [
+          {
+            "matches_mode": true,
+            "contract_mismatch": false
+          },
+          {
+            "matches_mode": false,
+            "contract_mismatch": true
+          },
+          {
+            "matches_mode": false,
+            "contract_mismatch": true
+          },
+          {
+            "matches_mode": false,
+            "contract_mismatch": true
+          },
+          {
+            "matches_mode": true,
+            "contract_mismatch": false
+          },
+          {
+            "matches_mode": false,
+            "contract_mismatch": true
+          },
+          {
+            "matches_mode": false,
+            "contract_mismatch": true
+          },
+          {
+            "matches_mode": null,
+            "contract_mismatch": false
+          }
+        ]
+      },
+      "acceptance": {
+        "A": "pass",
+        "B": "fail",
+        "C": "pass"
+      },
+      "retries": 0
+    },
+    {
+      "requested": {
+        "model": "gpt-6.1-sol",
+        "effort": "medium",
+        "source": "official preset candidate; active home unchanged"
+      },
+      "provenance": {
+        "tool": "collaboration.spawn_agent",
+        "task": "/root/calibration_sol_medium",
+        "role": "task_delegate",
+        "fork_turns": "none",
+        "result": "completed; normalized transcription of returned JSON"
+      },
+      "observed": {
+        "model": null,
+        "effort": null,
+        "identity_status": "unverified",
+        "metadata_source": null
+      },
+      "attempt": 1,
+      "execution_status": "completed",
+      "elapsed_ms": null,
+      "usage": null,
+      "normalized_answer": {
+        "A": {
+          "official": [
+            {
+              "model": "gpt-6-luna",
+              "effort": "high"
+            },
+            {
+              "model": "gpt-6.1-sol",
+              "effort": "medium"
+            },
+            {
+              "model": "gpt-6.1-sol",
+              "effort": "high"
+            },
+            {
+              "model": "gpt-6.1-sol",
+              "effort": "xhigh"
+            }
+          ],
+          "high": [
+            {
+              "model": "gpt-6-luna",
+              "effort": "max"
+            },
+            {
+              "model": "gpt-6.1-sol",
+              "effort": "ultra"
+            },
+            {
+              "model": "gpt-6-astra",
+              "effort": "ultra"
+            }
+          ],
+          "fire": [
+            {
+              "model": "gpt-6-astra",
+              "effort": "ultra"
+            }
+          ]
+        },
+        "B": [
+          {
+            "dispatch_role": "task_delegate",
+            "model": "gpt-6-luna",
+            "effort": "high",
+            "permission_contract": "readonly_review"
+          },
+          {
+            "dispatch_role": "task_delegate",
+            "model": "gpt-6.1-sol",
+            "effort": "high",
+            "permission_contract": "readonly_evidence"
+          },
+          {
+            "dispatch_role": "task_scan",
+            "model": "gpt-6-luna",
+            "effort": "high",
+            "permission_contract": "readonly_evidence"
+          },
+          {
+            "dispatch_role": "task_review",
+            "model": "gpt-6-astra",
+            "effort": "ultra",
+            "permission_contract": "readonly_review"
+          },
+          {
+            "dispatch_role": "task_delegate",
+            "model": "gpt-6-astra",
+            "effort": "ultra",
+            "permission_contract": "readonly_review"
+          },
+          {
+            "dispatch_role": "task_execute",
+            "model": "gpt-6-astra",
+            "effort": "ultra",
+            "permission_contract": "scoped_output"
+          },
+          {
+            "dispatch_role": "task_review",
+            "model": "gpt-6.1-sol",
+            "effort": "high",
+            "permission_contract": "readonly_review"
+          }
+        ],
+        "C": [
+          {
+            "matches_mode": true,
+            "contract_mismatch": false
+          },
+          {
+            "matches_mode": false,
+            "contract_mismatch": true
+          },
+          {
+            "matches_mode": false,
+            "contract_mismatch": true
+          },
+          {
+            "matches_mode": false,
+            "contract_mismatch": true
+          },
+          {
+            "matches_mode": true,
+            "contract_mismatch": false
+          },
+          {
+            "matches_mode": false,
+            "contract_mismatch": true
+          },
+          {
+            "matches_mode": false,
+            "contract_mismatch": true
+          },
+          {
+            "matches_mode": null,
+            "contract_mismatch": false
+          }
+        ]
+      },
+      "acceptance": {
+        "A": "pass",
+        "B": "pass",
+        "C": "pass"
+      },
+      "retries": 0
+    },
+    {
+      "requested": {
+        "model": "gpt-6.1-sol",
+        "effort": "high",
+        "source": "official preset candidate; active home unchanged"
+      },
+      "provenance": {
+        "tool": "collaboration.spawn_agent",
+        "task": "/root/calibration_sol_high",
+        "role": "task_delegate",
+        "fork_turns": "none",
+        "result": "completed; normalized transcription of returned JSON"
+      },
+      "observed": {
+        "model": null,
+        "effort": null,
+        "identity_status": "unverified",
+        "metadata_source": null
+      },
+      "attempt": 1,
+      "execution_status": "completed",
+      "elapsed_ms": null,
+      "usage": null,
+      "normalized_answer": {
+        "A": {
+          "official": [
+            {
+              "model": "gpt-6-luna",
+              "effort": "high"
+            },
+            {
+              "model": "gpt-6.1-sol",
+              "effort": "medium"
+            },
+            {
+              "model": "gpt-6.1-sol",
+              "effort": "high"
+            },
+            {
+              "model": "gpt-6.1-sol",
+              "effort": "xhigh"
+            }
+          ],
+          "high": [
+            {
+              "model": "gpt-6-luna",
+              "effort": "max"
+            },
+            {
+              "model": "gpt-6.1-sol",
+              "effort": "ultra"
+            },
+            {
+              "model": "gpt-6-astra",
+              "effort": "ultra"
+            }
+          ],
+          "fire": [
+            {
+              "model": "gpt-6-astra",
+              "effort": "ultra"
+            }
+          ]
+        },
+        "B": [
+          {
+            "dispatch_role": "task_delegate",
+            "model": "gpt-6-luna",
+            "effort": "high",
+            "permission_contract": "readonly_review"
+          },
+          {
+            "dispatch_role": "task_delegate",
+            "model": "gpt-6.1-sol",
+            "effort": "high",
+            "permission_contract": "readonly_evidence"
+          },
+          {
+            "dispatch_role": "task_scan",
+            "model": "gpt-6-luna",
+            "effort": "high",
+            "permission_contract": "readonly_evidence"
+          },
+          {
+            "dispatch_role": "task_review",
+            "model": "gpt-6-astra",
+            "effort": "ultra",
+            "permission_contract": "readonly_review"
+          },
+          {
+            "dispatch_role": "task_delegate",
+            "model": "gpt-6-astra",
+            "effort": "ultra",
+            "permission_contract": "readonly_review"
+          },
+          {
+            "dispatch_role": "task_execute",
+            "model": "gpt-6-astra",
+            "effort": "ultra",
+            "permission_contract": "scoped_output"
+          },
+          {
+            "dispatch_role": "task_review",
+            "model": "gpt-6.1-sol",
+            "effort": "high",
+            "permission_contract": "readonly_review"
+          }
+        ],
+        "C": [
+          {
+            "matches_mode": true,
+            "contract_mismatch": false
+          },
+          {
+            "matches_mode": false,
+            "contract_mismatch": true
+          },
+          {
+            "matches_mode": false,
+            "contract_mismatch": true
+          },
+          {
+            "matches_mode": false,
+            "contract_mismatch": true
+          },
+          {
+            "matches_mode": true,
+            "contract_mismatch": false
+          },
+          {
+            "matches_mode": false,
+            "contract_mismatch": true
+          },
+          {
+            "matches_mode": false,
+            "contract_mismatch": true
+          },
+          {
+            "matches_mode": null,
+            "contract_mismatch": false
+          }
+        ]
+      },
+      "acceptance": {
+        "A": "pass",
+        "B": "pass",
+        "C": "pass"
+      },
+      "retries": 0
+    }
+  ],
+  "summary": {
+    "task_groups_per_batch": 3,
+    "independent_batches_per_requested_pair": 1,
+    "passed_task_groups": [
+      2,
+      3,
+      3
+    ],
+    "requested_dispatches": 3,
+    "additional_retries": 0,
+    "default_mapping_changed": false
+  },
+  "limitations": [
+    "每候选仅一次独立批次，批内子问题不是独立重复样本",
+    "仅当前仓库的只读配置分析，不覆盖实现、写作、研究或高不确定性任务",
+    "宿主工具结果未提供可信实际模型/effort元数据，不把请求参数或代理自报当作运行证据",
+    "未取得同口径端到端耗时、token或费用，不作速度/成本比较",
+    "没有独立留出样本，不据此调整默认映射"
+  ],
+  "finding": {
+    "location": "B[4]: high/L4/task_review",
+    "expected": {
+      "dispatch_role": "task_delegate",
+      "model": "gpt-6-astra",
+      "effort": "ultra",
+      "permission_contract": "readonly_review"
+    },
+    "first_requested_candidate_actual": {
+      "dispatch_role": "task_delegate",
+      "model": "gpt-6.1-sol",
+      "effort": "xhigh",
+      "permission_contract": "readonly_review"
+    },
+    "interpretation": "该次答案用了official/L4的组合值，违反high模式快照；只报告本次结果，不归纳模型能力排名"
+  }
+}

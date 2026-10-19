@@ -1,11 +1,12 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { spawn } from 'node:child_process';
-import { mkdtemp, mkdir, readdir, realpath, rm, stat, symlink } from 'node:fs/promises';
+import { mkdtemp, mkdir, readdir, realpath, rm, stat, symlink, writeFile } from 'node:fs/promises';
 import path from 'node:path';
 import os from 'node:os';
 import { checkAccountModels } from '../lib/models.mjs';
 import { BUILTINS } from '../lib/codex.mjs';
+import { mutate, readSnapshot } from '../lib/install.mjs';
 
 const PRIVATE = 'PRIVATE_SENTINEL_TOKEN_EMAIL_CONFIG';
 function model(name = 'gpt-6-luna', efforts = ['high', 'medium']) {
@@ -46,9 +47,10 @@ function fakeServer(options = {}) {
       else if (request.method === 'account/read') reply(request.id, options.account ?? {account:{type:'chatgpt',email:${JSON.stringify(PRIVATE)},planType:'pro',token:${JSON.stringify(PRIVATE)}},requiresOpenaiAuth:true,workspaceRouting:{chatgptAccountId:${JSON.stringify(PRIVATE)}}});
       else if (request.method === 'config/read') {
         if (options.noConfigRead) process.stdout.write(JSON.stringify({id:request.id,error:{code:-32601,message:${JSON.stringify(PRIVATE)}}}) + '\\n');
-        else reply(request.id, {config:{model_provider:options.provider ?? 'openai',token:${JSON.stringify(PRIVATE)},profiles:{private:${JSON.stringify(PRIVATE)}}},origins:{private:${JSON.stringify(PRIVATE)}}});
+        else reply(request.id, {config:{model_provider:options.provider ?? 'openai',model_providers:options.providers,token:${JSON.stringify(PRIVATE)},profiles:{private:${JSON.stringify(PRIVATE)}}},origins:{private:${JSON.stringify(PRIVATE)}}});
       } else if (request.method === 'model/list') {
         if (!request.params.includeHidden) process.exit(7);
+        if (options.authOnCatalog) fs.writeFileSync(process.env.CODEX_HOME + '/auth.json', JSON.stringify({OPENAI_API_KEY:options.authOnCatalog}));
         if (options.loop) reply(request.id, {data:[],nextCursor:'same'});
         else if (options.endless) reply(request.id, {data:[],nextCursor:'cursor-' + page++});
         else reply(request.id, (options.pages ?? [{data:${JSON.stringify([model()])},nextCursor:null}])[page++]);
@@ -69,6 +71,16 @@ function fakeServer(options = {}) {
 }
 const single = { model: 'gpt-6-luna', effort: 'high' };
 const codes = report => report.diagnostics.map(item => item.code);
+
+test('a changed configuration after user confirmation sends no account or inference RPC', async t => {
+  const { home } = await fixture(t);
+  const server = fakeServer();
+  const report = await checkAccountModels({ home, verify: true, target: single, expectRevision: 'previous' }, { spawn: server.spawn, readSnapshot: async () => ({ configuration_revision: 'current', mode: BUILTINS.find(mode => mode.id === 'fire') }) });
+  assert.equal(report.exit_code, 1); assert.equal(report.configuration_changed, true);
+  assert.equal(report.source_revision, 'previous'); assert.ok(codes(report).includes('CONFIG_CHANGED'));
+  assert.equal(report.checked_pairs[0].request_status, 'not_checked');
+  assert.equal(server.launches.length, 0);
+});
 
 test('catalog pagination includes hidden models, binds home, and emits only safe fields', async t => {
   const { home } = await fixture(t);
@@ -119,8 +131,8 @@ test('catalog absence leaves access unknown; reliable effort incompatibility ret
 test('account null is unknown for external providers and authentication required for OpenAI', async t => {
   const { home } = await fixture(t);
   for (const provider of ['external', 'openai']) {
-    const server = fakeServer({ provider, account: { account: null, requiresOpenaiAuth: true } });
-    const report = await checkAccountModels({ home }, { spawn: server.spawn });
+    const server = fakeServer({ provider, providers: { external: { base_url: 'https://configured.example/v1', env_key: 'PROBE_TEST_KEY' } }, account: { account: null, requiresOpenaiAuth: true } });
+    const report = await checkAccountModels({ home }, { spawn: server.spawn, env: { PROBE_TEST_KEY: PRIVATE }, fetch: async () => new Response(JSON.stringify({ data: [{ id: 'external-model' }] })) });
     assert.equal(report.account.status, provider === 'openai' ? 'authentication_required' : 'unknown');
     assert.equal(report.exit_code, provider === 'openai' ? 1 : 0);
     assert.equal(report.catalog.status, 'complete');
@@ -171,7 +183,8 @@ for (const [name, options, code] of [
   test(`${name} returns safe partial data and closes its child`, async t => {
     const { home } = await fixture(t);
     const server = fakeServer(options);
-    const report = await checkAccountModels({ home, target: single }, { spawn: server.spawn, deadlineMs: name === 'timeout' ? 150 : 2000 });
+    // The RPC timeout starts from a ready snapshot, independent of filesystem load.
+    const report = await checkAccountModels({ home, target: single }, { spawn: server.spawn, deadlineMs: name === 'timeout' ? 150 : 2000, ...(name === 'timeout' ? { readSnapshot: async () => ({ configuration_revision: 'ready', mode: null }) } : {}) });
     assert.equal(report.exit_code, 1);
     assert.ok(codes(report).includes(code), JSON.stringify(codes(report)));
     assert.notEqual(report.catalog.status, 'complete');
@@ -190,18 +203,16 @@ test('incomplete pagination preserves models but does not infer an unsupported e
   assert.equal(report.checked_pairs[0].parameter_support, 'unknown');
 });
 
-test('post-deployment check keeps immutable committed pairs and revision across a later switch', async t => {
+test('manual catalog check retains its starting revision and explicit pair across a later switch', async t => {
   const { home } = await fixture(t);
   const server = fakeServer();
-  const selection = { mode: BUILTINS[0], configurationRevision: 'committed-revision', pairs: [single, single, { model: 'old-custom', effort: 'high' }] };
   let snapshots = 0;
-  const report = await checkAccountModels({ home, selection }, { spawn: server.spawn, readSnapshot: async () => ({ configuration_revision: snapshots++ ? 'later-revision' : 'start-revision', mode: BUILTINS[2] }) });
+  const report = await checkAccountModels({ home, target: single }, { spawn: server.spawn, readSnapshot: async () => ({ configuration_revision: snapshots++ ? 'later-revision' : 'start-revision', mode: BUILTINS[2] }) });
   assert.equal(report.configuration_revision, 'start-revision');
-  assert.equal(report.source_revision, 'committed-revision');
-  assert.equal(report.mode.id, 'low');
-  assert.deepEqual(report.checked_pairs.map(({ model: name, effort }) => ({ model: name, effort })), [single, { model: 'old-custom', effort: 'high' }]);
+  assert.equal(report.source_revision, 'start-revision');
+  assert.equal(report.mode, null);
+  assert.deepEqual(report.checked_pairs.map(({ model: name, effort }) => ({ model: name, effort })), [single]);
   assert.equal(report.configuration_changed, true);
-  assert.deepEqual(selection.pairs, [single, single, { model: 'old-custom', effort: 'high' }]);
 });
 
 test('busy end snapshot reports change unknown without replacing source revision', async t => {
@@ -214,28 +225,30 @@ test('busy end snapshot reports change unknown without replacing source revision
   assert.equal(JSON.stringify(report).includes(PRIVATE), false);
 });
 
-test('verify hard gate sends no thread, turn, tool or inference requests even with a compatible catalog', async t => {
+test('missing authorization sends no inference or agent requests even with a compatible catalog', async t => {
   const { home } = await fixture(t);
   const server = fakeServer({ pages: [{ data: [model(), model('gpt-6.1-sol')] }] });
   const report = await checkAccountModels({ home, verify: true }, { spawn: server.spawn, readSnapshot: async () => ({ configuration_revision: 'initial', mode: BUILTINS[1] }) });
   assert.equal(report.exit_code, 1);
   assert.equal(report.catalog.status, 'complete');
-  assert.ok(codes(report).includes('PROBE_ISOLATION_UNSUPPORTED'));
-  assert.equal(report.checked_pairs.length, 3);
+  assert.ok(codes(report).includes('PROBE_AUTH_UNAVAILABLE'));
+  assert.deepEqual(report.checked_pairs.map(pair => `${pair.model}/${pair.effort}`).sort(), ['gpt-6-luna/medium', 'gpt-6-luna/high', 'gpt-6-luna/xhigh', 'gpt-6-luna/max', 'gpt-6.1-sol/medium', 'gpt-6.1-sol/high', 'gpt-6.1-sol/xhigh', 'gpt-6-astra/low', 'gpt-6-astra/medium'].sort());
   assert.ok(report.checked_pairs.every(pair => pair.request_status === 'not_checked' && pair.access === 'unknown' && pair.actual_model === null));
   assert.ok(server.calls.every(call => ['initialize', 'initialized', 'account/read', 'config/read', 'model/list'].includes(call.method)));
-  assert.equal(report.diagnostics.find(item => item.code === 'PROBE_ISOLATION_UNSUPPORTED').evidence.tested_cli_version, '0.156.1');
+  assert.equal(report.codex_version, '0.156.1');
+  assert.equal(report.probe_transport, 'responses_without_tools');
   assert.deepEqual(await readdir(home), []);
 });
 
-test('verify incomplete safety gate has exit 1 priority over a known incompatible effort', async t => {
+test('verify rejects a known incompatible effort before sending a request', async t => {
   const { home } = await fixture(t);
   const server = fakeServer({ pages: [{ data: [model('gpt-6-luna', ['medium'])] }] });
   const report = await checkAccountModels({ home, verify: true, target: single }, { spawn: server.spawn });
-  assert.equal(report.exit_code, 1);
+  assert.equal(report.exit_code, 3);
   assert.equal(report.mode, null);
   assert.equal(report.checked_pairs[0].parameter_support, 'incompatible');
-  assert.ok(codes(report).includes('PROBE_ISOLATION_UNSUPPORTED'));
+  assert.ok(codes(report).includes('MODEL_EFFORT_UNSUPPORTED'));
+  assert.equal(report.checked_pairs[0].request_status, 'not_checked');
 });
 
 test('partial target input rejects before any child can launch', async t => {
@@ -277,11 +290,12 @@ test('unsafe home aliases do not start Codex even for an explicit target', async
   assert.equal(launched, false);
 });
 
-test('post-check accepts all eight committed primary and fallback combinations', async t => {
+test('manual catalog check reads all eight primary and fallback combinations from the active mode', async t => {
   const { home } = await fixture(t);
   const server = fakeServer();
   const pairs = Array.from({ length: 8 }, (_, index) => ({ model: `configured-${index}`, effort: 'high' }));
-  const report = await checkAccountModels({ home, selection: { mode: BUILTINS[0], configurationRevision: 'committed', pairs } }, { spawn: server.spawn, readSnapshot: async () => ({ configuration_revision: 'committed' }) });
+  const mode = { ...BUILTINS[0], levels: Object.fromEntries(Object.keys(BUILTINS[0].levels).map((level, index) => [level, { ...pairs[index * 2], fallback: pairs[index * 2 + 1] }])) };
+  const report = await checkAccountModels({ home }, { spawn: server.spawn, readSnapshot: async () => ({ configuration_revision: 'committed', mode }) });
   assert.equal(report.exit_code, 0);
   assert.equal(report.checked_pairs.length, 8);
   assert.ok(report.checked_pairs.every(pair => pair.access === 'unknown'));
@@ -297,4 +311,234 @@ test('a supplied home with spaces and quote characters remains data', async t =>
   assert.equal(server.launches[0].settings.env.CODEX_HOME, home);
   assert.equal(server.launches[0].settings.shell, false);
   assert.deepEqual(await readdir(home), []);
+});
+
+
+test('fire verification failure preserves unknown access and reports the user or parent fallback', async t => {
+  const { home } = await fixture(t);
+  const server = fakeServer({ pages: [{ data: [model('gpt-6-astra', ['ultra'])] }] });
+  const report = await checkAccountModels({ home, verify: true }, { spawn: server.spawn, readSnapshot: async () => ({ configuration_revision: 'initial', mode: BUILTINS[3] }) });
+  assert.equal(report.exit_code, 1);
+  assert.equal(report.checked_pairs.length, 1);
+  assert.equal(report.checked_pairs[0].parameter_support, 'supported');
+  assert.equal(report.checked_pairs[0].request_status, 'not_checked');
+  assert.equal(report.checked_pairs[0].actual_model, null);
+  assert.equal(report.verification.on_failure.selection, 'user_or_parent');
+  assert.equal(report.verification.on_failure.dispatch_role, 'task_delegate');
+  assert.ok(codes(report).includes('PROBE_AUTH_UNAVAILABLE'));
+  assert.ok(server.calls.every(call => ['initialize', 'initialized', 'account/read', 'config/read', 'model/list'].includes(call.method)));
+});
+
+ test('verify reaches an isolated Responses request and checks identity without starting a Codex thread', async t => {
+  const {home}=await fixture(t); const server=fakeServer({provider:'custom',providers:{custom:{base_url:'https://configured.example/v1',env_key:'PROBE_TEST_KEY'}}});
+  let calls=0;
+  const report=await checkAccountModels({home,verify:true,target:single},{spawn:server.spawn,env:{PROBE_TEST_KEY:PRIVATE},fetch:async (url,init)=>{
+   calls++;
+   if (init.method === 'GET') { assert.equal(url.href, 'https://configured.example/v1/models'); return new Response(JSON.stringify({data:[{id:single.model}]})); }
+   assert.equal(url.href,'https://configured.example/v1/responses');assert.equal(init.headers.get('authorization'),'Bearer '+PRIVATE);
+   const body=JSON.parse(init.body);assert.equal(body.tool_choice,'none');assert.deepEqual(body.tools,[]);
+   return new Response(JSON.stringify({status:'completed',model:single.model,reasoning:{effort:single.effort},output:[{type:'message',content:[{type:'output_text',text:'OK'}]}]}));
+  }});
+  assert.equal(calls,2);assert.equal(report.catalog.source,'provider_models');assert.equal(report.checked_pairs[0].parameter_support,'unknown');assert.equal(report.status,'passed');assert.equal(report.checked_pairs[0].identity_status,'matched');assert.equal(report.checked_pairs[0].access,'available');
+  assert.equal(report.context.context_match,'unverified');assert.ok(server.calls.every(call=>!['thread/start','turn/start'].includes(call.method)));assert.equal(JSON.stringify(report).includes(PRIVATE),false);
+ });
+
+const externalProviders={custom:{base_url:'https://configured.example/v1',env_key:'PROBE_TEST_KEY'}};
+test('manual primary verification uses the selected session profile, deduplicates and excludes fallback', async t => {
+  const { home, root } = await fixture(t);
+  await mutate(home, 'setup');
+  await mutate(home, 'set', { scope: 'session', project: root, thread: 'model-chat', mode: 'high' });
+  const server = fakeServer({ provider: 'custom', providers: externalProviders });
+  const requests = [];
+  const report = await checkAccountModels({ home, scope: 'session', project: root, thread: 'model-chat', verify: true }, {
+    spawn: server.spawn, env: { PROBE_TEST_KEY: PRIVATE }, fetch: async (url, init) => {
+      if (init.method === 'GET') return new Response(JSON.stringify({ data: [] }));
+      const body = JSON.parse(init.body); requests.push([body.model, body.reasoning.effort]);
+      return new Response(JSON.stringify({ status: 'completed', model: body.model, reasoning: body.reasoning, output: [{ type: 'message' }] }));
+    },
+  });
+  assert.equal(report.mode.id, 'high'); assert.equal(report.status, 'passed');
+  assert.deepEqual(requests, [['gpt-6-luna', 'max'], ['gpt-6.1-sol', 'ultra'], ['gpt-6-astra', 'ultra']]);
+  assert.equal(report.checked_pairs.length, 3);
+});
+function providerInternal(server,fetch) { return {spawn:server.spawn,env:{PROBE_TEST_KEY:PRIVATE},readSnapshot:async()=>({configuration_revision:'stable',mode:BUILTINS[3]}),fetch}; }
+test('third-party directory is a provider candidate list and never falls back to model/list',async t=>{
+  const {home}=await fixture(t);const server=fakeServer({provider:'custom',providers:externalProviders});let calls=0;
+  const report=await checkAccountModels({home,target:single},providerInternal(server,async(url,init)=>{
+    calls++;assert.equal(init.method,'GET');assert.equal(url.pathname,'/v1/models');return new Response(JSON.stringify({data:[{id:'provider-only',secret:PRIVATE}]}));
+  }));
+  assert.equal(calls,1);assert.equal(report.status,'passed');assert.deepEqual(report.catalog.models.map(model=>model.id),['provider-only']);
+  assert.equal(report.checked_pairs[0].reason_code,'MODEL_NOT_LISTED');assert.equal(server.calls.some(call=>call.method==='model/list'),false);assert.equal(JSON.stringify(report).includes(PRIVATE),false);
+});
+test('provider availability probes every candidate using Responses and records unavailable and unconfirmed separately',async t=>{
+  const {home}=await fixture(t);const server=fakeServer({provider:'custom',providers:externalProviders});const calls=[];
+  const internal=providerInternal(server,async(url,init)=>{
+    calls.push({url,method:init.method});
+    if(init.method==='GET')return new Response(JSON.stringify({data:[{id:'working'},{id:'missing'},{id:'limited'},{id:'redirected'}]}));
+    const body=JSON.parse(init.body);assert.equal(Object.hasOwn(body,'reasoning'),false);assert.equal(url.pathname,'/v1/responses');
+    if(body.model==='missing')return new Response(JSON.stringify({error:{code:'model_not_found',message:PRIVATE}}),{status:404});
+    if(body.model==='limited')return new Response(PRIVATE,{status:429});
+    return new Response(JSON.stringify({status:'completed',model:body.model==='redirected'?'other-model':body.model,output:[{type:'message'}]}));
+  });
+  const report=await checkAccountModels({home,verify:true,discover:true},internal);
+  assert.equal(report.status,'incomplete');assert.equal(report.check_kind,'availability');assert.equal(report.verification.required,false);
+  assert.deepEqual(report.availability,{total:4,available:1,unavailable:1,unconfirmed:2});assert.equal(calls.length,4);
+  assert.deepEqual(report.checked_pairs.map(pair=>pair.reason_code),['PROBE_AVAILABLE','PROBE_MODEL_NOT_FOUND','PROBE_RATE_LIMITED','CHECK_STOPPED']);
+  assert.equal(report.checked_pairs.some(pair=>pair.identity_status==='matched'),false);assert.equal(JSON.stringify(report).includes(PRIVATE),false);
+  assert.equal(server.calls.some(call=>['model/list','thread/start','turn/start'].includes(call.method)),false);
+});
+test('catalogue changes after confirmation prevent all batch inference requests',async t=>{
+  const {home}=await fixture(t);const server=fakeServer({provider:'custom',providers:externalProviders});let posts=0;
+  const report=await checkAccountModels({home,verify:true,discover:true,expectCatalog:'0'.repeat(64)},providerInternal(server,async(_url,init)=>{
+    if(init.method==='POST')posts++;return new Response(JSON.stringify({data:[{id:'new-model'}]}));
+  }));
+  assert.equal(posts,0);assert.equal(report.status,'incomplete');assert.ok(codes(report).includes('PROVIDER_CATALOG_CHANGED'));
+});
+test('unavailable model listing does not block an explicit Responses verification or borrow Codex candidates',async t=>{
+  const {home}=await fixture(t);const server=fakeServer({provider:'custom',providers:externalProviders});let posts=0;
+  const report=await checkAccountModels({home,verify:true,target:single},providerInternal(server,async(_url,init)=>{
+    if(init.method==='GET')return new Response(PRIVATE,{status:404});
+    posts++;return new Response(JSON.stringify({status:'completed',model:single.model,reasoning:{effort:single.effort},output:[{type:'message'}]}));
+  }));
+  assert.equal(posts,1);assert.equal(report.status,'passed');assert.equal(report.catalog.status,'incomplete');assert.equal(report.checked_pairs[0].identity_status,'matched');
+  assert.deepEqual(report.catalog.models,[]);assert.equal(server.calls.some(call=>call.method==='model/list'),false);
+});
+test('invalid discover combinations reject before launching any client',async()=>{
+  for(const options of [{discover:true},{verify:true,discover:true,target:single},{verify:true,discover:true,expectCatalog:'invalid'}]) {
+    await assert.rejects(checkAccountModels({home:'/tmp',...options},{spawn(){assert.fail('must not spawn');}}),{exitCode:2});
+  }
+});
+
+test('completed provider availability has a distinct success meaning from strict verification',async t=>{
+  const {home}=await fixture(t);const server=fakeServer({provider:'custom',providers:externalProviders});
+  const report=await checkAccountModels({home,verify:true,discover:true},providerInternal(server,async(_url,init)=>{
+    if(init.method==='GET')return new Response(JSON.stringify({data:[{id:'working'}]}));
+    return new Response(JSON.stringify({status:'completed',output:[{type:'message'}]}));
+  }));
+  assert.equal(report.status,'passed');assert.deepEqual(report.availability,{total:1,available:1,unavailable:0,unconfirmed:0});
+  assert.equal(report.checked_pairs[0].identity_status,'unverified');assert.equal(report.checked_pairs[0].effort,null);assert.equal(report.checked_pairs[0].reason_code,'PROBE_AVAILABLE');
+});
+test('a provider model mismatch alone keeps availability incomplete',async t=>{
+  const {home}=await fixture(t);const server=fakeServer({provider:'custom',providers:externalProviders});
+  const report=await checkAccountModels({home,verify:true,discover:true},providerInternal(server,async(_url,init)=>new Response(JSON.stringify(init.method==='GET'?{data:[{id:'requested'}]}:{status:'completed',model:'different',output:[{type:'message'}]}))));
+  assert.equal(report.status,'incomplete');assert.equal(report.availability.available,0);assert.equal(report.availability.unconfirmed,1);
+});
+test('a shared probe timeout retains every unattempted candidate without extra network calls',async t=>{
+  const {home}=await fixture(t);const server=fakeServer({provider:'custom',providers:externalProviders});let posts=0;
+  const internal=providerInternal(server,async(_url,init)=>{
+    if(init.method==='GET')return new Response(JSON.stringify({data:[{id:'slow'},{id:'unattempted'}]}));
+    posts++;await new Promise((resolve,reject)=>{init.signal.addEventListener('abort',()=>reject(Error(PRIVATE)),{once:true});});
+  });
+  const report=await checkAccountModels({home,verify:true,discover:true},{...internal,deadlineMs:1500});
+  assert.equal(posts,1);assert.equal(report.status,'incomplete');assert.equal(report.checked_pairs.length,2);
+  assert.equal(report.checked_pairs[1].request_status,'not_checked');assert.equal(report.checked_pairs[1].reason_code,'PROBE_TIMEOUT');assert.equal(report.availability.unconfirmed,2);
+});
+
+test('manual verification continues model-specific failures and missing identity but stops shared failures', async t => {
+  const { home } = await fixture(t);
+  const pairs = ['first', 'second', 'third'].map(model => ({ model, effort: 'high' }));
+  const mode = { ...BUILTINS[2], levels: Object.fromEntries(Object.keys(BUILTINS[2].levels).map((level, index) => [level, { ...pairs[index % pairs.length], fallback: null }])) };
+  const readSnapshot = async () => ({ configuration_revision: 'stable', mode });
+  for (const [label, status, error, reason, expectedCalls] of [
+    ['missing', 404, { code: 'model_not_found' }, 'PROBE_MODEL_NOT_FOUND', 3],
+    ['effort', 400, { param: 'reasoning.effort' }, 'PROBE_EFFORT_UNSUPPORTED', 3],
+    ['unauthorized', 401, {}, 'PROBE_AUTH_FAILED', 1],
+    ['permission', 403, {}, 'PROBE_ACCESS_DENIED', 1],
+    ['quota', 429, { code: 'insufficient_quota' }, 'PROBE_RATE_LIMITED', 1],
+    ['unknown', 500, { message: PRIVATE }, 'PROBE_HTTP_FAILED', 1],
+  ]) await t.test(label, async () => {
+    const server = fakeServer({ provider: 'custom', providers: externalProviders }); let posts = 0;
+    const report = await checkAccountModels({ home, verify: true }, { ...providerInternal(server, async (_url, init) => {
+      if (init.method === 'GET') return new Response(JSON.stringify({ data: pairs.map(pair => ({ id: pair.model })) }));
+      const body = JSON.parse(init.body); posts++;
+      if (posts === 1) return new Response(JSON.stringify({ error }), { status });
+      return new Response(JSON.stringify({ status: 'completed', model: body.model, reasoning: body.reasoning, output: [{ type: 'message' }] }));
+    }), readSnapshot });
+    assert.equal(posts, expectedCalls); assert.equal(report.checked_pairs.length, 3);
+    assert.equal(report.checked_pairs[0].reason_code, reason);
+    if (expectedCalls === 1) {
+      assert.equal(report.stop_reason, reason);
+      assert.ok(report.checked_pairs.slice(1).every(pair => pair.request_status === 'not_checked' && pair.reason_code === 'CHECK_STOPPED' && pair.stopped_by === reason));
+    } else assert.ok(report.checked_pairs.slice(1).every(pair => pair.identity_status === 'matched'));
+    assert.notEqual(report.exit_code, 0); assert.equal(JSON.stringify(report).includes(PRIVATE), false);
+  });
+  for (const actual of [{ model: 'different', reasoning: { effort: 'high' } }, {}]) {
+    const server = fakeServer({ provider: 'custom', providers: externalProviders }); let posts = 0;
+    const report = await checkAccountModels({ home, verify: true }, { ...providerInternal(server, async (_url, init) => {
+      if (init.method === 'GET') return new Response(JSON.stringify({ data: pairs.map(pair => ({ id: pair.model })) }));
+      const body = JSON.parse(init.body); posts++;
+      return new Response(JSON.stringify({ status: 'completed', ...(posts === 1 ? actual : { model: body.model, reasoning: body.reasoning }), output: [{ type: 'message' }] }));
+    }), readSnapshot });
+    assert.equal(posts, 3); assert.equal(report.checked_pairs[0].request_status, 'succeeded');
+    assert.notEqual(report.checked_pairs[0].identity_status, 'matched'); assert.notEqual(report.exit_code, 0);
+    assert.equal(report.stop_reason, undefined);
+  }
+});
+
+test('manual verification stops between probes on configuration change', async t => {
+  const { home } = await fixture(t);
+  const pairs = ['first', 'second'].map(model => ({ model, effort: 'high' }));
+  const mode = { ...BUILTINS[2], levels: Object.fromEntries(Object.keys(BUILTINS[2].levels).map((level, index) => [level, { ...pairs[index % pairs.length], fallback: null }])) };
+  const server = fakeServer({ provider: 'custom', providers: externalProviders }); let posts = 0;
+  const internal = providerInternal(server, async (_url, init) => {
+    if (init.method === 'GET') return new Response(JSON.stringify({ data: pairs.map(pair => ({ id: pair.model })) }));
+    const body = JSON.parse(init.body); posts++;
+    return new Response(JSON.stringify({ status: 'completed', model: body.model, reasoning: body.reasoning, output: [{ type: 'message' }] }));
+  });
+  internal.readSnapshot = async () => ({ configuration_revision: posts ? 'changed' : 'stable', mode });
+  const report = await checkAccountModels({ home, verify: true }, internal);
+  assert.equal(posts, 1); assert.equal(report.stop_reason, 'CONFIG_CHANGED'); assert.equal(report.exit_code, 1);
+  assert.equal(report.checked_pairs[0].identity_status, 'matched'); assert.equal(report.checked_pairs[1].request_status, 'not_checked');
+});
+
+test('verification stops and invalidates results when file authorization changes during a request', async t => {
+  for (const target of ['batch', 'single', 'logout', 'catalog', 'second', 'end']) await t.test(target, async t => {
+    const { home } = await fixture(t);
+    const authFile = path.join(home, 'auth.json');
+    await writeFile(authFile, JSON.stringify({ OPENAI_API_KEY: PRIVATE }), { mode: 0o600 });
+    const pairs = ['first', 'second'].map(model => ({ model, effort: 'high' }));
+    const mode = { ...BUILTINS[1], levels: Object.fromEntries(['L1', 'L2', 'L3', 'L4'].map((level, index) => [level, { ...pairs[index % 2], fallback: null }])) };
+    const initialRevision = (await readSnapshot(home)).configuration_revision;
+    const server = fakeServer({ pages: [{ data: pairs.map(pair => model(pair.model)) }], ...(target === 'catalog' ? { authOnCatalog: 'REPLACEMENT_KEY' } : {}) });
+    let posts = 0;
+    const report = await checkAccountModels({ home, verify: true, ...(target === 'single' ? { target: pairs[0] } : {}) }, {
+      spawn: server.spawn, env: {}, readSnapshot: async home => {
+        const snapshot = await readSnapshot(home);
+        if (target === 'end' && posts === 2) await writeFile(authFile, JSON.stringify({ OPENAI_API_KEY: 'REPLACEMENT_KEY' }), { mode: 0o600 });
+        return { ...snapshot, mode };
+      }, fetch: async (_url, init) => {
+        posts++;
+        assert.equal(init.headers.get('authorization'), 'Bearer ' + PRIVATE);
+        if (target === 'logout') await rm(authFile);
+        else if (target !== 'end' && (target !== 'second' || posts === 2)) await writeFile(authFile, JSON.stringify({ OPENAI_API_KEY: 'REPLACEMENT_KEY' }), { mode: 0o600 });
+        const body = JSON.parse(init.body);
+        return new Response(JSON.stringify({ status: 'completed', model: body.model, reasoning: body.reasoning, output: [{ type: 'message' }] }));
+      },
+    });
+    assert.equal(posts, target === 'catalog' ? 0 : ['second', 'end'].includes(target) ? 2 : 1);
+    assert.equal(report.status, 'incomplete'); assert.equal(report.exit_code, 1);
+    assert.equal(report.authorization_changed, true); assert.equal(report.stop_reason, 'PROBE_AUTH_CHANGED');
+    assert.equal(report.source_revision, initialRevision);
+    assert.ok(report.checked_pairs.every(pair => pair.access === 'unknown' && pair.identity_status !== 'matched'));
+    if (!['single', 'second', 'end'].includes(target)) assert.equal(report.checked_pairs[1].request_status, 'not_checked');
+    assert.equal(JSON.stringify(report).includes(PRIVATE), false);
+  });
+});
+
+test('a configured provider environment change invalidates the catalog before any inference', async t => {
+  const { home } = await fixture(t);
+  const server = fakeServer({ provider: 'custom', providers: externalProviders });
+  const env = { PROBE_TEST_KEY: PRIVATE };
+  let posts = 0;
+  const report = await checkAccountModels({ home, verify: true, target: single }, {
+    spawn: server.spawn, env, fetch: async (_url, init) => {
+      if (init.method === 'POST') posts++;
+      env.PROBE_TEST_KEY = 'REPLACEMENT_KEY';
+      return new Response(JSON.stringify({ data: [{ id: single.model }] }));
+    },
+  });
+  assert.equal(posts, 0); assert.equal(report.status, 'incomplete');
+  assert.equal(report.authorization_changed, true); assert.equal(report.stop_reason, 'PROBE_AUTH_CHANGED');
+  assert.equal(report.checked_pairs[0].access, 'unknown');
+  assert.equal(JSON.stringify(report).includes(PRIVATE), false);
 });

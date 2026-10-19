@@ -1,0 +1,537 @@
+{
+  "date": "2026-10-19",
+  "purpose": "既有 L1–L4 分级规则的边界核验；不评估候选完成业务任务的能力",
+  "status": "PARTIAL",
+  "status_reason": "本批案例分级与静态组合已核验；实际运行身份未验证，每个规则上下文仅一批样本，不能推广规则或模型能力结论",
+  "input_path": "docs/calibration/fixtures/2026-10-19-level-boundaries-input.json",
+  "expected_path": "docs/calibration/fixtures/2026-10-19-level-boundaries-expected.json",
+  "freeze": {
+    "date": "2026-10-19",
+    "sha256": {
+      "docs/calibration/fixtures/2026-10-19-level-boundaries-input.json": "c98385e202f28f961abab8ebf7822a07daeae9de6f3758f3e4a7c1f532f3bf13",
+      "docs/calibration/fixtures/2026-10-19-level-boundaries-expected.json": "7eadbcd48ae45591efa41c02f30eeca0cd68162498029e90fc7ae50feb9e78e4",
+      "adapters/codex/skills/subagent-delegation/SKILL.md": "096f7ef493f57989fea91dbcc538d1e05f6f60cb4afc74be3c13c87c628813a6",
+      "adapters/codex/modes.json": "3b35bf23f98c0abfcb0e5210b32a58f2a43819096afcab672327fb3f1d4273f2",
+      "/Users/fun/.codex/skills/subagent-delegation/SKILL.md": "f3a915b7365e1992f9e4ef2ab8cb2279d9a7bbbef857723609e0a32fe704ef37"
+    },
+    "preflight": "official L1-L4 explain: 4/4 passed",
+    "budget": {
+      "contexts": 2,
+      "batches_per_context": 1,
+      "cases_per_batch": 10,
+      "automatic_retries": 0,
+      "max_elapsed_ms_per_context": 120000
+    },
+    "control": "installed home Skill",
+    "candidate": "workspace Skill",
+    "requested": {
+      "model": "gpt-6.1-sol",
+      "effort": "ultra",
+      "source": "active high/L2; task_delegate preserves readonly analysis"
+    },
+    "input_instructions_identical": true
+  },
+  "methodology": {
+    "evaluator": "主代理",
+    "control": "已安装版 Skill；不是无指导控制组，宿主启动规则仍适用",
+    "candidate": "工作区版 Skill；宿主启动规则仍适用",
+    "identical_task_input": true,
+    "expected_answers_hidden_from_evaluators": true,
+    "side_effects": "子代理只读分级；主代理只用临时未安装 home 预览，未执行案例业务任务",
+    "provenance": "normalized_answer 从 collaboration 最终返回 JSON 规范化转录；分级字段与理由均保留",
+    "grouping": "每个上下文一批 10 个案例，不是每个上下文 10 次独立重复；此次未进行无指导消融或模型能力比较"
+  },
+  "runs": [
+    {
+      "variant": "installed",
+      "assigned_guidance": "/Users/fun/.codex/skills/subagent-delegation/SKILL.md",
+      "task": "/root/level_boundary_installed",
+      "role": "task_delegate",
+      "fork_turns": "none",
+      "requested": {
+        "model": "gpt-6.1-sol",
+        "effort": "ultra",
+        "source": "active high/L2; task_delegate preserves readonly analysis"
+      },
+      "observed": {
+        "model": null,
+        "effort": null,
+        "identity_status": "unverified",
+        "metadata_source": null
+      },
+      "attempt": 1,
+      "independent_batches": 1,
+      "execution_status": "completed",
+      "acceptance": "pass",
+      "passed_cases": 10,
+      "failed_cases": 0,
+      "unjudged_cases": 0,
+      "elapsed_ms": null,
+      "usage": null,
+      "normalized_answer": {
+        "cases": [
+          {
+            "id": "B01",
+            "complexity_level": "L1",
+            "effective_level": "L1",
+            "needs_prerequisite": false,
+            "reason": "逐项映射、操作与预期结果均明确且可全部逐字核验，200 个文件的数量本身不提高推理等级。"
+          },
+          {
+            "id": "B02",
+            "complexity_level": "L2",
+            "effective_level": "L2",
+            "needs_prerequisite": false,
+            "reason": "目标和验收明确，但需要局部方案取舍及多步实现，符合 L2，且没有复杂关系或冲突约束要求升级。"
+          },
+          {
+            "id": "B03",
+            "complexity_level": "L3",
+            "effective_level": "L3",
+            "needs_prerequisite": false,
+            "reason": "必要材料齐全，需要分析机制间的复杂关系、权衡矛盾观测并排除竞争解释，符合 L3。"
+          },
+          {
+            "id": "B04",
+            "complexity_level": "L4",
+            "effective_level": "L4",
+            "needs_prerequisite": false,
+            "reason": "证据与约束齐全，但仍须建立并检验关键因果假设，在强耦合冲突约束下形成方案，属于 L4 的困难推理而非缺失外部前提。"
+          },
+          {
+            "id": "B05",
+            "complexity_level": "L1",
+            "effective_level": "L1",
+            "needs_prerequisite": false,
+            "reason": "仅核验低影响且正确写法已确定的拼写替换，结果容易逐字检查，独立复核这一名称本身不构成独立关键复核。"
+          },
+          {
+            "id": "B06",
+            "complexity_level": "L1",
+            "effective_level": "L1",
+            "needs_prerequisite": true,
+            "reason": "固定脚本和模板不需要方案判断，推理需求为 L1，但必须先取得运行所需的测试账号授权，升级等级不能补足该前提。"
+          },
+          {
+            "id": "B07",
+            "complexity_level": "L1",
+            "effective_level": "L3",
+            "needs_prerequisite": true,
+            "reason": "机械映射本身为 L1，但大范围权限扩大的潜在后果要求 L3 级关键复核保障，且必须先补足可靠验收，不能用提高等级替代验证证据。"
+          },
+          {
+            "id": "B08",
+            "complexity_level": "L3",
+            "effective_level": "L3",
+            "needs_prerequisite": false,
+            "reason": "跨组件竞争涉及相互影响的约束与竞争解释，属于 L3，尽快完成的偏好不足以允许删减证据、范围或验收并降级。"
+          },
+          {
+            "id": "B09",
+            "complexity_level": "L3",
+            "effective_level": "L3",
+            "needs_prerequisite": false,
+            "reason": "取消、重入和恢复路径互相制约且假设与观测矛盾，需要 L3 的复杂关系与矛盾分析，单文件范围不降低等级。"
+          },
+          {
+            "id": "B10",
+            "complexity_level": "L2",
+            "effective_level": "L2",
+            "needs_prerequisite": false,
+            "reason": "接口、范围与验收明确，仅需有限局部选择和多步实现，符合 L2，20 个模块的数量本身不足以升级。"
+          }
+        ]
+      },
+      "results": [
+        {
+          "id": "B01",
+          "acceptance": "pass",
+          "rationale_review": "主代理逐项核对事实与原规则，通过；未使用措辞关键词代替判断",
+          "selection_reference": "official/L1/task_execute",
+          "next_action": "continue_authorized_pre_dispatch_checks",
+          "business_task_dispatched": false
+        },
+        {
+          "id": "B02",
+          "acceptance": "pass",
+          "rationale_review": "主代理逐项核对事实与原规则，通过；未使用措辞关键词代替判断",
+          "selection_reference": "official/L2/task_execute",
+          "next_action": "continue_authorized_pre_dispatch_checks",
+          "business_task_dispatched": false
+        },
+        {
+          "id": "B03",
+          "acceptance": "pass",
+          "rationale_review": "主代理逐项核对事实与原规则，通过；未使用措辞关键词代替判断",
+          "selection_reference": "official/L3/task_scan",
+          "next_action": "continue_authorized_pre_dispatch_checks",
+          "business_task_dispatched": false
+        },
+        {
+          "id": "B04",
+          "acceptance": "pass",
+          "rationale_review": "主代理逐项核对事实与原规则，通过；未使用措辞关键词代替判断",
+          "selection_reference": "official/L4/task_review",
+          "next_action": "continue_authorized_pre_dispatch_checks",
+          "business_task_dispatched": false
+        },
+        {
+          "id": "B05",
+          "acceptance": "pass",
+          "rationale_review": "主代理逐项核对事实与原规则，通过；未使用措辞关键词代替判断",
+          "selection_reference": "official/L1/task_review",
+          "next_action": "continue_authorized_pre_dispatch_checks",
+          "business_task_dispatched": false
+        },
+        {
+          "id": "B06",
+          "acceptance": "pass",
+          "rationale_review": "主代理逐项核对事实与原规则，通过；未使用措辞关键词代替判断",
+          "selection_reference": "official/L1/task_scan",
+          "next_action": "resolve_prerequisite_before_dispatch",
+          "business_task_dispatched": false
+        },
+        {
+          "id": "B07",
+          "acceptance": "pass",
+          "rationale_review": "主代理逐项核对事实与原规则，通过；未使用措辞关键词代替判断",
+          "selection_reference": "official/L3/task_execute",
+          "next_action": "resolve_prerequisite_before_dispatch",
+          "business_task_dispatched": false
+        },
+        {
+          "id": "B08",
+          "acceptance": "pass",
+          "rationale_review": "主代理逐项核对事实与原规则，通过；未使用措辞关键词代替判断",
+          "selection_reference": "official/L3/task_scan",
+          "next_action": "continue_authorized_pre_dispatch_checks",
+          "business_task_dispatched": false
+        },
+        {
+          "id": "B09",
+          "acceptance": "pass",
+          "rationale_review": "主代理逐项核对事实与原规则，通过；未使用措辞关键词代替判断",
+          "selection_reference": "official/L3/task_scan",
+          "next_action": "continue_authorized_pre_dispatch_checks",
+          "business_task_dispatched": false
+        },
+        {
+          "id": "B10",
+          "acceptance": "pass",
+          "rationale_review": "主代理逐项核对事实与原规则，通过；未使用措辞关键词代替判断",
+          "selection_reference": "official/L2/task_execute",
+          "next_action": "continue_authorized_pre_dispatch_checks",
+          "business_task_dispatched": false
+        }
+      ]
+    },
+    {
+      "variant": "workspace",
+      "assigned_guidance": "adapters/codex/skills/subagent-delegation/SKILL.md",
+      "task": "/root/level_boundary_workspace",
+      "role": "task_delegate",
+      "fork_turns": "none",
+      "requested": {
+        "model": "gpt-6.1-sol",
+        "effort": "ultra",
+        "source": "active high/L2; task_delegate preserves readonly analysis"
+      },
+      "observed": {
+        "model": null,
+        "effort": null,
+        "identity_status": "unverified",
+        "metadata_source": null
+      },
+      "attempt": 1,
+      "independent_batches": 1,
+      "execution_status": "completed",
+      "acceptance": "pass",
+      "passed_cases": 10,
+      "failed_cases": 0,
+      "unjudged_cases": 0,
+      "elapsed_ms": null,
+      "usage": null,
+      "normalized_answer": {
+        "cases": [
+          {
+            "id": "B01",
+            "complexity_level": "L1",
+            "effective_level": "L1",
+            "needs_prerequisite": false,
+            "reason": "输入、方法与验收均已确定，属于可逐字核验的低影响机械执行，200 个文件不会增加推理等级。"
+          },
+          {
+            "id": "B02",
+            "complexity_level": "L2",
+            "effective_level": "L2",
+            "needs_prerequisite": false,
+            "reason": "目标与验收明确，但实现需要在两种已知方案间作有限的局部取舍，符合有边界的推理。"
+          },
+          {
+            "id": "B03",
+            "complexity_level": "L3",
+            "effective_level": "L3",
+            "needs_prerequisite": false,
+            "reason": "必要证据齐全，需权衡异步状态、缓存与持久化之间的耦合约束，并根据矛盾观测排除竞争解释。"
+          },
+          {
+            "id": "B04",
+            "complexity_level": "L4",
+            "effective_level": "L4",
+            "needs_prerequisite": false,
+            "reason": "必要材料齐全，建立并检验关键因果假设属于任务本身，强耦合机制与冲突约束要求高不确定性推理。"
+          },
+          {
+            "id": "B05",
+            "complexity_level": "L1",
+            "effective_level": "L1",
+            "needs_prerequisite": false,
+            "reason": "正确写法与核验方法均已确定，独立复核要求约束执行者的独立性，不会将低影响的机械核对自动升档。"
+          },
+          {
+            "id": "B06",
+            "complexity_level": "L1",
+            "effective_level": "L1",
+            "needs_prerequisite": true,
+            "reason": "任务方法与验收明确，属于 L1，但必须先取得运行必需的测试账号授权并具备可执行环境，升档不能替代前提。"
+          },
+          {
+            "id": "B07",
+            "complexity_level": "L1",
+            "effective_level": "L3",
+            "needs_prerequisite": true,
+            "reason": "转换本身是 L1 机械执行，但高影响且缺乏可靠验收触发至少 L3 的保障下限，执行前仍须补足验证前提。"
+          },
+          {
+            "id": "B08",
+            "complexity_level": "L3",
+            "effective_level": "L3",
+            "needs_prerequisite": false,
+            "reason": "证据齐全但跨组件约束与竞争解释需要复杂权衡，尽快完成的要求不能降低原质量与验收所需等级。"
+          },
+          {
+            "id": "B09",
+            "complexity_level": "L3",
+            "effective_level": "L3",
+            "needs_prerequisite": false,
+            "reason": "取消、重入与恢复路径互相制约且假设与观测存在矛盾，需要复杂关系分析，集中在单个文件不降低等级。"
+          },
+          {
+            "id": "B10",
+            "complexity_level": "L2",
+            "effective_level": "L2",
+            "needs_prerequisite": false,
+            "reason": "接口、范围与验收明确，各模块仅需有限的局部方案选择，20 个模块的数量不使任务自动升为复杂推理。"
+          }
+        ]
+      },
+      "results": [
+        {
+          "id": "B01",
+          "acceptance": "pass",
+          "rationale_review": "主代理逐项核对事实与原规则，通过；未使用措辞关键词代替判断",
+          "selection_reference": "official/L1/task_execute",
+          "next_action": "continue_authorized_pre_dispatch_checks",
+          "business_task_dispatched": false
+        },
+        {
+          "id": "B02",
+          "acceptance": "pass",
+          "rationale_review": "主代理逐项核对事实与原规则，通过；未使用措辞关键词代替判断",
+          "selection_reference": "official/L2/task_execute",
+          "next_action": "continue_authorized_pre_dispatch_checks",
+          "business_task_dispatched": false
+        },
+        {
+          "id": "B03",
+          "acceptance": "pass",
+          "rationale_review": "主代理逐项核对事实与原规则，通过；未使用措辞关键词代替判断",
+          "selection_reference": "official/L3/task_scan",
+          "next_action": "continue_authorized_pre_dispatch_checks",
+          "business_task_dispatched": false
+        },
+        {
+          "id": "B04",
+          "acceptance": "pass",
+          "rationale_review": "主代理逐项核对事实与原规则，通过；未使用措辞关键词代替判断",
+          "selection_reference": "official/L4/task_review",
+          "next_action": "continue_authorized_pre_dispatch_checks",
+          "business_task_dispatched": false
+        },
+        {
+          "id": "B05",
+          "acceptance": "pass",
+          "rationale_review": "主代理逐项核对事实与原规则，通过；未使用措辞关键词代替判断",
+          "selection_reference": "official/L1/task_review",
+          "next_action": "continue_authorized_pre_dispatch_checks",
+          "business_task_dispatched": false
+        },
+        {
+          "id": "B06",
+          "acceptance": "pass",
+          "rationale_review": "主代理逐项核对事实与原规则，通过；未使用措辞关键词代替判断",
+          "selection_reference": "official/L1/task_scan",
+          "next_action": "resolve_prerequisite_before_dispatch",
+          "business_task_dispatched": false
+        },
+        {
+          "id": "B07",
+          "acceptance": "pass",
+          "rationale_review": "主代理逐项核对事实与原规则，通过；未使用措辞关键词代替判断",
+          "selection_reference": "official/L3/task_execute",
+          "next_action": "resolve_prerequisite_before_dispatch",
+          "business_task_dispatched": false
+        },
+        {
+          "id": "B08",
+          "acceptance": "pass",
+          "rationale_review": "主代理逐项核对事实与原规则，通过；未使用措辞关键词代替判断",
+          "selection_reference": "official/L3/task_scan",
+          "next_action": "continue_authorized_pre_dispatch_checks",
+          "business_task_dispatched": false
+        },
+        {
+          "id": "B09",
+          "acceptance": "pass",
+          "rationale_review": "主代理逐项核对事实与原规则，通过；未使用措辞关键词代替判断",
+          "selection_reference": "official/L3/task_scan",
+          "next_action": "continue_authorized_pre_dispatch_checks",
+          "business_task_dispatched": false
+        },
+        {
+          "id": "B10",
+          "acceptance": "pass",
+          "rationale_review": "主代理逐项核对事实与原规则，通过；未使用措辞关键词代替判断",
+          "selection_reference": "official/L2/task_execute",
+          "next_action": "continue_authorized_pre_dispatch_checks",
+          "business_task_dispatched": false
+        }
+      ]
+    }
+  ],
+  "static_mapping": {
+    "mode": "official",
+    "active_home_mode_changed": false,
+    "purpose": "按已判定等级用现有 CLI 查表，不由被测上下文手工生成模型值；仅静态规划",
+    "preflight_queries_passed": 4,
+    "unique_followup_queries_passed": 7,
+    "selections": {
+      "official/L1/task_execute": {
+        "mode_id": "official",
+        "level": "L1",
+        "requested_role": "task_execute",
+        "primary": {
+          "model": "gpt-6-luna",
+          "effort": "high"
+        },
+        "dispatch_role": "task_delegate",
+        "permission_contract": "scoped_output",
+        "source": "package",
+        "definition_version": "0.6.0",
+        "runtime_verification": "unverified"
+      },
+      "official/L2/task_execute": {
+        "mode_id": "official",
+        "level": "L2",
+        "requested_role": "task_execute",
+        "primary": {
+          "model": "gpt-6.1-sol",
+          "effort": "medium"
+        },
+        "dispatch_role": "task_execute",
+        "permission_contract": "scoped_output",
+        "source": "package",
+        "definition_version": "0.6.0",
+        "runtime_verification": "unverified"
+      },
+      "official/L3/task_scan": {
+        "mode_id": "official",
+        "level": "L3",
+        "requested_role": "task_scan",
+        "primary": {
+          "model": "gpt-6.1-sol",
+          "effort": "high"
+        },
+        "dispatch_role": "task_delegate",
+        "permission_contract": "readonly_evidence",
+        "source": "package",
+        "definition_version": "0.6.0",
+        "runtime_verification": "unverified"
+      },
+      "official/L4/task_review": {
+        "mode_id": "official",
+        "level": "L4",
+        "requested_role": "task_review",
+        "primary": {
+          "model": "gpt-6.1-sol",
+          "effort": "xhigh"
+        },
+        "dispatch_role": "task_delegate",
+        "permission_contract": "readonly_review",
+        "source": "package",
+        "definition_version": "0.6.0",
+        "runtime_verification": "unverified"
+      },
+      "official/L1/task_review": {
+        "mode_id": "official",
+        "level": "L1",
+        "requested_role": "task_review",
+        "primary": {
+          "model": "gpt-6-luna",
+          "effort": "high"
+        },
+        "dispatch_role": "task_delegate",
+        "permission_contract": "readonly_review",
+        "source": "package",
+        "definition_version": "0.6.0",
+        "runtime_verification": "unverified"
+      },
+      "official/L1/task_scan": {
+        "mode_id": "official",
+        "level": "L1",
+        "requested_role": "task_scan",
+        "primary": {
+          "model": "gpt-6-luna",
+          "effort": "high"
+        },
+        "dispatch_role": "task_scan",
+        "permission_contract": "readonly_evidence",
+        "source": "package",
+        "definition_version": "0.6.0",
+        "runtime_verification": "unverified"
+      },
+      "official/L3/task_execute": {
+        "mode_id": "official",
+        "level": "L3",
+        "requested_role": "task_execute",
+        "primary": {
+          "model": "gpt-6.1-sol",
+          "effort": "high"
+        },
+        "dispatch_role": "task_delegate",
+        "permission_contract": "scoped_output",
+        "source": "package",
+        "definition_version": "0.6.0",
+        "runtime_verification": "unverified"
+      }
+    }
+  },
+  "findings": {
+    "observed_grade_disagreements": 0,
+    "observed_combination_disagreements": 0,
+    "prerequisite_cases": [
+      "B06",
+      "B07"
+    ],
+    "safeguard_adjustment_case": "B07: intrinsic L1 / planned L3 / resolve prerequisite first",
+    "main_skill_changed": false,
+    "default_mapping_changed": false,
+    "interpretation": "未观察到违反现有分级规则的证据，保留原分级与组合；两组同答不证明能力等价或新版带来收益"
+  },
+  "limitations": [
+    "临时构造案例只覆盖本地规则边界，不是实际任务分布或独立保留集；本次用于验收，不据此调优映射。",
+    "实际模型与 effort 缺可信 metadata；无可信耗时、token 或费用计量，不能声明模型或成本收益。",
+    "任务授权、委派收益在案例输入中被假定已另行核对，本次不验证真实收益估计。",
+    "原已安装 home 未更新；新增案例与实验记录只在仓库保留，不随 Skill 发布。"
+  ]
+}

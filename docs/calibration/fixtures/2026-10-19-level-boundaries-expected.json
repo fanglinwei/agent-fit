@@ -1,0 +1,76 @@
+{
+  "schema_version": 1,
+  "purpose": "本地现有 Skill 规则的冻结验收；不是外部项目验证过的难度真值或模型能力基准。",
+  "cases": [
+    {
+      "id": "B01",
+      "complexity_level": "L1",
+      "effective_level": "L1",
+      "needs_prerequisite": false,
+      "rationale": "步骤量不改变已知方法与确定验收。"
+    },
+    {
+      "id": "B02",
+      "complexity_level": "L2",
+      "effective_level": "L2",
+      "needs_prerequisite": false,
+      "rationale": "边界明确，但存在局部推理与有限方案选择。"
+    },
+    {
+      "id": "B03",
+      "complexity_level": "L3",
+      "effective_level": "L3",
+      "needs_prerequisite": false,
+      "rationale": "只读职责不降低竞争假设与耦合约束的推理需求。"
+    },
+    {
+      "id": "B04",
+      "complexity_level": "L4",
+      "effective_level": "L4",
+      "needs_prerequisite": false,
+      "rationale": "材料齐备；关键假设未建立且强耦合，属于高不确定性推理。"
+    },
+    {
+      "id": "B05",
+      "complexity_level": "L1",
+      "effective_level": "L1",
+      "needs_prerequisite": false,
+      "rationale": "独立性属于验收要求；简单、低影响且确定的核对不自动升为 L3。"
+    },
+    {
+      "id": "B06",
+      "complexity_level": "L1",
+      "effective_level": "L1",
+      "needs_prerequisite": true,
+      "rationale": "缺授权先补前提，不能当作推理复杂度升到 L4。"
+    },
+    {
+      "id": "B07",
+      "complexity_level": "L1",
+      "effective_level": "L3",
+      "needs_prerequisite": true,
+      "rationale": "复杂度仍为机械执行；高后果且缺可靠验收触发本地至少 L3 保障下限，仍须补验证前提。"
+    },
+    {
+      "id": "B08",
+      "complexity_level": "L3",
+      "effective_level": "L3",
+      "needs_prerequisite": false,
+      "rationale": "时延只能在满足原质量的组合间取舍，不能降低必要推理等级。"
+    },
+    {
+      "id": "B09",
+      "complexity_level": "L3",
+      "effective_level": "L3",
+      "needs_prerequisite": false,
+      "rationale": "单文件也可能有竞争假设与复杂约束，文件数不决定等级。"
+    },
+    {
+      "id": "B10",
+      "complexity_level": "L2",
+      "effective_level": "L2",
+      "needs_prerequisite": false,
+      "rationale": "多模块但推理有边界；范围本身不等于 L3 或 L4。"
+    }
+  ]
+}
