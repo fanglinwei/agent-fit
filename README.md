@@ -22,10 +22,12 @@ Agent Fit 将任务复杂度、模型档位和委派职责放进一套可查询�
 安装命令行工具，预览并应用官方档位：
 
 ```sh
-npm install -g agent-fit
+npm install -g @fanglinwei/agent-fit
 agent-fit setup --mode official --dry-run
 agent-fit setup --mode official
 ```
+
+npm 包名为 [`@fanglinwei/agent-fit`](https://www.npmjs.com/package/@fanglinwei/agent-fit)，安装后的命令和 Skill 名为 `agent-fit`。
 
 **首次配置完成后重启 Codex。** 安装 npm 包本身不会修改 Codex；`setup` 才会写入 Skill、四个委派角色、AGENTS 管理区块和档位数据。默认目标为 `CODEX_HOME` 或 `~/.codex`，可通过 `--codex-home "/path/to/codex-home"` 指定独立目录。
 
@@ -131,7 +133,7 @@ agent-fit models check --verify
 
 ```sh
 agent-fit restore --dry-run
-agent-fit restore && npm uninstall -g agent-fit
+agent-fit restore && npm uninstall -g @fanglinwei/agent-fit
 ```
 
 独立 home 的预览和实际恢复都必须传入相同的 `--codex-home`，多个 home 逐一恢复成功后才可卸载。恢复会保留安装前内容、无关文件和管理区块外修改；文件漂移或损坏的恢复基线会阻止覆盖。恢复完成后重启 Codex。
@@ -149,7 +151,7 @@ npm test
 npm pack
 ```
 
-本地打包产物为 `agent-fit-0.7.0.tgz`，可用 `npm install -g ./agent-fit-0.7.0.tgz` 安装。浏览器集成使用已有 Playwright 与 Chrome，运行方法见[开发验证](docs/usage.md#开发验证)。唯一运行依赖为 [smol-toml](https://github.com/squirrelchat/smol-toml)。
+本地打包产物为 `fanglinwei-agent-fit-0.7.1.tgz`，可用 `npm install -g ./fanglinwei-agent-fit-0.7.1.tgz` 安装。浏览器集成使用已有 Playwright 与 Chrome，运行方法见[开发验证](docs/usage.md#开发验证)。唯一运行依赖为 [smol-toml](https://github.com/squirrelchat/smol-toml)。
 
 ## License
 

@@ -1,15 +1,15 @@
 # 使用说明
 
-`agent-fit` 0.7.0。首版支持 Codex；Node.js 22+。命令、网页和生成的 Skill 使用同一套档位数据。
+`agent-fit` 0.7.1，npm 包名为 `@fanglinwei/agent-fit`，命令和 Skill 名仍为 `agent-fit`。首版支持 Codex；Node.js 22+。命令、网页和生成的 Skill 使用同一套档位数据。
 
-终端命令与 npm 包名均为 `agent-fit`。工具只处理当前格式与版本的配置；独立 home 全程使用显式指定的路径。
+工具只处理当前格式与版本的配置；独立 home 全程使用显式指定的路径。
 
 ## 安装与配置
 
-从 npm registry 安装，或在项目目录运行 `npm pack` 后使用 `npm install -g ./agent-fit-0.7.0.tgz` 安装本地包。两种方式都需要 Node/npm。
+从 npm registry 安装，或在项目目录运行 `npm pack` 后使用 `npm install -g ./fanglinwei-agent-fit-0.7.1.tgz` 安装本地包。两种方式都需要 Node/npm。
 
 ```sh
-npm install -g agent-fit
+npm install -g @fanglinwei/agent-fit
 agent-fit setup --mode official --dry-run
 agent-fit setup --mode official
 ```
@@ -17,7 +17,7 @@ agent-fit setup --mode official
 一行安装并配置：
 
 ```sh
-npm install -g agent-fit && agent-fit setup --mode official
+npm install -g @fanglinwei/agent-fit && agent-fit setup --mode official
 ```
 
 目标目录优先级为 `--codex-home PATH`、`CODEX_HOME`、用户 `~/.codex`。空格路径需要 shell 引号。命令不会设置主代理模型、全局子代理默认、供应商、审批、沙箱、并发或子代理启用开关。
@@ -143,8 +143,8 @@ agent-fit explain --level L4 --role task_review
 无需全局安装的 npm 查询，以及本地包查询：
 
 ```sh
-npm exec --package=agent-fit@0.7.0 -- agent-fit status --details
-npm exec --package="/path/to/agent-fit-0.7.0.tgz" -- agent-fit status --details
+npm exec --package=@fanglinwei/agent-fit@0.7.1 -- agent-fit status --details
+npm exec --package="/path/to/fanglinwei-agent-fit-0.7.1.tgz" -- agent-fit status --details
 ```
 
 ## 委派收益检查
@@ -428,7 +428,7 @@ JSON stdout 只有统一 envelope：
 ```sh
 agent-fit restore --dry-run
 # 预览确认后执行；恢复失败时不会继续卸载
-agent-fit restore && npm uninstall -g agent-fit
+agent-fit restore && npm uninstall -g @fanglinwei/agent-fit
 ```
 
 restore 后重启 Codex。它不会卸载 npm 工具、删除整个 home、清理账号或重启应用。这条顺序要求由 Skill 和安装后的 AGENTS 规则约束；直接执行 npm 卸载不会自动代做 restore。

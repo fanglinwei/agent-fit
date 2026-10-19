@@ -204,7 +204,7 @@ test('human CLI errors escape terminal controls in untrusted paths', async t => 
 test('npm exposes the agent-fit executable and runs its symlink entry', async t => {
   const dir = await mkdtemp(path.join(os.tmpdir(), 'delegation-bin-')); t.after(() => rm(dir, { recursive: true, force: true }));
   const { name, bin } = JSON.parse(await readFile(new URL('../package.json', import.meta.url), 'utf8'));
-  assert.equal(name, 'agent-fit');
+  assert.equal(name, '@fanglinwei/agent-fit');
   assert.deepEqual(Object.keys(bin), ['agent-fit']);
   for (const command of Object.keys(bin)) {
     const link = path.join(dir, command);
