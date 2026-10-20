@@ -1,6 +1,10 @@
 # Codex configuration
 
-本工具管理四个 task_* 角色、此 Skill、全局档位、home 内的项目/会话配置及 AGENTS.md 中带 agent-fit 标记的区块。AGENTS 启动入口明确引用绑定 home 的 Skill；每次委派前必须按 Skill 检查。指令约束不等于宿主拦截器，原生 Skill 选择器发现与实际运行生效另行核验。
+本工具在绑定 home 内管理四个 task_* 角色、`.agent-fit/current-mode.json` 全局档位、项目/会话配置及 AGENTS.md 中带 agent-fit 标记的区块。共享 Skill 默认位于 `~/.agents/skills/agent-fit/`，只保存通用规则；AGENTS 和角色通过 `agent-fit skill path --codex-home <绑定 home> --json` 查询入口。每次委派前必须按 Skill 检查。指令约束不等于宿主拦截器，原生 Skill 选择器发现与实际运行生效另行核验。
+
+- `setup --dry-run` 预览、`setup` 迁移旧安装。迁移核对原安装摘要、权限和档位归属，保留当前档位及各作用域选择；冲突时保留现场。旧目录已移走或仅保留指向共享目录的软链接均可识别。
+- `status`、`explain`、`skill path` 只读；旧安装返回 `MIGRATION_REQUIRED`，不会在查询时迁移。
+- `setup` 仅在共享 Skill 尚不存在时安装；已有文件通过 `skill update --dry-run` 预览和 `skill update` 显式更新。日常切档与 home 的 `restore` 不改写或删除共享 Skill。恢复旧安装前先迁移；共享 Skill 删除不属于 home 恢复。
 
 - setup 首次默认 official；内置档位命令与 id 均为 cut、official、high、fire；mode set 切换，mode create/configure 保存自定义档位。
 - status --details 查看规则、磁盘角色及潜在覆盖；mode show 与 explain 只预览，不委派。

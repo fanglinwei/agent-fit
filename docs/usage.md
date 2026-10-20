@@ -1,12 +1,12 @@
 # 使用说明
 
-`agent-fit` 0.7.1，npm 包名为 `@fanglinwei/agent-fit`，命令和 Skill 名仍为 `agent-fit`。首版支持 Codex；Node.js 22+。命令、网页和生成的 Skill 使用同一套档位数据。
+`agent-fit` 0.7.2，npm 包名为 `@fanglinwei/agent-fit`，命令和 Skill 名仍为 `agent-fit`。首版支持 Codex；Node.js 22+。命令、网页和生成的 Skill 使用同一套档位数据。
 
 工具只处理当前格式与版本的配置；独立 home 全程使用显式指定的路径。
 
 ## 安装与配置
 
-从 npm registry 安装，或在项目目录运行 `npm pack` 后使用 `npm install -g ./fanglinwei-agent-fit-0.7.1.tgz` 安装本地包。两种方式都需要 Node/npm。
+从 npm registry 安装，或在项目目录运行 `npm pack` 后使用 `npm install -g ./fanglinwei-agent-fit-0.7.2.tgz` 安装本地包。两种方式都需要 Node/npm。
 
 ```sh
 npm install -g @fanglinwei/agent-fit
@@ -22,11 +22,34 @@ npm install -g @fanglinwei/agent-fit && agent-fit setup --mode official
 
 目标目录优先级为 `--codex-home PATH`、`CODEX_HOME`、用户 `~/.codex`。空格路径需要 shell 引号。命令不会设置主代理模型、全局子代理默认、供应商、审批、沙箱、并发或子代理启用开关。
 
-Skill 名称为 `agent-fit`，调用为 `$agent-fit`，安装目录为 `skills/agent-fit`。npm 安装命令获取已发布版本；当前内测开发代码通过 `npm pack` 构建本地包。
+Skill 名称为 `agent-fit`，调用为 `$agent-fit`，默认安装目录为 `~/.agents/skills/agent-fit/`。npm 安装命令获取已发布版本；当前内测开发代码通过 `npm pack` 构建本地包。
 
 首次 setup 默认官方（official）；同版本重复 setup 保留当前选择与首次恢复基线。npm 安装没有 postinstall 配置动作。`--dry-run` 不创建目标 home、锁或状态文件。
 
 **首次安装、基础规则更新或恢复原配置后需要重启 Codex；日常档位切换与模型/effort 调整无需重启。** 全局角色配置在下一轮加载，项目与会话选择由后续新任务重新查询；已开始的任务继续使用原快照。工具不会自动重启或停止任务。
+
+## Skill 目录与旧安装迁移
+
+共享 Skill 保存通用规则和说明；每个 Codex home 的当前档位保存在 `.agent-fit/current-mode.json`，作用域、自定义档位、角色和恢复记录仍属于该 home。CCSwitch 同步规则时不再携带当前运行配置。旧共享目录中遗留的 `references/current-mode.json` 会保留，但迁移后不参与查询、切档或恢复。
+
+支持 0.7.1 的旧布局：Skill 留在 `<home>/skills/agent-fit/`、已搬到共享目录并移除旧位置、旧位置软链接到共享目录。新规则通过 CLI 解析入口，不在角色或 AGENTS 中写死 Skill 的绝对路径。
+
+```sh
+agent-fit status --details --json
+# MIGRATION_REQUIRED 表示旧布局；以上查询不会修改文件。
+agent-fit setup --dry-run
+agent-fit setup
+# 普通 setup 不覆盖已有共享规则；更新规则须显式执行：
+agent-fit skill update --dry-run
+agent-fit skill update
+agent-fit skill path --json
+```
+
+独立 home 在各命令中添加相同的 `--codex-home PATH`。迁移保留已部署的模型组合、自定义档位和项目/会话选择，不以新包内置预设替代旧快照。旧档位、规则、角色和权限须与原安装记录一致；两个位置内容存在无法确认的差异，或旧 Skill 有尚未恢复的安装前内容时，报告冲突并保留所有文件与恢复记录。
+
+`setup` 仅在共享规则不存在时安装；已有规则的更新使用独立锁、内容摘要和逐文件安全回退，未登记的修改不会被覆盖。home 配置事务与共享规则安装是两个步骤；home 已写入但共享安装失败时，报告保留写入状态，修复目录后重试 `setup`。共享 Skill 根可解析符号链接，内部文件、状态、恢复记录与角色路径不跟随符号链接。两个 home 共用规则时，切档、配置和恢复互不改写对方的数据。
+
+`restore` 只恢复当前 home 的运行配置和规则；共享 Skill 与迁移后保留的旧 Skill 资产由用户统一管理，不随某个 home 的恢复删除。恢复 0.7.1 旧布局前先执行上述迁移；共享 Skill 的删除属于单独的管理操作。
 
 ## 全局、项目与会话
 
@@ -143,8 +166,8 @@ agent-fit explain --level L4 --role task_review
 无需全局安装的 npm 查询，以及本地包查询：
 
 ```sh
-npm exec --package=@fanglinwei/agent-fit@0.7.1 -- agent-fit status --details
-npm exec --package="/path/to/fanglinwei-agent-fit-0.7.1.tgz" -- agent-fit status --details
+npm exec --package=@fanglinwei/agent-fit@0.7.2 -- agent-fit status --details
+npm exec --package="/path/to/fanglinwei-agent-fit-0.7.2.tgz" -- agent-fit status --details
 ```
 
 ## 委派收益检查
@@ -435,7 +458,7 @@ restore 后重启 Codex。它不会卸载 npm 工具、删除整个 home、清�
 
 首次 setup 记录受影响文件的原存在状态与普通权限，仅允许接管同内容公开工具资产；AGENTS 只记录管理区块与校验元数据，不保存完整私有正文、config 或认证文件。同版本档位切换与自定义配置保留首次基线。
 
-恢复清理本工具新增 Skill、四角色、规则区块、当前档位、全部自定义与元数据；保留用户原文件和后续标记外正文。只非递归删除本工具创建的空目录，home 与无关文件保留。冲突先完整预检，失败不猜测删除。
+恢复清理本 home 中本工具新增的四角色、规则区块、当前档位、全部自定义与元数据；保留共享 Skill、用户原文件和后续标记外正文。只非递归删除本工具创建的空目录，home 与无关文件保留。冲突先完整预检，失败不猜测删除。
 
 工具统一使用 Node.js 22+ 和 npm，不需要 Python；安装与配置入口为 `agent-fit setup`。
 

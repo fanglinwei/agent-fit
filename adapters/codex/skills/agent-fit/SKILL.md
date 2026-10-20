@@ -6,7 +6,9 @@ license: MIT
 
 # Agent Fit
 
-Codex 启动后读取本 Skill；每次创建、重新委派或切换子智能体模型前，执行下面流程。新任务按下述作用域查询有效档位；[全局档位](references/current-mode.json) 仅代表全局基线。本 Skill 不指定主代理模型，不授予委派权限，不替代专业规则。
+Codex 启动后读取本 Skill；每次创建、重新委派或切换子智能体模型前，执行下面流程。新任务通过绑定 Codex home 的 CLI 按下述作用域查询有效档位。本 Skill 不指定主代理模型，不授予委派权限，不替代专业规则。
+
+本目录只保存可共享的规则与说明，可由 CCSwitch 放在 `~/.agents/skills/agent-fit/`。当前档位、项目与会话配置属于各自 Codex home；全局快照存于 `<home>/.agent-fit/current-mode.json`，有效配置通过 `agent-fit explain` 查询。目录中遗留的 `references/current-mode.json` 是旧安装文件，不能作为当前配置。规则入口用 `agent-fit skill path --codex-home <绑定 home> --json` 查询；退出码为 0 且 `errors` 为空后读取 `data.path`。
 
 ## 卸载前恢复
 

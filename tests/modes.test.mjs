@@ -1,3 +1,4 @@
+import './isolate-home.mjs';
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { readFile, readdir } from 'node:fs/promises';
@@ -58,7 +59,7 @@ test('all builtin primary/fallback tables render roles and current data consiste
       assert.deepEqual(selection.fallback_conditions, value.fallback ? mode.fallback_conditions : []);
     }
     const { files, block } = await renderPayload('/test/home with spaces', mode);
-    const current = JSON.parse(files.get('skills/agent-fit/references/current-mode.json'));
+    const current = JSON.parse(files.get('.agent-fit/current-mode.json'));
     assert.equal(current.id, mode.id);
     assert.deepEqual(current.levels, mode.levels);
     const contracts = [];
@@ -75,7 +76,8 @@ test('all builtin primary/fallback tables render roles and current data consiste
     assert.equal(new Set(contracts).size, 1);
     assert.match(block.toString(), /Codex 启动/); assert.match(block.toString(), /每次创建/);
     assert.doesNotMatch(block.toString(), /Git|不生成图像/);
-    assert.ok(block.toString().includes('/test/home with spaces/skills/agent-fit/SKILL.md'));
+    assert.ok(block.toString().includes('skill_command'));
+    assert.ok(block.toString().includes('/test/home with spaces/.agent-fit/current-mode.json'));
   }
 });
 
@@ -120,7 +122,7 @@ test('rendered paths are data escaped and distinct per home', async () => {
   const b = await renderPayload('/other', BUILTINS[1]);
   assert.notEqual(a.block.toString(), b.block.toString());
   const data = JSON.parse(a.block.toString().split('```json\n')[1].split('\n```')[0]);
-  assert.equal(data.skill, '/test/`quote<>"/skills/agent-fit/SKILL.md');
+  assert.deepEqual(data.skill_command, ['agent-fit', 'skill', 'path', '--codex-home', '/test/`quote<>"', '--json']);
 });
 
 

@@ -9,6 +9,7 @@ const HELP = `agent-fit ${VERSION} — Codex 子代理委派配置
 用法：agent-fit <命令> [选项]。
 
 setup [--mode MODE] [--dry-run]
+skill path | skill update [--dry-run]
 mode set MODE [--dry-run]
 mode clear [--dry-run]
 mode delete MODE [--dry-run]
@@ -45,6 +46,7 @@ const common = ['agent', 'codex-home', 'json'];
 const write = [...common, 'dry-run', 'expect-revision'];
 const scoped = ['scope', 'project', 'thread'];
 const commands = {
+  'skill-path': common, 'skill-update': [...common, 'dry-run'],
   setup: [...write, 'mode'], set: [...write, ...scoped], clear: [...write, ...scoped], delete: [...write, ...scoped], list: [...common, ...scoped], show: [...common, ...scoped],
   create: [...write, ...scoped, 'from'], configure: [...write, ...scoped, 'level', 'model', 'effort', 'fallback-model', 'fallback-effort', 'clear-fallback', 'definition-stdin'],
   status: [...common, ...scoped, 'details'], explain: [...common, ...scoped, 'level', 'task', 'mode', 'role'],
@@ -72,6 +74,9 @@ export function parseCommand(argv) {
     action = positionals[1]; count = 2;
     if (!['set', 'clear', 'delete', 'list', 'show', 'create', 'configure'].includes(action)) throw argumentError('未知 mode 子命令。');
     if (!['list', 'clear'].includes(action) && (action !== 'show' || positionals[2] !== undefined)) { selector = positionals[2]; count = 3; }
+  } else if (action === 'skill') {
+    if (!['path', 'update'].includes(positionals[1])) throw argumentError('skill 仅支持 path 或 update。');
+    action = `skill-${positionals[1]}`; count = 2;
   } else if (action === 'models') {
     if (positionals[1] !== 'check') throw argumentError('models 仅支持 check。');
     count = 2;
@@ -153,12 +158,19 @@ function renderHuman(data) {
     }
     if (data.verification?.required) lines.push('fire：每个会话首次委派前须实际验证；失败时使用用户指定组合，否则继承父代理模型与推理强度。');
     lines.push(...data.warnings);
+  } else if (data.action === 'skill-update') {
+    lines.push(`共享 Skill：${data.path}`, `规则版本：${data.version} · ${data.result} · 变化文件：${data.changed_files.length}`);
+    if (data.result === 'preview') lines.push(...data.changed_files);
+    lines.push(data.restart.message);
+  } else if (data.path) {
+    lines.push(data.path);
   } else if (data.result) {
     lines.push(`操作：${data.action} · ${data.result} · ${data.configuration_status}`, `Codex home：${data.home}`, `档位：${data.mode?.name || '无'} · 变化文件：${data.changed_files?.length || 0}`);
     if (data.created_mode) lines.push(`已创建：${data.created_mode.name} (${data.created_mode.id})，${data.mode?.id === data.created_mode.id ? '已在当前作用域选择。' : '尚未设为当前档位。'}`);
     if (data.result === 'preview') lines.push(...(data.changes || []).map(change => `${change.action}  ${change.path}`));
     if (data.custom_modes_removed?.length) lines.push(`清理自定义档位：${data.custom_modes_removed.join('、')}`);
     if (data.restart?.message) lines.push(data.restart.message);
+    if (data.shared_skill) lines.push(`共享 Skill：${data.shared_skill.path} · ${data.shared_skill.result}`);
     lines.push(...(data.warnings || []));
   } else if (data.modes) {
     lines.push(...data.modes.map(mode => `${mode.active ? '*' : ' '} ${mode.id}  ${mode.name}  ${mode.kind}`));
@@ -199,7 +211,14 @@ async function main() {
       return;
     }
     let data; let code = 0;
-    if (action === 'status') {
+    if (action === 'skill-path' || action === 'skill-update') {
+      const { inspectSkill, updateSkill } = await import('../lib/skill.mjs');
+      if (action === 'skill-path') {
+        const skill = await inspectSkill(home);
+        if (!skill.path) throw Object.assign(new Error('未找到 agent-fit Skill；请执行 setup 安装。'), { code: 'SKILL_NOT_INSTALLED', exitCode: 1 });
+        data = { home, path: skill.path };
+      } else data = await updateSkill(home, { dryRun: options.dryRun, legacyState: (await installer.readSnapshot(home)).state });
+    } else if (action === 'status') {
       for (let attempt = 0; attempt < 2; attempt++) {
         data = await installer.statusReport(home, options);
         const related = await inspectProject(options.project || process.cwd());

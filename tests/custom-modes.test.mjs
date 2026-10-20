@@ -1,3 +1,4 @@
+import './isolate-home.mjs';
 import test, { afterEach } from 'node:test';
 import assert from 'node:assert/strict';
 import fs from 'node:fs/promises';
@@ -26,7 +27,7 @@ test('create copies complete source by value without activating and extends firs
 
 for (const scope of ['global', 'project', 'session']) test(`${scope} copies the displayed installed snapshot without adding package task candidates`, async () => {
   const home = await fixture();
-  const relative = 'skills/agent-fit/references/current-mode.json';
+  const relative = '.agent-fit/current-mode.json';
   const installed = JSON.parse(await fs.readFile(path.join(home, relative), 'utf8'));
   for (const level of LEVELS) delete installed.levels[level].tasks;
   const bytes = Buffer.from(JSON.stringify(installed));
@@ -80,7 +81,7 @@ test('active custom atomic four-level configure updates deployed roles and mode 
   const report = await mutate(home, 'configure', { mode: 'active', definition });
   assert.equal(report.restart.required, false); assert.equal(report.restart.reason, 'routing_changed');
   const current = await readSnapshot(home); assert.deepEqual(current.mode.levels, definition.levels); assert.equal(current.diagnostics.filter(value => value.status === 'fail').length, 0);
-  const modeFile = JSON.parse(await fs.readFile(path.join(home, 'skills/agent-fit/references/current-mode.json'), 'utf8')); assert.deepEqual(modeFile.levels, definition.levels);
+  const modeFile = JSON.parse(await fs.readFile(path.join(home, '.agent-fit/current-mode.json'), 'utf8')); assert.deepEqual(modeFile.levels, definition.levels);
   const role = await fs.readFile(path.join(home, 'agents/task-execute.toml'), 'utf8'); assert.ok(role.includes('model-L2')); assert.ok(role.includes('effort-L2'));
 });
 

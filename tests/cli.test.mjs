@@ -1,3 +1,4 @@
+import './isolate-home.mjs';
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { spawnSync } from 'node:child_process';
@@ -42,7 +43,7 @@ test('real CLI supports setup/switch/custom whole stdin/status/explain/restore w
     assert.equal(run(home, ['mode', 'show', id]).report.data.definition.id, id);
     assert.equal(run(home, ['explain', '--level', 'L1']).report.data.mode_id, id);
     assert.equal(JSON.parse(await readFile(path.join(home, '.agent-fit/state.json'), 'utf8')).mode, id);
-    assert.equal(JSON.parse(await readFile(path.join(home, 'skills/agent-fit/references/current-mode.json'), 'utf8')).id, id);
+    assert.equal(JSON.parse(await readFile(path.join(home, '.agent-fit/current-mode.json'), 'utf8')).id, id);
   }
   assert.deepEqual(run(home, ['mode', 'list']).report.data.modes.map(mode => mode.id), ['cut', 'official', 'high', 'fire']);
   result = run(home, ['mode', 'create', '我的任务', '--from', 'fire']); assert.equal(result.status, 0); assert.equal(result.report.data.restart.required, false);

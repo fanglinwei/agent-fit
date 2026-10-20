@@ -1,3 +1,4 @@
+import './isolate-home.mjs';
 import test, { afterEach } from 'node:test';
 import assert from 'node:assert/strict';
 import fs from 'node:fs/promises';
@@ -5,6 +6,7 @@ import os from 'node:os';
 import path from 'node:path';
 import { createHash } from 'node:crypto';
 import { mutate, readSnapshot, statusReport, setTestHooks, resolveHome } from '../lib/install.mjs';
+import { sharedSkillPath } from '../lib/skill.mjs';
 import { renderPayload, resolveDefinition } from '../lib/codex.mjs';
 
 const temporary = [];
@@ -56,10 +58,10 @@ test('existing same public assets and rule block are restored with their origina
 test('restore clears all custom modes and tool metadata, while preserving new user files and unrelated config', async () => {
   const { home } = await fixture(); await fs.mkdir(home); const config = 'model = "private"\n'; await fs.writeFile(path.join(home, 'config.toml'), config); await mutate(home, 'setup');
   await mutate(home, 'create', { name: 'one' }); await mutate(home, 'create', { name: 'two' }); await mutate(home, 'set', { mode: 'one' });
-  await fs.writeFile(path.join(home, 'skills/agent-fit/user-notes.md'), 'user notes'); await fs.writeFile(path.join(home, 'agents/user-role.toml'), 'name = "user-role"\n');
+  await fs.writeFile(path.join(sharedSkillPath(), 'user-notes.md'), 'user notes'); await fs.writeFile(path.join(home, 'agents/user-role.toml'), 'name = "user-role"\n');
   const dryBefore = await tree(home); const preview = await mutate(home, 'restore', { dryRun: true }); assert.deepEqual(preview.custom_modes_removed, ['one', 'two']); assert.deepEqual(await tree(home), dryBefore);
   const report = await mutate(home, 'restore'); assert.deepEqual(report.custom_modes_removed, ['one', 'two']);
-  assert.equal(await fs.readFile(path.join(home, 'config.toml'), 'utf8'), config); assert.equal(await fs.readFile(path.join(home, 'skills/agent-fit/user-notes.md'), 'utf8'), 'user notes'); assert.equal(await fs.readFile(path.join(home, 'agents/user-role.toml'), 'utf8'), 'name = "user-role"\n');
+  assert.equal(await fs.readFile(path.join(home, 'config.toml'), 'utf8'), config); assert.equal(await fs.readFile(path.join(sharedSkillPath(), 'user-notes.md'), 'utf8'), 'user notes'); assert.equal(await fs.readFile(path.join(home, 'agents/user-role.toml'), 'utf8'), 'name = "user-role"\n');
   assert.equal(await fs.stat(path.join(home, '.agent-fit')).catch(() => null), null); assert.equal(await fs.stat(path.join(home, 'AGENTS.md')).catch(() => null), null);
 });
 
@@ -107,7 +109,7 @@ test('managed drift, removed files, chmod and state chmod refuse restore with al
   for (const edit of [
     async home => fs.appendFile(path.join(home, 'agents/task-review.toml'), '\n# User edit\n'),
     async home => fs.unlink(path.join(home, 'agents/task-scan.toml')),
-    async home => fs.chmod(path.join(home, 'skills/agent-fit/SKILL.md'), 0o644),
+    async home => fs.chmod(path.join(home, '.agent-fit/current-mode.json'), 0o644),
     async home => fs.chmod(path.join(home, '.agent-fit/state.json'), 0o644),
   ]) {
     const { home } = await fixture(); await mutate(home, 'setup'); await edit(home); const before = await tree(home);

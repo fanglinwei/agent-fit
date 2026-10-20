@@ -1,3 +1,4 @@
+import './isolate-home.mjs';
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { mkdtemp, mkdir, writeFile, rm, symlink, realpath } from 'node:fs/promises';

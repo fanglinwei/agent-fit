@@ -1,3 +1,4 @@
+import './isolate-home.mjs';
 import test, { afterEach } from 'node:test';
 import assert from 'node:assert/strict';
 import fs from 'node:fs/promises';
@@ -5,6 +6,7 @@ import os from 'node:os';
 import path from 'node:path';
 import { createHash } from 'node:crypto';
 import { mutate, readSnapshot, statusReport, showReport, setTestHooks, DelegationError, resolveHome } from '../lib/install.mjs';
+import { sharedSkillPath } from '../lib/skill.mjs';
 import { VERSION, renderPayload, resolveDefinition } from '../lib/codex.mjs';
 
 const temporary = [];
@@ -59,7 +61,7 @@ test('setup and mode switches deploy routing and escalation rules with the origi
   const { home } = await fixture(); await mutate(home, 'setup');
   for (const mode of ['official', 'cut', 'high', 'fire']) {
     if (mode !== 'official') await mutate(home, 'set', { mode });
-    const skill = await fs.readFile(path.join(home, 'skills/agent-fit/SKILL.md'), 'utf8');
+    const skill = await fs.readFile(path.join(sharedSkillPath(), 'SKILL.md'), 'utf8');
     const rules = await fs.readFile(path.join(home, 'AGENTS.md'), 'utf8');
     assert.match(skill, /## 委派收益检查/);
     assert.match(skill, /启动、上下文交接、等待、汇总、验证与可能返工/);
@@ -72,27 +74,27 @@ test('setup and mode switches deploy routing and escalation rules with the origi
     assert.match(skill, /L4：高不确定性推理/);
     assert.match(skill, /错误后果与可验证性/);
     assert.match(skill, /角色名称不决定等级/);
-    const failure = await fs.readFile(path.join(home, 'skills/agent-fit/references/failure-policy.md'), 'utf8');
+    const failure = await fs.readFile(path.join(sharedSkillPath(), 'references/failure-policy.md'), 'utf8');
     assert.match(failure, /## 质量升级/);
     assert.match(failure, /相邻等级组合相同时不重派/);
     assert.match(failure, /拆分困难部分不重置计数/);
     assert.match(skill, /references\/calibration\.md/);
     assert.ok(skill.includes('档位 id + 最终等级'));
-    const calibration = await fs.readFile(path.join(home, 'skills/agent-fit/references/calibration.md'), 'utf8');
+    const calibration = await fs.readFile(path.join(sharedSkillPath(), 'references/calibration.md'), 'utf8');
     assert.match(calibration, /## 冻结任务与候选/);
     assert.match(calibration, /## 记录与判定/);
     assert.match(calibration, /较强模型调用比例不等于验收通过率/);
     assert.match(calibration, /运行身份未验证/);
     assert.match(rules, /先做委派收益检查/);
     assert.match(rules, /角色名称不决定等级/);
-    const current = JSON.parse(await fs.readFile(path.join(home, 'skills/agent-fit/references/current-mode.json'), 'utf8'));
+    const current = JSON.parse(await fs.readFile(path.join(home, '.agent-fit/current-mode.json'), 'utf8'));
     assert.deepEqual(current.levels, resolveDefinition(mode).levels);
     assert.equal((await readSnapshot(home)).diagnostics.filter(item => item.status === 'fail').length, 0);
   }
   await mutate(home, 'restore');
-  assert.equal(await fs.stat(path.join(home, 'skills/agent-fit/SKILL.md')).catch(() => null), null);
-  assert.equal(await fs.stat(path.join(home, 'skills/agent-fit/references/failure-policy.md')).catch(() => null), null);
-  assert.equal(await fs.stat(path.join(home, 'skills/agent-fit/references/calibration.md')).catch(() => null), null);
+  assert.ok(await fs.stat(path.join(sharedSkillPath(), 'SKILL.md')));
+  assert.ok(await fs.stat(path.join(sharedSkillPath(), 'references/failure-policy.md')));
+  assert.ok(await fs.stat(path.join(sharedSkillPath(), 'references/calibration.md')));
   assert.equal(await fs.stat(path.join(home, 'AGENTS.md')).catch(() => null), null);
 });
 
@@ -158,7 +160,7 @@ test('mode switches share immutable baseline and synchronize roles, mode record 
     const status = await statusReport(home);
     for (const role of status.roles) assert.equal(role.matches_mode, true);
     assert.ok(status.warnings.every(message => !/请重启|需要重启/.test(message)));
-    const current = JSON.parse(await fs.readFile(path.join(home, 'skills/agent-fit/references/current-mode.json'), 'utf8'));
+    const current = JSON.parse(await fs.readFile(path.join(home, '.agent-fit/current-mode.json'), 'utf8'));
     assert.equal(current.id, mode);
     assert.deepEqual(current.levels, resolveDefinition(mode).levels);
     assert.equal(Object.hasOwn(report, 'post_check_target'), false);
@@ -167,12 +169,12 @@ test('mode switches share immutable baseline and synchronize roles, mode record 
 });
 
 test('routing previews need no restart while packaged rule and role updates still do', async () => {
-  for (const relative of ['skills/agent-fit/SKILL.md', 'agents/task-execute.toml', 'AGENTS.md']) {
+  for (const relative of ['agents/task-delegate.toml', 'agents/task-execute.toml', 'AGENTS.md']) {
     const { home } = await fixture(); await mutate(home, 'setup');
     const preview = await mutate(home, 'set', { mode: 'cut', dryRun: true });
     assert.equal(preview.restart.required, false); assert.match(preview.restart.message, /无需重启/);
     const target = path.join(home, relative), original = await fs.readFile(target, 'utf8');
-    const previous = relative === 'AGENTS.md' ? original.replace('<!-- agent-fit:end -->', 'Previous packaged rule.\n<!-- agent-fit:end -->') : relative.endsWith('.toml') ? original.replace('启动后先读取本 home', '旧规则：启动后先读取本 home') : original + '\nPrevious packaged instructions.\n';
+    const previous = relative === 'AGENTS.md' ? original.replace('<!-- agent-fit:end -->', 'Previous packaged rule.\n<!-- agent-fit:end -->') : relative.endsWith('.toml') ? original.replace('启动后先通过', '旧规则：启动后先通过') : original + '\nPrevious packaged instructions.\n';
     assert.notEqual(previous, original);
     await fs.writeFile(target, previous);
     const statePath = path.join(home, '.agent-fit/state.json'), state = JSON.parse(await fs.readFile(statePath, 'utf8'));
@@ -296,7 +298,7 @@ test('unsupported state formats and mode ids are rejected without migrating or w
   const { home } = await fixture(); await mutate(home, 'setup');
   const target = path.join(home, '.agent-fit/state.json');
   const state = JSON.parse(await fs.readFile(target, 'utf8'));
-  for (const change of [{ schema_version: 1 }, { schema_version: 3 }, ...['economy', 'balanced', 'performance'].map(mode => ({ mode })), { restoration: { status: 'unavailable', baseline_sha256: null } }, { files: { ...state.files, 'skills/unsupported-skill/SKILL.md': '0'.repeat(64) } }]) {
+  for (const change of [{ schema_version: 1 }, { schema_version: 4 }, ...['economy', 'balanced', 'performance'].map(mode => ({ mode })), { restoration: { status: 'unavailable', baseline_sha256: null } }, { files: { ...state.files, 'skills/unsupported-skill/SKILL.md': '0'.repeat(64) } }]) {
     await fs.writeFile(target, JSON.stringify({ ...state, ...change }));
     const before = await tree(home);
     await rejectsCode(statusReport(home), 'STATE_INVALID');
@@ -358,10 +360,10 @@ test('signals before first write cancel without changes and signals after writes
 });
 
 test('stable installed mode data is read from its owned deployed snapshot instead of current package preset', async () => {
-  const { home } = await fixture(); await mutate(home, 'setup'); const target = path.join(home, 'skills/agent-fit/references/current-mode.json'); const current = JSON.parse(await fs.readFile(target, 'utf8'));
+  const { home } = await fixture(); await mutate(home, 'setup'); const target = path.join(home, '.agent-fit/current-mode.json'); const current = JSON.parse(await fs.readFile(target, 'utf8'));
   current.levels.L1.model = 'installed-snapshot-model'; const bytes = Buffer.from(JSON.stringify(current)); await fs.writeFile(target, bytes);
-  const stateTarget = path.join(home, '.agent-fit/state.json'); const state = JSON.parse(await fs.readFile(stateTarget, 'utf8')); state.files['skills/agent-fit/references/current-mode.json'] = createHash('sha256').update(bytes).digest('hex');
-  for (const relative of ['agents/task-scan.toml', 'skills/agent-fit/assets/codex/agents/task-scan.toml']) {
+  const stateTarget = path.join(home, '.agent-fit/state.json'); const state = JSON.parse(await fs.readFile(stateTarget, 'utf8')); state.files['.agent-fit/current-mode.json'] = createHash('sha256').update(bytes).digest('hex');
+  for (const relative of ['agents/task-scan.toml']) {
     const rolePath = path.join(home, relative), role = (await fs.readFile(rolePath, 'utf8')).replace('model = "gpt-6-luna"', 'model = "installed-snapshot-model"');
     await fs.writeFile(rolePath, role); state.files[relative] = createHash('sha256').update(role).digest('hex');
   }
@@ -376,7 +378,7 @@ test('stable installed mode data is read from its owned deployed snapshot instea
 });
 
 test('protected JSON rejects duplicate keys instead of silently accepting the final occurrence', async () => {
-  const { home } = await fixture(); await mutate(home, 'setup'); const target = path.join(home, '.agent-fit/state.json'); const text = await fs.readFile(target, 'utf8'); await fs.writeFile(target, text.replace('"schema_version": 2,', '"schema_version": 2, "schema_version": 2,'));
+  const { home } = await fixture(); await mutate(home, 'setup'); const target = path.join(home, '.agent-fit/state.json'); const text = await fs.readFile(target, 'utf8'); await fs.writeFile(target, text.replace('"schema_version": 3,', '"schema_version": 3, "schema_version": 3,'));
   await rejectsCode(readSnapshot(home), 'STATE_INVALID');
 });
 
@@ -389,7 +391,7 @@ test('registered outside roles and profiles are reported as safe candidates with
 test('committed lock cleanup failure preserves applied report and restart reminder', async () => {
   const { home } = await fixture(); setTestHooks({ beforeUnlock() { const error = new Error('Cannot remove lock'); error.code = 'EACCES'; throw error; } });
   await assert.rejects(mutate(home, 'setup'), error => { assert.equal(error.code, 'LOCK_RELEASE_FAILED'); assert.equal(error.details.report.result, 'applied'); assert.equal(error.details.report.configuration_status, 'written'); assert.equal(error.details.report.restart.required, true); return true; });
-  setTestHooks(); await fs.unlink(path.join(home, '.agent-fit/install.lock')); assert.equal((await readSnapshot(home)).state.schema_version, 2);
+  setTestHooks(); await fs.unlink(path.join(home, '.agent-fit/install.lock')); assert.equal((await readSnapshot(home)).state.schema_version, 3);
 });
 
 test('late edit after temporary write is preserved at the final atomic replacement check', async () => {
