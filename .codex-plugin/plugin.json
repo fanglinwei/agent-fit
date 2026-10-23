@@ -1,0 +1,34 @@
+{
+  "name": "agent-fit",
+  "version": "0.7.3",
+  "description": "为 Codex 已获授权的子任务选择模型、推理强度和备用组合；需要 agent-fit CLI。",
+  "author": {
+    "name": "fanglinwei",
+    "url": "https://github.com/fanglinwei"
+  },
+  "homepage": "https://github.com/fanglinwei/agent-fit",
+  "repository": "https://github.com/fanglinwei/agent-fit",
+  "license": "MIT",
+  "keywords": [
+    "codex",
+    "subagents",
+    "model-routing",
+    "skills"
+  ],
+  "skills": "./adapters/codex/skills/",
+  "interface": {
+    "displayName": "Agent Fit",
+    "shortDescription": "按任务复杂度、作用域和预算选择子代理模型",
+    "longDescription": "提供 agent-fit Skill，查询已配置的档位，为已获授权的委派选择模型、推理强度和备用组合。使用前须安装 @fanglinwei/agent-fit CLI 并完成 setup；插件安装不会自动修改 Codex 配置。",
+    "developerName": "fanglinwei",
+    "category": "Productivity",
+    "capabilities": [
+      "Instructions"
+    ],
+    "websiteURL": "https://github.com/fanglinwei/agent-fit",
+    "defaultPrompt": [
+      "使用 Agent Fit 查看当前有效档位和委派规则。",
+      "使用 Agent Fit 为已获授权的子任务选择模型与推理强度。"
+    ]
+  }
+}

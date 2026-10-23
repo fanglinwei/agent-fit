@@ -45,6 +45,19 @@ agent-fit serve --open
 
 日常全局、项目和会话切档，以及模型与 effort 调整无需重启；后续新任务读取新选择。更新基础 Skill、AGENTS 或角色职责，以及恢复原配置后仍需重启。
 
+## Marketplace 插件
+
+仓库同时提供 Codex marketplace 插件，直接复用现有 Skill：
+
+- marketplace 清单：`.agents/plugins/marketplace.json`。
+- 插件清单：`.codex-plugin/plugin.json`，通过 `skills` 指向 `adapters/codex/skills/`。
+- 在 Codex 的插件管理中添加 GitHub 仓库 `https://github.com/fanglinwei/agent-fit` 作为 marketplace 来源，选择 **Agent Fit** 安装并启用。首次安装后重启 Codex，使插件 Skill 可被发现。
+- 本地验证时可将当前仓库作为 marketplace 来源；清单中的 `source.path` 相对于仓库根目录解析。
+
+插件安装提供规则；运行依赖仍按上面的快速开始安装 `@fanglinwei/agent-fit` 并执行 `setup`。已有配置无需重新 setup。插件不会自动运行命令、切档、检测模型或修改账号。使用时可要求“使用 Agent Fit 查看当前有效档位”。
+
+CLI setup 安装的共享 Skill 与插件中的 Skill 来自同一份源码，可能同时被发现；两者应保持同版本。插件通过插件管理更新，共享 Skill 通过 `agent-fit skill update` 更新。禁用或卸载插件只移除插件规则；如需移除 CLI 配置，仍须按下文恢复流程处理原绑定 home。
+
 ## 四种档位
 
 | 档位 | 使用方式 |
@@ -155,7 +168,7 @@ npm test
 npm pack
 ```
 
-本地打包产物为 `fanglinwei-agent-fit-0.7.2.tgz`，可用 `npm install -g ./fanglinwei-agent-fit-0.7.2.tgz` 安装。浏览器集成使用已有 Playwright 与 Chrome，运行方法见[开发验证](docs/usage.md#开发验证)。唯一运行依赖为 [smol-toml](https://github.com/squirrelchat/smol-toml)。
+本地打包产物为 `fanglinwei-agent-fit-0.7.3.tgz`，可用 `npm install -g ./fanglinwei-agent-fit-0.7.3.tgz` 安装。浏览器集成使用已有 Playwright 与 Chrome，运行方法见[开发验证](docs/usage.md#开发验证)。唯一运行依赖为 [smol-toml](https://github.com/squirrelchat/smol-toml)。
 
 ## License
 

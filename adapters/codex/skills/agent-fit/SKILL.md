@@ -10,6 +10,12 @@ Codex 启动后读取本 Skill；每次创建、重新委派或切换子智能�
 
 本目录只保存可共享的规则与说明，可由 CCSwitch 放在 `~/.agents/skills/agent-fit/`。当前档位、项目与会话配置属于各自 Codex home；全局快照存于 `<home>/.agent-fit/current-mode.json`，有效配置通过 `agent-fit explain` 查询。目录中遗留的 `references/current-mode.json` 是旧安装文件，不能作为当前配置。规则入口用 `agent-fit skill path --codex-home <绑定 home> --json` 查询；退出码为 0 且 `errors` 为空后读取 `data.path`。
 
+## Marketplace 插件前提
+
+通过 marketplace 安装本 Skill 后，仍需 Node.js 22+、`@fanglinwei/agent-fit` CLI 和已完成 `setup` 的目标 Codex home。插件安装仅提供规则，不自动安装 CLI、写入角色或切换档位。
+
+首次使用先确认 `agent-fit --version` 可用，再用 `agent-fit status --codex-home <绑定 home> --json` 检查配置。CLI 缺失或尚未配置时，说明缺少的前提并提供 README 中的安装与 setup 步骤；不凭预设猜测有效档位，不自动执行安装或 setup。用户已授权初始化时可按其范围完成配置。插件缓存中的规则由插件更新管理；`agent-fit skill update` 管理的是共享 Skill，不更新插件缓存。
+
 ## 卸载前恢复
 
 执行本工具的卸载指令（包括 `npm uninstall`、`npm remove`）前，必须先按恢复流程，用可用的本工具版本对原绑定 home 执行 `agent-fit restore --dry-run` 预览，再执行实际 `agent-fit restore`。使用独立 home 时，两步均显式传入相同的 `--codex-home <原路径>`；涉及多个 home 时逐一恢复，不能只恢复默认 home。

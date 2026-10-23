@@ -1,0 +1,20 @@
+{
+  "name": "agent-fit",
+  "interface": {
+    "displayName": "Agent Fit"
+  },
+  "plugins": [
+    {
+      "name": "agent-fit",
+      "source": {
+        "source": "local",
+        "path": "./"
+      },
+      "policy": {
+        "installation": "AVAILABLE",
+        "authentication": "ON_USE"
+      },
+      "category": "Productivity"
+    }
+  ]
+}

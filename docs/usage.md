@@ -1,12 +1,12 @@
 # 使用说明
 
-`agent-fit` 0.7.2，npm 包名为 `@fanglinwei/agent-fit`，命令和 Skill 名仍为 `agent-fit`。首版支持 Codex；Node.js 22+。命令、网页和生成的 Skill 使用同一套档位数据。
+`agent-fit` 0.7.3，npm 包名为 `@fanglinwei/agent-fit`，命令和 Skill 名仍为 `agent-fit`。首版支持 Codex；Node.js 22+。命令、网页和生成的 Skill 使用同一套档位数据。
 
 工具只处理当前格式与版本的配置；独立 home 全程使用显式指定的路径。
 
 ## 安装与配置
 
-从 npm registry 安装，或在项目目录运行 `npm pack` 后使用 `npm install -g ./fanglinwei-agent-fit-0.7.2.tgz` 安装本地包。两种方式都需要 Node/npm。
+从 npm registry 安装，或在项目目录运行 `npm pack` 后使用 `npm install -g ./fanglinwei-agent-fit-0.7.3.tgz` 安装本地包。两种方式都需要 Node/npm。
 
 ```sh
 npm install -g @fanglinwei/agent-fit
@@ -166,8 +166,8 @@ agent-fit explain --level L4 --role task_review
 无需全局安装的 npm 查询，以及本地包查询：
 
 ```sh
-npm exec --package=@fanglinwei/agent-fit@0.7.2 -- agent-fit status --details
-npm exec --package="/path/to/fanglinwei-agent-fit-0.7.2.tgz" -- agent-fit status --details
+npm exec --package=@fanglinwei/agent-fit@0.7.3 -- agent-fit status --details
+npm exec --package="/path/to/fanglinwei-agent-fit-0.7.3.tgz" -- agent-fit status --details
 ```
 
 ## 委派收益检查
