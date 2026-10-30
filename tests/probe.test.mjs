@@ -46,6 +46,15 @@ test('streamed completion metadata is required; the assistant cannot declare its
   const event = 'data: ' + JSON.stringify({ type: 'response.completed', response: completed() }) + '\n\n';
   assert.equal((await invoke(null, { fetch: async () => new Response(event, { headers: { 'content-type': 'text/event-stream' } }) })).result.identity_status, 'matched');
 });
+test('failed, incomplete and conflicting SSE terminal events never verify successfully', async () => {
+  const event = (type, response = completed()) => 'data: ' + JSON.stringify({ type, response }) + '\n\n';
+  for (const body of [event('response.failed'), event('response.incomplete'), event('response.completed', completed({ status: 'failed' })), event('response.completed') + event('response.failed'), event('response.completed') + event('response.completed')]) {
+    const { result } = await invoke(null, { fetch: async () => new Response(body, { headers: { 'content-type': 'text/event-stream' } }) });
+    assert.notEqual(result.request_status, 'succeeded');
+    assert.notEqual(result.identity_status, 'matched');
+    assert.equal(result.reason_code, 'PROBE_RESPONSE_FAILED');
+  }
+});
 test('Codex file authorization is used without writing or following symlinks', async t => {
   const home = await mkdtemp(path.join(await realpath(os.tmpdir()), 'delegation-probe-test-')); t.after(() => rm(home, { recursive: true, force: true }));
   await writeFile(path.join(home, 'auth.json'), JSON.stringify({ OPENAI_API_KEY: key }), { mode: 0o600 });

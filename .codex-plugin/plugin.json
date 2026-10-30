@@ -1,6 +1,6 @@
 {
   "name": "agent-fit",
-  "version": "0.7.3",
+  "version": "0.7.4",
   "description": "为 Codex 已获授权的子任务选择模型、推理强度和备用组合；需要 agent-fit CLI。",
   "author": {
     "name": "fanglinwei",

@@ -74,3 +74,30 @@ test('provider candidates, availability outcomes and source survive history with
  assert.equal(record.kind,'availability');assert.equal(record.result.catalog.source,'provider_models');assert.equal(record.result.availability.available,1);
  assert.equal(record.result.checked_pairs[0].effort,null);assert.equal(JSON.stringify(record).includes(PRIVATE),false);assert.equal((await modelHistory(home)).records[0].kind,'availability');
 });
+
+test('a passed check with unavailable history keeps its check result but fails the overall command', async t => {
+ const {home}=await fixture(t);
+ await writeFile(path.join(home,'.agent-fit-checks'),'not a directory');
+ const {spawn}=await import('node:child_process');
+ const script=`import readline from 'node:readline';
+ for await(const line of readline.createInterface({input:process.stdin})) {
+  const r=JSON.parse(line); if(r.id===undefined)continue;
+  const values={initialize:{userAgent:'codex-cli/0.162.1',codexHome:process.env.CODEX_HOME,platformFamily:'unix',platformOs:'macos'},'account/read':{account:null,requiresOpenaiAuth:false},'config/read':{config:{}},'model/list':{data:[],nextCursor:null}};
+  process.stdout.write(JSON.stringify({id:r.id,result:values[r.method]})+'\\n');
+ }`;
+ const report=await recordedModelCheck({home},{spawn:(_command,_args,settings)=>spawn(process.execPath,['--input-type=module','-e',script],settings)});
+ assert.equal(report.check_status,'passed');
+ assert.equal(report.status,'incomplete');assert.equal(report.exit_code,1);
+ assert.equal(report.history.status,'failed');
+});
+
+test('history preserves verification layers and stale-pair provenance without extra private fields', async t => {
+ const {home}=await fixture(t);
+ const report={...data,check_status:'passed',verification_summary:{request_succeeded:true,reported_identity_matched:true,session_context_matched:null,fire_gate_satisfied:null,missing_evidence:['SESSION_CONTEXT_UNVERIFIED'],secret:PRIVATE},checked_pairs:[{...data.checked_pairs[0],source_revision:'old',valid_for_current_configuration:false}]};
+ const saved=await saveModelCheck(home,report,{verify:true});const record=(await modelHistory(home,{id:saved.id})).record;
+ assert.equal(record.result.check_status,'passed');
+ assert.equal(record.result.verification_summary.fire_gate_satisfied,null);
+ assert.equal(record.result.checked_pairs[0].valid_for_current_configuration,false);
+ assert.equal(record.result.checked_pairs[0].source_revision,'old');
+ assert.ok(!JSON.stringify(record).includes(PRIVATE));
+});

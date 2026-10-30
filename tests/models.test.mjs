@@ -342,6 +342,13 @@ test('fire verification failure preserves unknown access and reports the user or
   }});
   assert.equal(calls,2);assert.equal(report.catalog.source,'provider_models');assert.equal(report.checked_pairs[0].parameter_support,'unknown');assert.equal(report.status,'passed');assert.equal(report.checked_pairs[0].identity_status,'matched');assert.equal(report.checked_pairs[0].access,'available');
   assert.equal(report.context.context_match,'unverified');assert.ok(server.calls.every(call=>!['thread/start','turn/start'].includes(call.method)));assert.equal(JSON.stringify(report).includes(PRIVATE),false);
+  assert.equal(report.verification_summary.request_succeeded, true);
+  assert.equal(report.verification_summary.reported_identity_matched, true);
+  assert.equal(report.verification_summary.session_context_matched, null);
+  assert.equal(report.verification_summary.fire_gate_satisfied, null);
+  assert.ok(report.verification_summary.missing_evidence.includes('SESSION_CONTEXT_UNVERIFIED'));
+  assert.equal(report.checked_pairs[0].source_revision, report.source_revision);
+  assert.equal(report.checked_pairs[0].valid_for_current_configuration, true);
  });
 
 const externalProviders={custom:{base_url:'https://configured.example/v1',env_key:'PROBE_TEST_KEY'}};
@@ -490,6 +497,9 @@ test('manual verification stops between probes on configuration change', async t
   const report = await checkAccountModels({ home, verify: true }, internal);
   assert.equal(posts, 1); assert.equal(report.stop_reason, 'CONFIG_CHANGED'); assert.equal(report.exit_code, 1);
   assert.equal(report.checked_pairs[0].identity_status, 'matched'); assert.equal(report.checked_pairs[1].request_status, 'not_checked');
+  assert.equal(report.checked_pairs[0].source_revision, 'stable');
+  assert.equal(report.checked_pairs[0].valid_for_current_configuration, false);
+  assert.equal(report.verification_summary.fire_gate_satisfied, false);
 });
 
 test('verification stops and invalidates results when file authorization changes during a request', async t => {

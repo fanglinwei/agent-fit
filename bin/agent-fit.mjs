@@ -216,7 +216,7 @@ async function main() {
       if (action === 'skill-path') {
         const skill = await inspectSkill(home);
         if (!skill.path) throw Object.assign(new Error('未找到 agent-fit Skill；请执行 setup 安装。'), { code: 'SKILL_NOT_INSTALLED', exitCode: 1 });
-        data = { home, path: skill.path };
+        data = { home, path: skill.path, skill_revision: skill.revision, skill_integrity: skill.integrity };
       } else data = await updateSkill(home, { dryRun: options.dryRun, legacyState: (await installer.readSnapshot(home)).state });
     } else if (action === 'status') {
       for (let attempt = 0; attempt < 2; attempt++) {
@@ -244,7 +244,7 @@ async function main() {
         if (snapshot.configuration_revision === shown.configuration_revision) break;
         if (attempt) throw Object.assign(new Error('配置读取期间变化；请刷新。'), { code: 'BUSY', exitCode: 1 });
       }
-      data = { configuration_revision: shown.configuration_revision, diagnostics: shown.diagnostics, source: shown.source, definition_version: shown.definition_version, scope: shown.scope, effective_scope: shown.effective_scope, context: shown.context, inherited: shown.inherited, task_profile: shown.definition, ...explainSelection({ definition: shown.definition, level: options.level, task: options.task, role: options.role || 'task_delegate', selected: shown.active, active: options.scope === undefined && shown.active && shown.effective_scope === 'global' }) };
+      data = { configuration_revision: shown.configuration_revision, skill_revision: shown.skill_revision, skill_integrity: shown.skill_integrity, diagnostics: shown.diagnostics, source: shown.source, definition_version: shown.definition_version, scope: shown.scope, effective_scope: shown.effective_scope, context: shown.context, inherited: shown.inherited, task_profile: shown.definition, ...explainSelection({ definition: shown.definition, level: options.level, task: options.task, role: options.role || 'task_delegate', selected: shown.active, active: options.scope === undefined && shown.active && shown.effective_scope === 'global' }) };
     } else if (action === 'models') {
       const { recordedModelCheck } = await import('../lib/model-history.mjs');
       data = await recordedModelCheck({ home, scope: options.scope, project: options.project, thread: options.thread, verify: Boolean(options.verify), discover: Boolean(options.discover), expectCatalog: options.expectCatalog, target: options.model ? { model: options.model, effort: options.effort } : undefined, expectRevision: options.expectRevision });

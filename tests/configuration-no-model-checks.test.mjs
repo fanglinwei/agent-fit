@@ -93,7 +93,8 @@ test('manual verification still makes an isolated request and saves history inde
   assert.equal(result.code, 0); assert.equal((await readSnapshot(f.home)).mode.id, 'high');
   assert.equal(f.posts.length, 1);
   result = await f.run(args);
-  assert.equal(result.code, 1); assert.equal(result.report.data.status, 'passed');
+  assert.equal(result.code, 1); assert.equal(result.report.data.status, 'incomplete');
+  assert.equal(result.report.data.check_status, 'passed');
   assert.equal(result.report.data.history.status, 'failed');
   assert.equal((await readSnapshot(f.home)).mode.id, 'high');
 });

@@ -1,12 +1,12 @@
 # 使用说明
 
-`agent-fit` 0.7.3，npm 包名为 `@fanglinwei/agent-fit`，命令和 Skill 名仍为 `agent-fit`。首版支持 Codex；Node.js 22+。命令、网页和生成的 Skill 使用同一套档位数据。
+`agent-fit` 0.7.4，npm 包名为 `@fanglinwei/agent-fit`，命令和 Skill 名仍为 `agent-fit`。首版支持 Codex；Node.js 22+。命令、网页和生成的 Skill 使用同一套档位数据。
 
 工具只处理当前格式与版本的配置；独立 home 全程使用显式指定的路径。
 
 ## 安装与配置
 
-从 npm registry 安装，或在项目目录运行 `npm pack` 后使用 `npm install -g ./fanglinwei-agent-fit-0.7.3.tgz` 安装本地包。两种方式都需要 Node/npm。
+从 GitHub v0.7.4 Release 下载发行包，或在项目目录运行 `npm pack` 后使用 `npm install -g ./fanglinwei-agent-fit-0.7.4.tgz` 安装。npm registry 获取的是该渠道当前已发布版本；两种方式都需要 Node/npm。本版按全新安装处理，不增加旧配置兼容。已有其他版本配置时，先保留所需自定义方案，用原版本 CLI 对原绑定 home 预览并实际 restore，之后再安装新版并 setup；不自动迁移旧档位或恢复记录。
 
 ```sh
 npm install -g @fanglinwei/agent-fit
@@ -166,8 +166,7 @@ agent-fit explain --level L4 --role task_review
 无需全局安装的 npm 查询，以及本地包查询：
 
 ```sh
-npm exec --package=@fanglinwei/agent-fit@0.7.3 -- agent-fit status --details
-npm exec --package="/path/to/fanglinwei-agent-fit-0.7.3.tgz" -- agent-fit status --details
+npm exec --package="/path/to/fanglinwei-agent-fit-0.7.4.tgz" -- agent-fit status --details
 ```
 
 ## 委派收益检查
@@ -384,6 +383,16 @@ agent-fit models check --verify --discover
 
 每轮实际验证私下绑定请求地址、请求头和授权，发请求前、成功响应后及整轮结束时核对。账号切换、退出登录或所用授权变化时返回 `PROBE_AUTH_CHANGED`、`authorization_changed: true`，停止后续请求，整轮结果标为未完成；已检查项目也失去当前可用性证明。授权绑定及其摘要不进入普通 `configuration_revision`、网页或历史；历史仅保留授权是否变化的状态。
 
+### 验证报告的不同层次
+
+`check_status` 表示检查子结果，`status` 和进程退出码表示整条命令结果。历史保存失败时保留 check_status，status 为 incomplete、history.status 为 failed、退出非零，不能称为已保存或整条命令通过。
+
+`verification_summary` 分开返回 request_succeeded、reported_identity_matched、session_context_matched、fire_gate_satisfied 和 missing_evidence。布尔 null 表示证据不足；独立 CLI 不核实正在聊天的宿主上下文，所以即使请求和响应身份匹配，session_context_matched 与 fire_gate_satisfied 仍为 null。失败或配置/授权变化会使 fire_gate_satisfied 为 false。不能用 check_status=passed 代替 fire 放行，也不能把这些供应商响应字段称为对其上游路由的独立证明。
+
+每个 checked_pairs 条目保存 source_revision 和 valid_for_current_configuration。后者描述本轮检查结束时：检测到配置/授权变化为 false，未完成或无法核实则为 null。历史记录保留当时的值，不在读取时重新认证；历史 matched 或 true 不说明对读取时的配置或聊天仍有效，使用前须重新核对。记录白名单保留这些字段，不保存认证绑定。
+
+共享 Skill 通过 manifest 核对文件完整性。status、mode show、explain、skill path 增加 skill_revision、skill_integrity；home 的 configuration_revision 不因共享规则变化而改变。规则不完整、被修改或未登记时，rules.integrity 不再显示 clean，并给出具体诊断；只读查询和安全恢复仍可进行，但新委派必须先核验规则。用户修改不会被自动覆盖。
+
 ## 本地网页
 
 ```sh
@@ -472,7 +481,7 @@ npm pack
 
 `npm test` 验证安装、档位、查询、恢复和本地服务；安装保护用例覆盖用户配置保留、冲突、符号链接、失败回退及输出脱敏。
 
-浏览器集成脚本不安装额外依赖；使用开发环境已存在的 Playwright 和 Chrome：
+浏览器集成入口自动隔离用户 home 与 Codex home，防止安装共享 Skill 到真实用户目录。浏览器集成脚本不安装额外依赖；使用开发环境已存在的 Playwright 和 Chrome：
 
 ```sh
 PLAYWRIGHT_MODULE=/path/to/playwright CHROME_PATH=/path/to/chrome npm run test:browser

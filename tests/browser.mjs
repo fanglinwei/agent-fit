@@ -1,3 +1,4 @@
+import { isolatedUserHome } from './isolate-home.mjs';
 import { createRequire } from 'node:module';
 import { mkdtemp, realpath, readFile, writeFile, rm } from 'node:fs/promises';
 import os from 'node:os';
@@ -39,6 +40,7 @@ try {
  await page.locator('#apply').click();
  await page.waitForFunction(()=>document.querySelector('#new-mode').disabled===false);
  console.log('installed',await page.locator('#configured').innerText());
+ assert.ok((await readFile(path.join(isolatedUserHome,'.agents/skills/agent-fit/SKILL.md'),'utf8')).includes('name: agent-fit'),'shared rules must be installed in the isolated user home');
  assert.match(await page.locator('#result').innerText(),/配置已写入/);
  assert.match(await page.locator('#result').innerText(),/请重启 Codex/);
  assert.match(await page.locator('#runtime').innerText(),/全局、项目和会话切档无需重启/);

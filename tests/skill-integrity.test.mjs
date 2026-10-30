@@ -1,0 +1,52 @@
+import './isolate-home.mjs';
+import test, { beforeEach } from 'node:test';
+import assert from 'node:assert/strict';
+import fs from 'node:fs/promises';
+import os from 'node:os';
+import path from 'node:path';
+import { spawnSync } from 'node:child_process';
+import { mutate, readSnapshot, statusReport } from '../lib/install.mjs';
+import { sharedSkillPath, inspectSkill } from '../lib/skill.mjs';
+
+beforeEach(() => fs.rm(sharedSkillPath(), { recursive: true, force: true }));
+for (const scenario of ['missing', 'modified', 'manifest']) test(`shared Skill ${scenario} is observable without blocking home recovery`, async t => {
+  const root = await fs.realpath(await fs.mkdtemp(path.join(os.tmpdir(), 'agent-fit-integrity-')));
+  t.after(() => fs.rm(root, { recursive: true, force: true }));
+  const home = path.join(root, 'home');
+  await mutate(home, 'setup');
+  const before = await statusReport(home);
+  assert.equal(before.skill_integrity, 'clean');
+  const reference = path.join(sharedSkillPath(), 'references/failure-policy.md');
+  if (scenario === 'missing') await fs.unlink(reference);
+  if (scenario === 'modified') await fs.appendFile(path.join(sharedSkillPath(), 'SKILL.md'), '\nUser edit\n');
+  if (scenario === 'manifest') await fs.writeFile(path.join(sharedSkillPath(), '.agent-fit-manifest.json'), '{invalid');
+  const after = await statusReport(home);
+  assert.notEqual(after.skill_integrity, 'clean');
+  assert.equal(after.rules.integrity, after.skill_integrity);
+  assert.notEqual(after.skill_revision, before.skill_revision);
+  assert.equal(after.configuration_revision, before.configuration_revision);
+  const code = { missing: 'SKILL_FILE_MISSING', modified: 'SKILL_FILE_MODIFIED', manifest: 'SKILL_MANIFEST_INVALID' }[scenario];
+  assert.ok(after.diagnostics.some(item => item.code === code));
+  const cli = spawnSync(process.execPath, [new URL('../bin/agent-fit.mjs', import.meta.url).pathname, 'explain', '--codex-home', home, '--level', 'L3', '--json'], { encoding: 'utf8' });
+  const report = JSON.parse(cli.stdout);
+  assert.equal(cli.status, 0);
+  assert.equal(report.data.skill_integrity, after.skill_integrity);
+  assert.equal(report.data.skill_revision, after.skill_revision);
+  const contents = await fs.readFile(path.join(sharedSkillPath(), 'SKILL.md'));
+  await mutate(home, 'restore', { expectRevision: after.configuration_revision });
+  assert.deepEqual(await fs.readFile(path.join(sharedSkillPath(), 'SKILL.md')), contents);
+  assert.equal((await readSnapshot(home)).state, null);
+});
+
+test('untracked rules and incomplete manifests are not reported as clean', async t => {
+  const root = await fs.realpath(await fs.mkdtemp(path.join(os.tmpdir(), 'agent-fit-integrity-')));
+  t.after(() => fs.rm(root, { recursive: true, force: true }));
+  await mutate(path.join(root, 'home'), 'setup');
+  const file = path.join(sharedSkillPath(), '.agent-fit-manifest.json');
+  const manifest = JSON.parse(await fs.readFile(file));
+  delete manifest.files['references/failure-policy.md'];
+  await fs.writeFile(file, JSON.stringify(manifest));
+  assert.equal((await inspectSkill(path.join(root, 'home'))).integrity, 'invalid');
+  await fs.unlink(file);
+  assert.equal((await inspectSkill(path.join(root, 'home'))).integrity, 'untracked');
+});

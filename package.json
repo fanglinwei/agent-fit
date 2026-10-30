@@ -1,6 +1,6 @@
 {
   "name": "@fanglinwei/agent-fit",
-  "version": "0.7.3",
+  "version": "0.7.4",
   "description": "Match delegated tasks to model and reasoning effort profiles for Codex, with scoped configuration and restore.",
   "type": "module",
   "license": "MIT",

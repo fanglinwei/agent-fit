@@ -1,8 +1,8 @@
 # Agent Fit
 
-**为 Codex 子任务匹配模型与推理强度。**
+**面向 Codex 子任务的 AI 模型与推理资源调配工具。**
 
-Agent Fit 将任务复杂度、模型档位和委派职责放进一套可查询、可配置、可恢复的规则中。先判断是否值得委派，再为需要委派的任务选择模型、推理强度和备用组合，适用于研究、写作、数据分析、规划、开发与审查。
+Agent Fit 根据任务复杂度、质量要求和预算，为已获授权的子任务匹配模型、推理强度和备用组合。先判断是否值得委派，再决定投入多少推理资源；支持研究、写作、数据分析、规划、开发与审查。模型档位、委派职责与配置来源均可查询和恢复。
 
 [快速开始](#快速开始) · [四种档位](#四种档位) · [作用域](#按会话项目或全局配置) · [完整文档](docs/usage.md) · [更新记录](https://github.com/fanglinwei/agent-fit/releases)
 
@@ -13,27 +13,31 @@ Agent Fit 将任务复杂度、模型档位和委派职责放进一套可查询�
 - **会话、项目、全局三层作用域**：优先级为会话 > 项目 > 全局。聊天切换默认仅影响当前聊天，项目按 Git worktree 隔离，已开始任务沿用原快照。
 - **CLI 与本地配置页面**：查看和编辑档位、浏览委派路由与选择依据、管理账号授权、预览和执行恢复。网页操作复用 CLI，只监听 `127.0.0.1`。
 - **配置与模型检测分开**：安装、切档和保存配置只处理本地文件。需要时手动查询目录或验证模型，网页检测前确认主组合和费用。
+- **配置与规则完整性分别检查**：识别共享 Skill 文件缺失、内容修改和清单异常，分别报告配置与规则修订号；规则异常时保留查询和安全恢复能力。
+- **受控接续与完整交接**：区分前提缺失、质量升级与故障备用，保存任务完整快照；交接明确职责、权限、独占范围和验收，所有接续共用次数与预算。
 - **可检查、可恢复**：提供状态诊断、职责核对、配置冲突保护及首次安装前的恢复基线；保留无关配置和管理区块之外的修改。
 
-当前面向 **Codex**，需要 **Node.js 22+** 和支持独立角色 TOML 的 Codex 客户端。已在 macOS 与 Codex CLI 0.162.1 验证相关配置和账号接口，其他环境的验证范围见[实施验收记录](docs/implementation-review.md)。项目处于内测阶段，处理当前配置，并支持 0.7.1 旧目录布局的显式迁移。
+当前面向 **Codex**，需要 **Node.js 22+** 和支持独立角色 TOML 的 Codex 客户端。已在 macOS 与 Codex CLI 0.162.1 验证相关配置和账号接口，其他环境的验证范围见[实施验收记录](docs/implementation-review.md)。项目处于内测阶段；v0.7.4 按全新安装提供，不增加旧版本配置兼容。
 
 ## 快速开始
 
-安装命令行工具，预览并应用官方档位：
+从 [v0.7.4 Release](https://github.com/fanglinwei/agent-fit/releases/tag/v0.7.4) 下载 `fanglinwei-agent-fit-0.7.4.tgz`，在下载目录安装，预览并应用官方档位：
 
 ```sh
-npm install -g @fanglinwei/agent-fit
+npm install -g ./fanglinwei-agent-fit-0.7.4.tgz
 agent-fit setup --mode official --dry-run
 agent-fit setup --mode official
 ```
 
-npm 包名为 [`@fanglinwei/agent-fit`](https://www.npmjs.com/package/@fanglinwei/agent-fit)，安装后的命令和 Skill 名为 `agent-fit`。
+npm 包名为 [`@fanglinwei/agent-fit`](https://www.npmjs.com/package/@fanglinwei/agent-fit)，安装后的命令和 Skill 名为 `agent-fit`。也可用 `npm install -g @fanglinwei/agent-fit` 获取 npm 当前已发布版本；GitHub Release 与 npm registry 的版本以各自页面为准。
+
+**已有其他版本配置时，不要直接用新版覆盖。** 先保留需要的自定义方案，并用原版本 CLI 对原绑定 home 按[恢复与卸载](#恢复与卸载)完成预览及实际恢复，再安装新版并重新 setup。v0.7.4 不自动迁移旧档位或恢复记录。
 
 **首次配置完成后重启 Codex。** 安装 npm 包本身不会修改 Codex；`setup` 才会写入四个委派角色、AGENTS 管理区块和档位数据，并在共享 Skill 不存在时安装规则。默认目标为 `CODEX_HOME` 或 `~/.codex`，可通过 `--codex-home "/path/to/codex-home"` 指定独立目录。
 
 Skill 默认放在 `~/.agents/skills/agent-fit/`，可由 CCSwitch 统一管理。动态档位存于对应 home 的 `.agent-fit/current-mode.json`，多个 home 共用规则但配置独立。`status`、`explain` 和 `skill path` 只读；日常切档和 `restore` 不改写或删除共享 Skill。
 
-从 0.7.1 迁移时，先执行 `agent-fit setup --dry-run`，再执行 `agent-fit setup`。旧目录保留、移除或软链接到共享目录均可识别；迁移验证安装记录，冲突时保留现场。已有共享规则需要更新时，显式执行 `agent-fit skill update --dry-run` 和 `agent-fit skill update`。完整边界见[目录与迁移](docs/usage.md#skill-目录与旧安装迁移)。
+已有共享规则需要单独更新：先执行 `agent-fit skill update --dry-run`，核对后再执行 `agent-fit skill update`；`setup` 不覆盖现有共享规则。发现用户修改或归属冲突时保留现场，不直接删除目录来绕过保护。完整边界见[Skill 目录说明](docs/usage.md#skill-目录与旧安装迁移)。
 
 打开本地配置页面：
 
@@ -134,13 +138,15 @@ agent-fit models check --verify
 
 网页账号页管理已有授权、登录、取消授权和退出登录；档位页的“检测当前档位主模型”按组合去重，排除备用，并在执行前确认。保存或切换配置不会自动检测模型。
 
-实际验证通过独立 Responses 请求进行，不启动带项目材料的 Codex 任务或工具执行器。请求成功、供应商返回的身份与配置是否生效分别核验；检测结果不代替 `fire` 的会话验证。供应商目录、批量可用性检查和验证边界见[模型检查](docs/usage.md#模型检查)。
+实际验证通过独立 Responses 请求进行，不启动带项目材料的 Codex 任务或工具执行器。请求成功、供应商返回的身份与当前聊天上下文匹配分别报告；独立 CLI 检查通过不代替 `fire` 的会话验证。失败、未完成或矛盾的流式终止结果不计为成功；检查历史保存失败时，整条命令报告未完成。供应商目录、批量可用性检查和验证边界见[模型检查](docs/usage.md#模型检查)。
 
 ## 委派规则如何生效
 
 `setup` 安装的 AGENTS 入口要求 Codex 启动时通过 `agent-fit skill path` 查找并读取规则，并在创建、重试或切换子代理模型前重新核对规则与有效档位。主代理仍负责设计、集成、关键验证和最终结论。
 
 共同规则包括先权衡委派收益与协调成本、保留用户授权和预算、区分复杂度与职责、明确独占写入范围、禁止递归委派，以及完成最小充分验证。质量升级与故障备用分别判断，初次派发、重试和接续共用每任务最多三次委派。
+
+`status`、`mode show`、`explain` 和 `skill path` 分别报告配置与共享规则的状态。委派前核对 `skill_integrity` 为 `clean`，并保存 `skill_revision` 与完整任务档位快照；CLI 查询成功不等于规则完整，也不证明模型实际可用。共享规则异常时先修复受影响部分。
 
 这些规则由宿主读取并遵循；工具提供配置与解释，不自动派发任务，也没有宿主级委派拦截器。实际模型身份、能力和成本需要独立证据。完整契约见 [Skill](adapters/codex/skills/agent-fit/SKILL.md)，预设评估方法见[离线校准指南](adapters/codex/skills/agent-fit/references/calibration.md)。
 
@@ -168,7 +174,7 @@ npm test
 npm pack
 ```
 
-本地打包产物为 `fanglinwei-agent-fit-0.7.3.tgz`，可用 `npm install -g ./fanglinwei-agent-fit-0.7.3.tgz` 安装。浏览器集成使用已有 Playwright 与 Chrome，运行方法见[开发验证](docs/usage.md#开发验证)。唯一运行依赖为 [smol-toml](https://github.com/squirrelchat/smol-toml)。
+本地打包产物为 `fanglinwei-agent-fit-0.7.4.tgz`，可用 `npm install -g ./fanglinwei-agent-fit-0.7.4.tgz` 安装。浏览器集成使用已有 Playwright 与 Chrome，运行方法见[开发验证](docs/usage.md#开发验证)。唯一运行依赖为 [smol-toml](https://github.com/squirrelchat/smol-toml)。
 
 ## License
 
