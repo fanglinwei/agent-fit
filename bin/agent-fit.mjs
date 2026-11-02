@@ -19,7 +19,7 @@ mode configure MODE --level L1|L2|L3|L4 --model MODEL --effort EFFORT
   [--fallback-model MODEL --fallback-effort EFFORT | --clear-fallback]
 mode configure MODE --definition-stdin [--dry-run]
 status [--details] [--project PATH]
-explain --level L1|L2|L3|L4 [--task mechanical|bounded|scan|deep|complex|uncertain|reasoning|latency] [--mode MODE] [--role ROLE]
+explain --level L1|L2|L3|L4 [--task mechanical|bounded|scan|deep|complex|uncertain|reasoning|visual|computer|writing|latency] [--mode MODE] [--role ROLE]
 models check [--verify] [--discover] [--expect-catalog HASH] [--model MODEL --effort EFFORT]
 restore [--dry-run]
 serve [--port PORT] [--open]

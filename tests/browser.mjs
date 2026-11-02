@@ -71,7 +71,7 @@ try {
  assert.equal(checkedStatus.status,0,checkedStatus.stdout);
  const checkedSnapshot=JSON.parse(checkedStatus.stdout).data;
  const requestedPairs=[...new Map(Object.values(checkedSnapshot.mode.levels).flatMap(pair=>[pair,...Object.values(pair.tasks??{})]).map(pair=>[`${pair.model}/${pair.effort}`,{model:pair.model,effort:pair.effort}])).values()];
- assert.equal(requestedPairs.length,9,'baseline and task candidates are deduplicated before confirmation');
+ assert.equal(requestedPairs.length,12,'baseline and task candidates are deduplicated before confirmation');
  assert.ok(requestedPairs.some(pair=>pair.model==='gpt-6-astra'&&pair.effort==='low'));
  let checkData={configuration_revision:checkedSnapshot.configuration_revision,source_revision:checkedSnapshot.configuration_revision,configuration_changed:false,status:'passed',diagnostics:[],checked_pairs:requestedPairs.map(pair=>({...pair,request_status:'succeeded',access:'available',identity_status:'matched',reason_code:'PROBE_VERIFIED'}))};
  let checkExit=0;
@@ -144,6 +144,12 @@ try {
  assert.equal(await page.locator('#rules-mode').inputValue(),'','rules default to active config, independently of editor preview');
  assert.match(await page.locator('#routes-L1 .route-baseline').innerText(),/Luna \/ high/);
  assert.match(await page.locator('#routes-L1 [data-task="mechanical"]').innerText(),/Luna \/ medium/);
+ assert.match(await page.locator('#routes-L1 [data-task="visual"]').innerText(),/Terra 6.1 \/ low/);
+ assert.match(await page.locator('#routes-L2 [data-task="computer"]').innerText(),/Terra 6.1 \/ medium/);
+ await page.locator('#routes-L3 [data-task="writing"]').click();
+ await page.waitForFunction(()=>document.querySelector('#explanation').textContent.includes('gpt-6.1-sol / high'));
+ assert.match(await page.locator('#route-detail-title').innerText(),/L3 · 自然写作与修订/);
+ assert.match(await page.locator('#explanation').innerText(),/gpt-6.1-sol \/ high/);
  assert.match(await page.locator('#routes-L1 div.route-row').innerText(),/低延迟[\s\S]*未配置/);
  assert.equal(await page.locator('#explain-level, #explain-task, #explain-mode, #explain').count(),0);
  await page.locator('#routes-L1 [data-task="mechanical"]').focus();

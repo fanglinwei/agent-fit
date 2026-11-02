@@ -1,12 +1,12 @@
 # 使用说明
 
-`agent-fit` 0.7.4，npm 包名为 `@fanglinwei/agent-fit`，命令和 Skill 名仍为 `agent-fit`。首版支持 Codex；Node.js 22+。命令、网页和生成的 Skill 使用同一套档位数据。
+`agent-fit` 0.8.0，npm 包名为 `@fanglinwei/agent-fit`，命令和 Skill 名仍为 `agent-fit`。首版支持 Codex；Node.js 22+。命令、网页和生成的 Skill 使用同一套档位数据。
 
 工具只处理当前格式与版本的配置；独立 home 全程使用显式指定的路径。
 
 ## 安装与配置
 
-从 GitHub v0.7.4 Release 下载发行包，或在项目目录运行 `npm pack` 后使用 `npm install -g ./fanglinwei-agent-fit-0.7.4.tgz` 安装。npm registry 获取的是该渠道当前已发布版本；两种方式都需要 Node/npm。本版按全新安装处理，不增加旧配置兼容。已有其他版本配置时，先保留所需自定义方案，用原版本 CLI 对原绑定 home 预览并实际 restore，之后再安装新版并 setup；不自动迁移旧档位或恢复记录。
+从 GitHub v0.8.0 Release 下载发行包，或在项目目录运行 `npm pack` 后使用 `npm install -g ./fanglinwei-agent-fit-0.8.0.tgz` 安装。npm registry 获取的是该渠道当前已发布版本；两种方式都需要 Node/npm。本版按全新安装处理，不增加旧配置兼容。已有其他版本配置时，先保留所需自定义方案，用原版本 CLI 对原绑定 home 预览并实际 restore，之后再安装新版并 setup；不自动迁移旧档位或恢复记录。
 
 ```sh
 npm install -g @fanglinwei/agent-fit
@@ -124,9 +124,14 @@ L1–L4 保留为推理复杂度；在最终等级内通过 `--task` 选择模�
 | `complex`：有界复杂任务 | L2/L3 | Sol / medium |
 | `uncertain`：高歧义、高耦合或高后果且难验收 | L3/L4 | Astra / low |
 | `reasoning`：复杂推理或已证实推理不足 | L3/L4 | Astra / medium |
-| `latency`：明确追求低延迟 | 任意等级 | 须显式配置；不自动启用 Terra |
+| `visual`：视觉理解与图像推理 | L1/L2/L3 | Terra 6.1 / low、medium、high |
+| `computer`：有界电脑操作 | L1/L2/L3 | Terra 6.1 / low、medium、high |
+| `writing`：自然写作与修订 | L1/L2/L3 | Terra 6.1 / low、medium、high |
+| `latency`：明确追求低延迟 | 任意等级 | 须显式配置，不保证实际延迟 |
 
 这些是待校准的本地策略，不代表已经验证模型能力或延迟。普通自动 Astra 路由默认 low，复杂推理或有证据的质量升级最多 medium；更高强度需要明确授权。**用户明确选择 high/fire 即授权其展示的最高强度，包含 Astra/ultra**；预览或保存不构成选择，预算、宿主支持和 fire 会话验证继续适用。已选择的自定义档位执行明确保存的组合。
+
+先判断等级，再核对组合的工具、输入、上下文与验收能力。无法明确匹配任务候选时使用本级基线，仍需能力检查；候选适用依据与 L2/L3 complex 的边界见 [任务路由](../adapters/codex/skills/agent-fit/references/task-routing.md#基线与候选的选择边界)。同一组合改标签不构成质量升级，也不存在固定的跨模型升级顺序。
 
 ```sh
 agent-fit explain --level L1 --task mechanical --role task_execute --json
@@ -137,7 +142,7 @@ agent-fit explain --level L3 --task reasoning --role task_execute --json
 
 聊天仍须使用会话作用域及目标项目、线程上下文。`--task` 只查表，不自动分类、切档或发模型请求；不传时返回原等级基线。类型与等级不匹配会被拒绝；明确请求但快照未配置时返回 `TASK_ROUTE_NOT_CONFIGURED`，不能借用包内新值或自行拼组合。旧安装尚无候选时，预览并更新基础配置后再查询；本次基础 Skill 更新部署后仍需重启一次。
 
-每级可选 `tasks`，键为上表类型，每项完整包含 `model`、`effort`、`fallback`（可为 null）。复制档位、三层作用域和任务快照均保留候选；单级 CLI 配置只改基线，候选通过整表 JSON 或网页“任务候选 JSON”编辑，`{}` 清空本级候选。例如 L1 的 `tasks.latency` 可保存用户明确提供的 Terra 模型 ID、high 及适当备用；必须满足原能力要求，不能凭模型名承诺低延迟。
+每级可选 `tasks`，键为上表类型，每项完整包含 `model`、`effort`、`fallback`（可为 null）。复制档位、三层作用域和任务快照均保留候选；单级 CLI 配置只改基线，候选通过整表 JSON 或网页“任务候选 JSON”编辑，`{}` 清空本级候选。Terra 的三个专长候选分别带有 Sol 6.1 备用；latency 仍须独立显式配置，不能凭模型名承诺低延迟。
 
 三个作用域的复制内容均与同一作用域下 `mode show <源档位>` 显示的完整定义一致。源档位对应已部署快照时复制该快照；旧快照没有的候选不会因复制而自动加入。
 
@@ -166,7 +171,7 @@ agent-fit explain --level L4 --role task_review
 无需全局安装的 npm 查询，以及本地包查询：
 
 ```sh
-npm exec --package="/path/to/fanglinwei-agent-fit-0.7.4.tgz" -- agent-fit status --details
+npm exec --package="/path/to/fanglinwei-agent-fit-0.8.0.tgz" -- agent-fit status --details
 ```
 
 ## 委派收益检查
@@ -294,7 +299,7 @@ Astra 不可用：先区分认证、权限、额度、临时故障或能力不�
 
 ## 验收失败与质量升级
 
-请求成功而结果未达原验收属于质量问题，不能当作模型不可用。主代理先指出可复核的失败，再区分材料/环境前提、方法或交接遗漏、推理不足；前提缺失先补齐，方法遗漏可补正后有限重试，推理不足或新暴露复杂约束才重评困难部分等级。用户选择、原预算与宿主能力允许时，选择原任务快照中的同级任务候选或更高等级主组合，保留原职责和验收；本级 fallback 仅供可用性接续。
+请求成功而结果未达原验收属于质量问题，不能当作模型不可用。主代理先指出可复核的失败，再区分材料/环境前提、方法或交接遗漏、推理不足；前提缺失先补齐，方法遗漏可补正后有限重试，推理不足或新暴露复杂约束才重评困难部分等级。用户选择、原预算与宿主能力允许时，选择原任务快照中的同级基线、任务候选或更高等级主组合，说明它针对的具体失败，保留原职责和验收；本级 fallback 仅供可用性接续。
 
 比较实际 model + effort，相邻等级组合相同不重派；可核对下一不同组合，但自定义高等级不保证能力更强。high 的 L3→L4 与 fire 的升等级都没有实际组合提升，无适合候选时报告上限。若有新证据或具体方法修正，可以在余量内重试原组合，并如实称为重试；不机械地先加 effort 或先换模型。
 
@@ -334,6 +339,37 @@ JSON
 ```
 
 最高 64 KiB UTF-8 JSON；必须明确全部等级与备用/null；每级可选 tasks，候选也须完整提供 model、effort 和 fallback/null，拒绝未知字段、无效类型/等级、缺级、半对参数或主备用相同。与单级参数互斥。活动定义与部署角色同一事务保存；非活动定义只保存，不激活。
+
+### Terra 专长路线
+
+[官方指南](https://learn.chatgpt.com/docs/models)将 Terra 6.1 用于日常写作、视觉工作和支持的应用操作；[模型说明](https://developers.openai.com/api/docs/models/gpt-6.1-terra)强调视觉推理、电脑操作与自然写作。cut/official 的 visual/computer/writing 使用本地 L1 low、L2 medium、L3 high，故障备用分别为 Sol 6.1 medium、medium、high。官方未制定此等级表，当前映射不代表实测性能优势。high/fire 按原最高强度策略处理这三类任务，L4 不提供 Terra 专长路线。
+
+先确定复杂度与保障要求，再核对主要工作是否属于专长、关键事实和约束是否已知、结果是否可核验。开放研究、强耦合或高后果且难验收的任务仍使用基线或 uncertain/reasoning；含有图片或产出文章不足以选择 Terra。电脑操作仍须原工具与写入授权，不能扩大只读职责。
+
+```sh
+agent-fit explain --level L1 --task visual --role task_scan --json
+agent-fit explain --level L2 --task computer --role task_execute --json
+agent-fit explain --level L3 --task writing --role task_review --json
+```
+
+聊天中补齐 Skill 要求的 session、project 与 thread 参数。已有自定义定义和任务快照不自动合并新候选；可从当前内置定义创建新档位，或通过完整定义编辑。配置与规则同步后重启一次 Codex，随后按新任务查询；不需要先追加模型评测。
+
+### Terra 历史候选评估
+
+以下保留早期评估复现步骤，不是当前推荐分配。包内 [terra-evaluation.json](../adapters/codex/profiles/terra-evaluation.json) 只将 official 的 L2 bounded、L3 complex 改为 Terra 6.1/medium，实验路由的备用为 null，以分别观察原验收和失败；其他路由保留冻结原值。它不含后来的 visual/computer/writing，保留历史快照，不证明 Terra 比 Luna 或 Sol 更合适。
+
+以下命令在包根目录执行。先替换 home、项目及目标聊天 ID；只创建、保存和预览会话自定义档位，不执行 mode set，不修改当前选择。导入的是完整冻结定义，不与本机已有配置逐字段合并。
+
+```sh
+evaluation_home=/path/to/codex-home
+evaluation_project=/path/to/project
+evaluation_thread=TARGET_THREAD_ID
+agent-fit mode create "Terra 评估" --from official --scope session --codex-home "$evaluation_home" --project "$evaluation_project" --thread "$evaluation_thread"
+agent-fit mode configure "Terra 评估" --definition-stdin --scope session --codex-home "$evaluation_home" --project "$evaluation_project" --thread "$evaluation_thread" < adapters/codex/profiles/terra-evaluation.json
+agent-fit explain --mode "Terra 评估" --level L2 --task bounded --role task_execute --scope session --codex-home "$evaluation_home" --project "$evaluation_project" --thread "$evaluation_thread" --json
+```
+
+L3 预览改为 `--level L3 --task complex`。逐条检查退出码、errors、规则完整性、目标上下文与完整 task_profile；effective_scope 仍表示当前选择的继承来源，不表示预览定义已激活。实际对照使用 task_delegate 显式组合，按 [校准指南](../adapters/codex/skills/agent-fit/references/calibration.md#新模型候选与默认晋升) 冻结样本、预算与验收；实证比较与备用适配分别判定。历史对照不是使用当前专长路线的前置条件。
 
 ### 配置与模型检查分开执行
 

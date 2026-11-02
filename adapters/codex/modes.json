@@ -43,6 +43,30 @@
                 "model": "gpt-6.1-sol",
                 "effort": "high"
               }
+            },
+            "visual": {
+              "model": "gpt-6.1-terra",
+              "effort": "low",
+              "fallback": {
+                "model": "gpt-6.1-sol",
+                "effort": "medium"
+              }
+            },
+            "computer": {
+              "model": "gpt-6.1-terra",
+              "effort": "low",
+              "fallback": {
+                "model": "gpt-6.1-sol",
+                "effort": "medium"
+              }
+            },
+            "writing": {
+              "model": "gpt-6.1-terra",
+              "effort": "low",
+              "fallback": {
+                "model": "gpt-6.1-sol",
+                "effort": "medium"
+              }
             }
           }
         },
@@ -85,6 +109,30 @@
                 "model": "gpt-6.1-sol",
                 "effort": "high"
               }
+            },
+            "visual": {
+              "model": "gpt-6.1-terra",
+              "effort": "medium",
+              "fallback": {
+                "model": "gpt-6.1-sol",
+                "effort": "medium"
+              }
+            },
+            "computer": {
+              "model": "gpt-6.1-terra",
+              "effort": "medium",
+              "fallback": {
+                "model": "gpt-6.1-sol",
+                "effort": "medium"
+              }
+            },
+            "writing": {
+              "model": "gpt-6.1-terra",
+              "effort": "medium",
+              "fallback": {
+                "model": "gpt-6.1-sol",
+                "effort": "medium"
+              }
             }
           }
         },
@@ -118,6 +166,30 @@
               "fallback": {
                 "model": "gpt-6.1-sol",
                 "effort": "xhigh"
+              }
+            },
+            "visual": {
+              "model": "gpt-6.1-terra",
+              "effort": "high",
+              "fallback": {
+                "model": "gpt-6.1-sol",
+                "effort": "high"
+              }
+            },
+            "computer": {
+              "model": "gpt-6.1-terra",
+              "effort": "high",
+              "fallback": {
+                "model": "gpt-6.1-sol",
+                "effort": "high"
+              }
+            },
+            "writing": {
+              "model": "gpt-6.1-terra",
+              "effort": "high",
+              "fallback": {
+                "model": "gpt-6.1-sol",
+                "effort": "high"
               }
             }
           }
@@ -185,6 +257,30 @@
                 "model": "gpt-6.1-sol",
                 "effort": "high"
               }
+            },
+            "visual": {
+              "model": "gpt-6.1-terra",
+              "effort": "low",
+              "fallback": {
+                "model": "gpt-6.1-sol",
+                "effort": "medium"
+              }
+            },
+            "computer": {
+              "model": "gpt-6.1-terra",
+              "effort": "low",
+              "fallback": {
+                "model": "gpt-6.1-sol",
+                "effort": "medium"
+              }
+            },
+            "writing": {
+              "model": "gpt-6.1-terra",
+              "effort": "low",
+              "fallback": {
+                "model": "gpt-6.1-sol",
+                "effort": "medium"
+              }
             }
           }
         },
@@ -227,6 +323,30 @@
                 "model": "gpt-6.1-sol",
                 "effort": "high"
               }
+            },
+            "visual": {
+              "model": "gpt-6.1-terra",
+              "effort": "medium",
+              "fallback": {
+                "model": "gpt-6.1-sol",
+                "effort": "medium"
+              }
+            },
+            "computer": {
+              "model": "gpt-6.1-terra",
+              "effort": "medium",
+              "fallback": {
+                "model": "gpt-6.1-sol",
+                "effort": "medium"
+              }
+            },
+            "writing": {
+              "model": "gpt-6.1-terra",
+              "effort": "medium",
+              "fallback": {
+                "model": "gpt-6.1-sol",
+                "effort": "medium"
+              }
             }
           }
         },
@@ -260,6 +380,30 @@
               "fallback": {
                 "model": "gpt-6.1-sol",
                 "effort": "xhigh"
+              }
+            },
+            "visual": {
+              "model": "gpt-6.1-terra",
+              "effort": "high",
+              "fallback": {
+                "model": "gpt-6.1-sol",
+                "effort": "high"
+              }
+            },
+            "computer": {
+              "model": "gpt-6.1-terra",
+              "effort": "high",
+              "fallback": {
+                "model": "gpt-6.1-sol",
+                "effort": "high"
+              }
+            },
+            "writing": {
+              "model": "gpt-6.1-terra",
+              "effort": "high",
+              "fallback": {
+                "model": "gpt-6.1-sol",
+                "effort": "high"
               }
             }
           }

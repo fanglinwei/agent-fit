@@ -48,7 +48,7 @@ license: MIT
 - high（高级）：L1 Luna/max，L2 Sol/ultra，L3、L4 Astra/ultra；各模型使用宿主支持的最高推理强度。
 - fire（全开）：全部等级 Astra/ultra，委派前必须通过下面的实际验证；失败时使用用户指定组合，否则继承父代理组合。
 
-cut/official 保留四级基线，并增加同级任务候选。用户明确选择 high/fire 即授权其展示的最高组合，含 Astra/ultra；仅预览或保存不算选择，预算和 fire 验证继续适用。自定义按明确保存并选择的基线与候选执行。
+cut/official 保留四级基线，并增加同级任务候选。Terra 6.1 用于符合条件的 visual/computer/writing：L1 low、L2 medium、L3 high，故障备用为 Sol 6.1 medium/medium/high；不提供 L4 专长候选。先判复杂度再匹配专长，高不确定性、强耦合或高后果且难验收时优先原保障路线，电脑操作不扩大权限。用户明确选择 high/fire 即授权其展示的最高组合，含 Astra/ultra；仅预览或保存不算选择，预算和 fire 验证继续适用。自定义按明确保存并选择的基线与候选执行。
 
 完整模型 id、各级组合与静态备用以当前档位配置为准；最高 effort 须核对宿主与所选模型支持，不能把写入配置当作实际可用。
 
@@ -67,7 +67,7 @@ L1–L4 表示任务需求，档位表示资源策略，model + effort 是最终
 
 范围用于限定职责、上下文与交互边界，不能按文件数计分；用户明确的时延要求只在满足原质量要求的候选间取舍。以上任务信号用于说明选择，不相加为固定总分，不额外调用模型分类。
 
-在最终等级内，按 [同级任务候选](references/task-routing.md) 选择 mechanical、bounded、scan、deep、complex、uncertain 或 reasoning；明确低延迟路线用已配置的 latency。普通 Astra 候选默认 low，复杂推理或有证据的质量升级最多 medium；不能自动提高到 high/xhigh/max/ultra。high/fire 的明确选档授权及用户明确保存并选择的自定义组合按上文执行。规模、审查职责和时延均不能绕过保障下限。同级候选及各自备用也属于任务完整快照。
+在最终等级内，先核对组合是否满足原工具、输入、上下文与验收能力，再按 [同级任务候选](references/task-routing.md) 判断使用基线还是 mechanical、bounded、scan、deep、complex、uncertain、reasoning，或视觉 visual、电脑操作 computer、写作 writing；说明候选适用依据，无法满足能力要求时停止受影响委派。明确低延迟路线用已配置的 latency。普通 Astra 候选默认 low，复杂推理或有证据的质量升级最多 medium；不能自动提高到 high/xhigh/max/ultra。high/fire 的明确选档授权及用户明确保存并选择的自定义组合按上文执行。规模、审查职责和时延均不能绕过保障下限。同级候选及各自备用也属于任务完整快照。
 
 按“档位 id + 最终等级”及同级任务类型（如有）核对同一条配置中的 model、effort；两者含义不同，但按配置成对选择，不临时拼出未配置组合。不假定不同模型的同名 effort 等效，也不假定更高 effort 总比换模型合适。用一句话说明档位 id、等级、任务类型、复杂度依据、保障调整（如有）与所选组合；用户明确组合与原预算优先，无法满足时报告受影响部分。
 

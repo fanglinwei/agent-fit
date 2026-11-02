@@ -17,21 +17,21 @@ Agent Fit 根据任务复杂度、质量要求和预算，为已获授权的子�
 - **受控接续与完整交接**：区分前提缺失、质量升级与故障备用，保存任务完整快照；交接明确职责、权限、独占范围和验收，所有接续共用次数与预算。
 - **可检查、可恢复**：提供状态诊断、职责核对、配置冲突保护及首次安装前的恢复基线；保留无关配置和管理区块之外的修改。
 
-当前面向 **Codex**，需要 **Node.js 22+** 和支持独立角色 TOML 的 Codex 客户端。已在 macOS 与 Codex CLI 0.162.1 验证相关配置和账号接口，其他环境的验证范围见[实施验收记录](docs/implementation-review.md)。项目处于内测阶段；v0.7.4 按全新安装提供，不增加旧版本配置兼容。
+当前面向 **Codex**，需要 **Node.js 22+** 和支持独立角色 TOML 的 Codex 客户端。已在 macOS 与 Codex CLI 0.162.1 验证相关配置和账号接口，其他环境的验证范围见[实施验收记录](docs/implementation-review.md)。项目处于内测阶段；v0.8.0 按全新安装提供，不增加旧版本配置兼容。
 
 ## 快速开始
 
-从 [v0.7.4 Release](https://github.com/fanglinwei/agent-fit/releases/tag/v0.7.4) 下载 `fanglinwei-agent-fit-0.7.4.tgz`，在下载目录安装，预览并应用官方档位：
+从 [v0.8.0 Release](https://github.com/fanglinwei/agent-fit/releases/tag/v0.8.0) 下载 `fanglinwei-agent-fit-0.8.0.tgz`，在下载目录安装，预览并应用官方档位：
 
 ```sh
-npm install -g ./fanglinwei-agent-fit-0.7.4.tgz
+npm install -g ./fanglinwei-agent-fit-0.8.0.tgz
 agent-fit setup --mode official --dry-run
 agent-fit setup --mode official
 ```
 
 npm 包名为 [`@fanglinwei/agent-fit`](https://www.npmjs.com/package/@fanglinwei/agent-fit)，安装后的命令和 Skill 名为 `agent-fit`。也可用 `npm install -g @fanglinwei/agent-fit` 获取 npm 当前已发布版本；GitHub Release 与 npm registry 的版本以各自页面为准。
 
-**已有其他版本配置时，不要直接用新版覆盖。** 先保留需要的自定义方案，并用原版本 CLI 对原绑定 home 按[恢复与卸载](#恢复与卸载)完成预览及实际恢复，再安装新版并重新 setup。v0.7.4 不自动迁移旧档位或恢复记录。
+**已有其他版本配置时，不要直接用新版覆盖。** 先保留需要的自定义方案，并用原版本 CLI 对原绑定 home 按[恢复与卸载](#恢复与卸载)完成预览及实际恢复，再安装新版并重新 setup。v0.8.0 不自动迁移旧档位或恢复记录。
 
 **首次配置完成后重启 Codex。** 安装 npm 包本身不会修改 Codex；`setup` 才会写入四个委派角色、AGENTS 管理区块和档位数据，并在共享 Skill 不存在时安装规则。默认目标为 `CODEX_HOME` 或 `~/.codex`，可通过 `--codex-home "/path/to/codex-home"` 指定独立目录。
 
@@ -79,6 +79,8 @@ agent-fit status --details
 ```
 
 L1–L4 表示任务的推理需求：从方法明确的执行，到有边界的局部推理、复杂约束权衡和高不确定性推理。模型与 effort 使用档位中保存的完整组合；相邻等级可以共用组合。完整模型表与分级边界见[使用说明](docs/usage.md#任务等级与委派职责)。`official` 是本项目的预设名称，官方没有固定的 L1–L4 对照表。
+
+cut/official 已按 [官方定位](https://learn.chatgpt.com/docs/models)加入 Terra 6.1 的视觉、电脑操作和写作候选：L1 low、L2 medium、L3 high，候选故障备用为 Sol 6.1 medium/medium/high。先按 Skill 判断等级，再匹配专长；通用基线、编码路线及 high/fire 策略保留。条件与查询见 [Terra 专长路线](docs/usage.md#terra-专长路线)。
 
 ### 查询同级任务候选
 
@@ -174,7 +176,7 @@ npm test
 npm pack
 ```
 
-本地打包产物为 `fanglinwei-agent-fit-0.7.4.tgz`，可用 `npm install -g ./fanglinwei-agent-fit-0.7.4.tgz` 安装。浏览器集成使用已有 Playwright 与 Chrome，运行方法见[开发验证](docs/usage.md#开发验证)。唯一运行依赖为 [smol-toml](https://github.com/squirrelchat/smol-toml)。
+本地打包产物为 `fanglinwei-agent-fit-0.8.0.tgz`，可用 `npm install -g ./fanglinwei-agent-fit-0.8.0.tgz` 安装。浏览器集成使用已有 Playwright 与 Chrome，运行方法见[开发验证](docs/usage.md#开发验证)。唯一运行依赖为 [smol-toml](https://github.com/squirrelchat/smol-toml)。
 
 ## License
 

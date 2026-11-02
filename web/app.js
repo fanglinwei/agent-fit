@@ -4,8 +4,8 @@ const LEVELS = ['L1', 'L2', 'L3', 'L4'];
 const LEVEL_LABELS = ['明确执行', '有边界的推理', '复杂推理', '高不确定性推理'];
 const LEVEL_EXAMPLES = ['方法与验收已知，含大型确定性处理', '局部分析、有限方案选择', '多约束、竞争假设与矛盾证据', '检验关键假设、处理强耦合开放问题'];
 const ROUTE_EXAMPLES = ['按明确格式取证、按已批准规则批量替换', '实现边界清楚的功能、修复可复现的局部问题', '跨模块根因分析、状态与生命周期问题', '多机制交互的疑难问题、约束冲突的架构取舍'];
-const TASK_LABELS = { mechanical: '确定性机械任务', bounded: '普通有界任务', scan: '大型有界扫描或审查', deep: '大型确定性深度任务', complex: '有界复杂任务', uncertain: '高歧义、高耦合或高后果', reasoning: '复杂推理或质量验证失败', latency: '明确追求低延迟' };
-const TASK_LEVELS = { mechanical: ['L1'], bounded: ['L2'], scan: ['L1', 'L2'], deep: ['L1', 'L2'], complex: ['L2', 'L3'], uncertain: ['L3', 'L4'], reasoning: ['L3', 'L4'], latency: LEVELS };
+const TASK_LABELS = { mechanical: '确定性机械任务', bounded: '普通有界任务', scan: '大型有界扫描或审查', deep: '大型确定性深度任务', complex: '有界复杂任务', uncertain: '高歧义、高耦合或高后果', reasoning: '复杂推理或质量验证失败', visual: '视觉理解与图像推理', computer: '有界电脑操作', writing: '自然写作与修订', latency: '明确追求低延迟' };
+const TASK_LEVELS = { mechanical: ['L1'], bounded: ['L2'], scan: ['L1', 'L2'], deep: ['L1', 'L2'], complex: ['L2', 'L3'], uncertain: ['L3', 'L4'], reasoning: ['L3', 'L4'], visual: ['L1', 'L2', 'L3'], computer: ['L1', 'L2', 'L3'], writing: ['L1', 'L2', 'L3'], latency: LEVELS };
 const ROLE_LABELS = { task_scan: '扫描取证', task_execute: '范围内产出', task_review: '独立复核', task_delegate: '明确委派' };
 const CONTRACT_LABELS = { readonly_evidence: '只读取证，保留证据与局部阻断', scoped_output: '只在明确范围内产出，独占写入', readonly_review: '只读独立复核，保留原验收要求', bounded_delegate: '遵守本次明确职责与授权范围' };
 const $ = id => document.getElementById(id);
@@ -36,7 +36,7 @@ function custom() { return state.saved?.kind === 'custom'; }
 function now() { return new Date().toLocaleTimeString('zh-CN', { hour: '2-digit', minute: '2-digit', second: '2-digit' }); }
 function pairText(pair) { return pair ? `${pair.model} / ${pair.effort ?? '供应商默认参数'}` : '无备用'; }
 function routePair(pair) {
-  const names = { 'gpt-6-luna': 'Luna', 'gpt-6.1-sol': 'Sol 6.1', 'gpt-6-sol': 'Sol 6', 'gpt-6-astra': 'Astra', 'gpt-5.6-sol': 'Sol 5.6' };
+  const names = { 'gpt-6.1-terra': 'Terra 6.1', 'gpt-6-luna': 'Luna', 'gpt-6.1-sol': 'Sol 6.1', 'gpt-6-sol': 'Sol 6', 'gpt-6-astra': 'Astra', 'gpt-5.6-sol': 'Sol 5.6' };
   return pair ? `${names[pair.model] ?? pair.model} / ${pair.effort ?? '供应商默认参数'}` : '未配置';
 }
 function primaryPairs(definition) {

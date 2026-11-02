@@ -1,0 +1,134 @@
+{
+  "levels": {
+    "L1": {
+      "model": "gpt-6-luna",
+      "effort": "high",
+      "fallback": {
+        "model": "gpt-6.1-sol",
+        "effort": "medium"
+      },
+      "tasks": {
+        "mechanical": {
+          "model": "gpt-6-luna",
+          "effort": "medium",
+          "fallback": {
+            "model": "gpt-6.1-sol",
+            "effort": "medium"
+          }
+        },
+        "scan": {
+          "model": "gpt-6-luna",
+          "effort": "xhigh",
+          "fallback": {
+            "model": "gpt-6.1-sol",
+            "effort": "medium"
+          }
+        },
+        "deep": {
+          "model": "gpt-6-luna",
+          "effort": "max",
+          "fallback": {
+            "model": "gpt-6.1-sol",
+            "effort": "high"
+          }
+        }
+      }
+    },
+    "L2": {
+      "model": "gpt-6.1-sol",
+      "effort": "medium",
+      "fallback": {
+        "model": "gpt-6-sol",
+        "effort": "medium"
+      },
+      "tasks": {
+        "bounded": {
+          "model": "gpt-6.1-terra",
+          "effort": "medium",
+          "fallback": null
+        },
+        "complex": {
+          "model": "gpt-6.1-sol",
+          "effort": "medium",
+          "fallback": {
+            "model": "gpt-6-sol",
+            "effort": "medium"
+          }
+        },
+        "scan": {
+          "model": "gpt-6-luna",
+          "effort": "xhigh",
+          "fallback": {
+            "model": "gpt-6.1-sol",
+            "effort": "medium"
+          }
+        },
+        "deep": {
+          "model": "gpt-6-luna",
+          "effort": "max",
+          "fallback": {
+            "model": "gpt-6.1-sol",
+            "effort": "high"
+          }
+        }
+      }
+    },
+    "L3": {
+      "model": "gpt-6.1-sol",
+      "effort": "high",
+      "fallback": {
+        "model": "gpt-6-sol",
+        "effort": "high"
+      },
+      "tasks": {
+        "complex": {
+          "model": "gpt-6.1-terra",
+          "effort": "medium",
+          "fallback": null
+        },
+        "uncertain": {
+          "model": "gpt-6-astra",
+          "effort": "low",
+          "fallback": {
+            "model": "gpt-6.1-sol",
+            "effort": "high"
+          }
+        },
+        "reasoning": {
+          "model": "gpt-6-astra",
+          "effort": "medium",
+          "fallback": {
+            "model": "gpt-6.1-sol",
+            "effort": "xhigh"
+          }
+        }
+      }
+    },
+    "L4": {
+      "model": "gpt-6.1-sol",
+      "effort": "xhigh",
+      "fallback": {
+        "model": "gpt-6-sol",
+        "effort": "xhigh"
+      },
+      "tasks": {
+        "uncertain": {
+          "model": "gpt-6-astra",
+          "effort": "low",
+          "fallback": {
+            "model": "gpt-6.1-sol",
+            "effort": "high"
+          }
+        },
+        "reasoning": {
+          "model": "gpt-6-astra",
+          "effort": "medium",
+          "fallback": {
+            "model": "gpt-6.1-sol",
+            "effort": "xhigh"
+          }
+        }
+      }
+    }
+  }
+}

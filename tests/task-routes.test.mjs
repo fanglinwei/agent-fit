@@ -1,12 +1,12 @@
 import './isolate-home.mjs';
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { mkdtemp, rm } from 'node:fs/promises';
+import { mkdtemp, readFile, rm } from 'node:fs/promises';
 import os from 'node:os';
 import path from 'node:path';
 import { spawnSync } from 'node:child_process';
-import { explainSelection, resolveDefinition, validateDefinition } from '../lib/codex.mjs';
-import { mutate } from '../lib/install.mjs';
+import { explainSelection, resolveDefinition, ROLES, validateDefinition } from '../lib/codex.mjs';
+import { mutate, readSnapshot } from '../lib/install.mjs';
 
 const cases = [
   ['L1', 'mechanical', 'gpt-6-luna', 'medium'],
@@ -36,7 +36,7 @@ test('task candidates cover the task gradient without changing complexity or res
 test('explicit maximum profiles keep their combinations and latency requires a configured candidate', () => {
   for (const mode of ['high', 'fire']) {
     const definition = resolveDefinition(mode);
-    for (const task of ['uncertain', 'reasoning']) {
+    for (const task of ['uncertain', 'reasoning', 'visual', 'computer', 'writing']) {
       const selected = explainSelection({ definition, level: 'L3', task, selected: true });
       assert.deepEqual(selected.primary, { model: 'gpt-6-astra', effort: 'ultra' });
       assert.ok(selected.reason_codes.includes('PROFILE_MAXIMUM_AUTHORIZED'));
@@ -86,4 +86,78 @@ test('scoped CLI queries preserve all candidates in snapshots and custom edits p
   assert.deepEqual(before.task_profile.levels.L1.tasks, after.task_profile.levels.L1.tasks);
   assert.notEqual(before.configuration_revision, after.configuration_revision);
   await mutate(home, 'restore');
+});
+
+test('Terra evaluation imports only two isolated candidates without activating or borrowing a fallback', async t => {
+  const source = await readFile(new URL('../adapters/codex/profiles/terra-evaluation.json', import.meta.url), 'utf8');
+  const definition = JSON.parse(source);
+  const expected = structuredClone(resolveDefinition('official').levels);
+  for (const [level, task] of [['L2', 'bounded'], ['L3', 'complex']]) {
+    expected[level].tasks[task] = { model: 'gpt-6.1-terra', effort: 'medium', fallback: null };
+  }
+  for (const level of Object.values(expected)) for (const task of ['visual', 'computer', 'writing']) delete level.tasks?.[task];
+  assert.deepEqual(validateDefinition(definition), expected, 'historical evaluation retains its frozen routes and baselines');
+  for (const task of ['visual', 'computer', 'writing']) assert.throws(() => explainSelection({ definition: { ...resolveDefinition('official'), levels: definition.levels }, level: 'L2', task }), error => error.code === 'TASK_ROUTE_NOT_CONFIGURED');
+
+  const project = await mkdtemp(path.join(os.tmpdir(), 'agent-fit-terra-evaluation-'));
+  t.after(() => rm(project, { recursive: true, force: true }));
+  const home = path.join(project, 'home'); await mutate(home, 'setup');
+  const roleFiles = Object.keys(ROLES).map(role => path.join(home, 'agents', `${role.replaceAll('_', '-')}.toml`));
+  const rolesBefore = await Promise.all(roleFiles.map(file => readFile(file)));
+  const cli = new URL('../bin/agent-fit.mjs', import.meta.url);
+  const run = (args, input) => {
+    const result = spawnSync(process.execPath, [cli.pathname, ...args, '--codex-home', home, '--scope', 'session', '--project', project, '--thread', 'terra-evaluation-chat', '--json'], { encoding: 'utf8', input, env: { ...process.env, PATH: '/nonexistent' } });
+    assert.equal(result.status, 0, result.stdout || result.stderr);
+    const report = JSON.parse(result.stdout); assert.deepEqual(report.errors, []); return report.data;
+  };
+  run(['mode', 'create', 'Terra 评估', '--from', 'official']);
+  run(['mode', 'configure', 'Terra 评估', '--definition-stdin'], source);
+  const preview = run(['mode', 'show', 'Terra 评估']);
+  assert.equal(preview.active, false); assert.equal(preview.definition_scope, 'session');
+  for (const [level, task, role, contract] of [['L2', 'bounded', 'task_execute', 'scoped_output'], ['L3', 'complex', 'task_review', 'readonly_review']]) {
+    const query = ['explain', '--level', level, '--task', task, '--role', role];
+    const active = run(query);
+    assert.equal(active.mode_id, 'official');
+    assert.deepEqual(active.primary, { model: level === 'L2' ? 'gpt-6-luna' : 'gpt-6.1-sol', effort: level === 'L2' ? 'high' : 'medium' });
+    const candidate = run([...query, '--mode', 'Terra 评估']);
+    assert.equal(candidate.mode_kind, 'custom');
+    assert.equal(candidate.skill_integrity, 'clean');
+    assert.equal(candidate.scope, 'session'); assert.equal(candidate.effective_scope, 'global', 'preview retains the source of the active selection');
+    assert.deepEqual(candidate.context, active.context); assert.equal(candidate.context.thread, 'terra-evaluation-chat');
+    assert.deepEqual(candidate.primary, { model: 'gpt-6.1-terra', effort: 'medium' });
+    assert.equal(candidate.fallback, null); assert.deepEqual(candidate.fallback_conditions, []);
+    assert.equal(candidate.dispatch_role, 'task_delegate'); assert.equal(candidate.permission_contract, contract);
+    assert.deepEqual(candidate.task_profile.levels, expected);
+    assert.equal(candidate.runtime_verification, 'unverified');
+  }
+  assert.equal((await readSnapshot(home)).mode.id, 'official');
+  assert.deepEqual(await Promise.all(roleFiles.map(file => readFile(file))), rolesBefore);
+});
+
+
+test('Terra specialists preserve level, permissions and independent fallback without replacing general routes', () => {
+  for (const mode of ['cut', 'official']) {
+    const definition = resolveDefinition(mode);
+    validateDefinition({ levels: definition.levels });
+    for (const task of ['visual', 'computer', 'writing']) {
+      for (const [level, effort, backup] of [['L1', 'low', 'medium'], ['L2', 'medium', 'medium'], ['L3', 'high', 'high']]) {
+        for (const [role, contract] of [['task_scan', 'readonly_evidence'], ['task_execute', 'scoped_output'], ['task_review', 'readonly_review']]) {
+          const selected = explainSelection({ definition, level, task, role, active: true });
+          assert.deepEqual(selected.primary, { model: 'gpt-6.1-terra', effort });
+          assert.deepEqual(selected.fallback, { model: 'gpt-6.1-sol', effort: backup });
+          assert.ok(selected.fallback_conditions.includes('TASK_REQUIREMENTS_AND_TOOL_CAPABILITIES_MET'));
+          assert.equal(selected.level, level); assert.equal(selected.task, task);
+          assert.equal(selected.dispatch_role, 'task_delegate'); assert.equal(selected.permission_contract, contract);
+        }
+      }
+      assert.throws(() => explainSelection({ definition, level: 'L4', task }), error => error.code === 'INVALID_ARGUMENT');
+      const invalid = structuredClone(definition.levels);
+      invalid.L4.tasks[task] = structuredClone(invalid.L3.tasks[task]);
+      assert.throws(() => validateDefinition({ levels: invalid }));
+    }
+    for (const [level, pair] of Object.entries(definition.levels)) {
+      assert.notEqual(pair.model, 'gpt-6.1-terra');
+      for (const task of ['bounded', 'complex']) if (pair.tasks?.[task]) assert.notEqual(pair.tasks[task].model, 'gpt-6.1-terra');
+    }
+  }
 });

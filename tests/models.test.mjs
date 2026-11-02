@@ -233,7 +233,7 @@ test('missing authorization sends no inference or agent requests even with a com
   assert.equal(report.exit_code, 1);
   assert.equal(report.catalog.status, 'complete');
   assert.ok(codes(report).includes('PROBE_AUTH_UNAVAILABLE'));
-  assert.deepEqual(report.checked_pairs.map(pair => `${pair.model}/${pair.effort}`).sort(), ['gpt-6-luna/medium', 'gpt-6-luna/high', 'gpt-6-luna/xhigh', 'gpt-6-luna/max', 'gpt-6.1-sol/medium', 'gpt-6.1-sol/high', 'gpt-6.1-sol/xhigh', 'gpt-6-astra/low', 'gpt-6-astra/medium'].sort());
+  assert.deepEqual(report.checked_pairs.map(pair => `${pair.model}/${pair.effort}`).sort(), ['gpt-6-luna/medium', 'gpt-6-luna/high', 'gpt-6-luna/xhigh', 'gpt-6-luna/max', 'gpt-6.1-sol/medium', 'gpt-6.1-sol/high', 'gpt-6.1-sol/xhigh', 'gpt-6-astra/low', 'gpt-6-astra/medium', 'gpt-6.1-terra/low', 'gpt-6.1-terra/medium', 'gpt-6.1-terra/high'].sort());
   assert.ok(report.checked_pairs.every(pair => pair.request_status === 'not_checked' && pair.access === 'unknown' && pair.actual_model === null));
   assert.ok(server.calls.every(call => ['initialize', 'initialized', 'account/read', 'config/read', 'model/list'].includes(call.method)));
   assert.equal(report.codex_version, '0.156.1');
