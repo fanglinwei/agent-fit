@@ -8,7 +8,7 @@
 
 - setup 首次默认 official；内置档位命令与 id 均为 cut、official、high、fire；mode set 切换，mode create/configure 保存自定义档位。
 - status --details 查看规则、磁盘角色及潜在覆盖；mode show 与 explain 只预览，不委派。
-- models check 只查询账号与目录，目录不证明调用权限；--verify 只有宿主可强制隔离工具、委派及外部副作用时才能运行。
+- models check 只查询账号与目录，目录不证明调用权限；--verify 使用禁用工具的独立 Responses 请求，不启动 Codex 任务线程，可能产生费用。
 - restore 仅撤销可证明归属的改动，保留安装前内容和管理区块之外的用户修改；基线缺失或损坏时拒绝恢复。
 - 卸载前必须按 [Skill 的卸载前恢复规则](../SKILL.md#卸载前恢复) 恢复原绑定 home；预览不算恢复完成，多个 home 逐一恢复。实际恢复失败或结果未知时停止卸载，保留工具和恢复记录。
 - 仅支持当前配置格式与版本；不符合时拒绝读写，保持现有文件不变。

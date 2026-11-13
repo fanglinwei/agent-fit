@@ -1,174 +1,64 @@
 # Agent Fit
 
-**面向 Codex 子任务的 AI 模型与推理资源调配工具。**
-
-Agent Fit 根据任务复杂度、质量要求和预算，为已获授权的子任务匹配模型、推理强度和备用组合。先判断是否值得委派，再决定投入多少推理资源；支持研究、写作、数据分析、规划、开发与审查。模型档位、委派职责与配置来源均可查询和恢复。
-
-[快速开始](#快速开始) · [四种档位](#四种档位) · [作用域](#按会话项目或全局配置) · [完整文档](docs/usage.md) · [更新记录](https://github.com/fanglinwei/agent-fit/releases)
-
-## 功能特色
-
-- **四种资源策略**：`cut / official / high / fire`，按 L1–L4 的推理需求配置模型与 effort；也可复制成自己的档位，设置每级主组合和备用。
-- **同级任务候选**：在复杂度等级内区分机械处理、有界扫描、深度处理、复杂推理等任务，查询对应的完整组合；任务类型与委派职责分别配置。
-- **会话、项目、全局三层作用域**：优先级为会话 > 项目 > 全局。聊天切换默认仅影响当前聊天，项目按 Git worktree 隔离，已开始任务沿用原快照。
-- **CLI 与本地配置页面**：查看和编辑档位、浏览委派路由与选择依据、管理账号授权、预览和执行恢复。网页操作复用 CLI，只监听 `127.0.0.1`。
-- **配置与模型检测分开**：安装、切档和保存配置只处理本地文件。需要时手动查询目录或验证模型，网页检测前确认主组合和费用。
-- **配置与规则完整性分别检查**：识别共享 Skill 文件缺失、内容修改和清单异常，分别报告配置与规则修订号；规则异常时保留查询和安全恢复能力。
-- **受控接续与完整交接**：区分前提缺失、质量升级与故障备用，保存任务完整快照；交接明确职责、权限、独占范围和验收，所有接续共用次数与预算。
-- **可检查、可恢复**：提供状态诊断、职责核对、配置冲突保护及首次安装前的恢复基线；保留无关配置和管理区块之外的修改。
-
-当前面向 **Codex**，需要 **Node.js 22+** 和支持独立角色 TOML 的 Codex 客户端。已在 macOS 与 Codex CLI 0.162.1 验证相关配置和账号接口，其他环境的验证范围见[实施验收记录](docs/implementation-review.md)。项目处于内测阶段；v0.8.0 按全新安装提供，不增加旧版本配置兼容。
+为已获授权的 Codex 子任务选择模型与推理强度，支持会话、项目和全局档位。CLI 与本地网页共用配置，主代理按 Skill 决定是否委派并验收结果。
 
 ## 快速开始
 
-从 [v0.8.0 Release](https://github.com/fanglinwei/agent-fit/releases/tag/v0.8.0) 下载 `fanglinwei-agent-fit-0.8.0.tgz`，在下载目录安装，预览并应用官方档位：
+需要 Node.js 22+。npm 包名为 [`@fanglinwei/agent-fit`](https://www.npmjs.com/package/@fanglinwei/agent-fit)，命令与 Skill 名为 `agent-fit`。
 
 ```sh
-npm install -g ./fanglinwei-agent-fit-0.8.0.tgz
+npm install -g @fanglinwei/agent-fit
 agent-fit setup --mode official --dry-run
 agent-fit setup --mode official
-```
-
-npm 包名为 [`@fanglinwei/agent-fit`](https://www.npmjs.com/package/@fanglinwei/agent-fit)，安装后的命令和 Skill 名为 `agent-fit`。也可用 `npm install -g @fanglinwei/agent-fit` 获取 npm 当前已发布版本；GitHub Release 与 npm registry 的版本以各自页面为准。
-
-**已有其他版本配置时，不要直接用新版覆盖。** 先保留需要的自定义方案，并用原版本 CLI 对原绑定 home 按[恢复与卸载](#恢复与卸载)完成预览及实际恢复，再安装新版并重新 setup。v0.8.0 不自动迁移旧档位或恢复记录。
-
-**首次配置完成后重启 Codex。** 安装 npm 包本身不会修改 Codex；`setup` 才会写入四个委派角色、AGENTS 管理区块和档位数据，并在共享 Skill 不存在时安装规则。默认目标为 `CODEX_HOME` 或 `~/.codex`，可通过 `--codex-home "/path/to/codex-home"` 指定独立目录。
-
-Skill 默认放在 `~/.agents/skills/agent-fit/`，可由 CCSwitch 统一管理。动态档位存于对应 home 的 `.agent-fit/current-mode.json`，多个 home 共用规则但配置独立。`status`、`explain` 和 `skill path` 只读；日常切档和 `restore` 不改写或删除共享 Skill。
-
-已有共享规则需要单独更新：先执行 `agent-fit skill update --dry-run`，核对后再执行 `agent-fit skill update`；`setup` 不覆盖现有共享规则。发现用户修改或归属冲突时保留现场，不直接删除目录来绕过保护。完整边界见[Skill 目录说明](docs/usage.md#skill-目录与旧安装迁移)。
-
-打开本地配置页面：
-
-```sh
 agent-fit serve --open
 ```
 
-页面包含**档位配置、委派规则、账号配置、恢复**。委派规则页按等级展示基线与任务候选，点击可查看选择依据和备用条件；预览其他档位不会切换当前配置。编辑先成为草稿，保存或应用时才写入。
+npm 安装只提供工具，`setup` 才配置 Codex。默认目标为 `CODEX_HOME` 或 `~/.codex`；独立目录全程添加 `--codex-home "/path/to/codex-home"`。首次配置、基础规则更新或恢复后重启 Codex，日常切档无需重启。
 
-日常全局、项目和会话切档，以及模型与 effort 调整无需重启；后续新任务读取新选择。更新基础 Skill、AGENTS 或角色职责，以及恢复原配置后仍需重启。
+已有其他版本配置时，先保留所需自定义方案，用原版本 CLI 对原绑定 home 预览并实际恢复，再安装新版。版本与发行包见 [GitHub Releases](https://github.com/fanglinwei/agent-fit/releases)；本地安装和 Skill 更新见[使用说明](docs/usage.md#安装与配置)。
 
-## Marketplace 插件
+## 选择与查询
 
-仓库同时提供 Codex marketplace 插件，直接复用现有 Skill：
-
-- marketplace 清单：`.agents/plugins/marketplace.json`。
-- 插件清单：`.codex-plugin/plugin.json`，通过 `skills` 指向 `adapters/codex/skills/`。
-- 在 Codex 的插件管理中添加 GitHub 仓库 `https://github.com/fanglinwei/agent-fit` 作为 marketplace 来源，选择 **Agent Fit** 安装并启用。首次安装后重启 Codex，使插件 Skill 可被发现。
-- 本地验证时可将当前仓库作为 marketplace 来源；清单中的 `source.path` 相对于仓库根目录解析。
-
-插件安装提供规则；运行依赖仍按上面的快速开始安装 `@fanglinwei/agent-fit` 并执行 `setup`。已有配置无需重新 setup。插件不会自动运行命令、切档、检测模型或修改账号。使用时可要求“使用 Agent Fit 查看当前有效档位”。
-
-CLI setup 安装的共享 Skill 与插件中的 Skill 来自同一份源码，可能同时被发现；两者应保持同版本。插件通过插件管理更新，共享 Skill 通过 `agent-fit skill update` 更新。禁用或卸载插件只移除插件规则；如需移除 CLI 配置，仍须按下文恢复流程处理原绑定 home。
-
-## 四种档位
-
-| 档位 | 使用方式 |
+| 档位 | 策略 |
 | --- | --- |
-| `cut` · 经济 | 以较轻组合处理容易核验的任务，复杂部分选择相应等级或任务候选 |
-| `official` · 官方 | 首次配置默认档位；依据官方建议制定的本地映射 |
-| `high` · 高级 | 使用预设模型的最高受支持推理强度 |
-| `fire` · 全开 | 各等级使用 Astra / ultra，委派前须通过当前会话的实际验证 |
+| `cut` · 经济 | 较轻组合处理容易核验的任务，复杂部分提高等级 |
+| `official` · 官方 | 首次配置默认；依据官方建议制定的本地映射 |
+| `high` · 高级 | 预设模型的最高受支持推理强度 |
+| `fire` · 全开 | Astra / ultra，委派前须通过当前会话的实际验证 |
 
 ```sh
 agent-fit mode list
-agent-fit mode show official
 agent-fit mode set cut
 agent-fit status --details
+agent-fit explain --level L2 --task bounded --role task_execute --json
 ```
 
-L1–L4 表示任务的推理需求：从方法明确的执行，到有边界的局部推理、复杂约束权衡和高不确定性推理。模型与 effort 使用档位中保存的完整组合；相邻等级可以共用组合。完整模型表与分级边界见[使用说明](docs/usage.md#任务等级与委派职责)。`official` 是本项目的预设名称，官方没有固定的 L1–L4 对照表。
+L1–L4 表示任务推理需求，`--task` 查询同级候选；cut/official 包含 Terra 6.1 的视觉、电脑操作和写作路线。`explain` 只查配置，不调用模型或创建子代理。完整组合、职责和选择边界见[使用说明](docs/usage.md#任务等级与委派职责)与 [Skill](adapters/codex/skills/agent-fit/SKILL.md)。
 
-cut/official 已按 [官方定位](https://learn.chatgpt.com/docs/models)加入 Terra 6.1 的视觉、电脑操作和写作候选：L1 low、L2 medium、L3 high，候选故障备用为 Sol 6.1 medium/medium/high。先按 Skill 判断等级，再匹配专长；通用基线、编码路线及 high/fire 策略保留。条件与查询见 [Terra 专长路线](docs/usage.md#terra-专长路线)。
+有效档位按 **会话 > 项目 > 全局** 整份选择。CLI 默认全局，聊天中用 `$agent-fit` 切档默认仅当前会话；项目和会话操作见[作用域说明](docs/usage.md#全局项目与会话)。自定义、账号与手动模型检查也见使用说明；配置操作不自动发送模型请求。
 
-### 查询同级任务候选
+## Marketplace 插件
 
-```sh
-# 确定性机械任务
-agent-fit explain --level L1 --task mechanical --role task_execute --json
+在 Codex 插件管理中添加仓库 `https://github.com/fanglinwei/agent-fit` 为 marketplace 来源，安装并启用 **Agent Fit**，然后重启 Codex。本地验证也可将当前仓库作为来源。
 
-# 有界扫描与复杂推理
-agent-fit explain --level L1 --task scan --role task_review --json
-agent-fit explain --level L3 --task reasoning --role task_execute --json
-```
-
-`explain` 只查询配置，不调用模型或创建子代理。复杂度、任务类型和职责由主代理判断；返回值包含主组合、备用、权限契约及配置来源。未配置的显式候选会报错，不从其他档位补值。支持的类型和编辑方法见[同级任务候选](docs/usage.md#同级任务候选)。
-
-明确选择 `high / fire` 即授权其展示的最高强度组合，预算和宿主支持仍需满足；`fire` 另外要求当前会话的实际调用和可信身份验证。预览档位不构成选择，模型目录列出也不证明实际可调用。
-
-## 按会话、项目或全局配置
-
-```sh
-# CLI 默认操作全局；此处显式写出作用域
-agent-fit mode set official --scope global
-
-# 仅对指定项目生效
-agent-fit mode set cut --scope project --project "/path/to/project"
-
-# 恢复项目对全局档位的继承
-agent-fit mode clear --scope project --project "/path/to/project"
-```
-
-在 Codex 聊天中用 `$agent-fit` 要求切档时，默认只修改当前会话；明确要求后才修改项目或全局。CLI 操作会话时须绑定目标项目与聊天线程，具体参数见[作用域说明](docs/usage.md#全局项目与会话)。项目和会话配置保存在绑定 home 中，不写入项目仓库。
-
-每次委派保存完整档位快照，重试、质量升级和故障备用沿用该快照。切档影响后续新任务，不改变正在执行的任务，也不重置委派次数。
-
-## 自定义档位
-
-复制现有档位，再调整所需等级：
-
-```sh
-agent-fit mode create "我的研究方案" --from official
-agent-fit mode configure "我的研究方案" \
-  --level L3 --model gpt-6-astra --effort low \
-  --fallback-model gpt-6.1-sol --fallback-effort high
-agent-fit mode set "我的研究方案"
-```
-
-复制包含四级基线、同级任务候选及各自备用，不自动激活。CLI 可修改单级基线；网页或完整 JSON 可编辑候选。局部编辑继承来的自定义档位会生成局部副本，避免覆盖其他作用域。详见[自定义档位](docs/usage.md#自定义档位)。
-
-## 账号与模型检查
-
-```sh
-# 查询授权状态与模型目录，不发起推理
-agent-fit models check
-
-# 手动验证当前档位的主模型组合，可能产生费用
-agent-fit models check --verify
-```
-
-网页账号页管理已有授权、登录、取消授权和退出登录；档位页的“检测当前档位主模型”按组合去重，排除备用，并在执行前确认。保存或切换配置不会自动检测模型。
-
-实际验证通过独立 Responses 请求进行，不启动带项目材料的 Codex 任务或工具执行器。请求成功、供应商返回的身份与当前聊天上下文匹配分别报告；独立 CLI 检查通过不代替 `fire` 的会话验证。失败、未完成或矛盾的流式终止结果不计为成功；检查历史保存失败时，整条命令报告未完成。供应商目录、批量可用性检查和验证边界见[模型检查](docs/usage.md#模型检查)。
-
-## 委派规则如何生效
-
-`setup` 安装的 AGENTS 入口要求 Codex 启动时通过 `agent-fit skill path` 查找并读取规则，并在创建、重试或切换子代理模型前重新核对规则与有效档位。主代理仍负责设计、集成、关键验证和最终结论。
-
-共同规则包括先权衡委派收益与协调成本、保留用户授权和预算、区分复杂度与职责、明确独占写入范围、禁止递归委派，以及完成最小充分验证。质量升级与故障备用分别判断，初次派发、重试和接续共用每任务最多三次委派。
-
-`status`、`mode show`、`explain` 和 `skill path` 分别报告配置与共享规则的状态。委派前核对 `skill_integrity` 为 `clean`，并保存 `skill_revision` 与完整任务档位快照；CLI 查询成功不等于规则完整，也不证明模型实际可用。共享规则异常时先修复受影响部分。
-
-这些规则由宿主读取并遵循；工具提供配置与解释，不自动派发任务，也没有宿主级委派拦截器。实际模型身份、能力和成本需要独立证据。完整契约见 [Skill](adapters/codex/skills/agent-fit/SKILL.md)，预设评估方法见[离线校准指南](adapters/codex/skills/agent-fit/references/calibration.md)。
+插件提供规则，仍需安装 CLI 并完成 `setup`。共享 Skill 与插件规则来自同一源码：共享版本通过 `agent-fit skill update` 更新，插件版本通过插件管理更新。二者应保持同版本；已有配置无需重新 setup。清单位于 `.agents/plugins/marketplace.json` 与 `.codex-plugin/plugin.json`。
 
 ## 恢复与卸载
 
-**卸载前先恢复原绑定 home。** 先预览，再执行实际恢复；恢复失败或结果未知时保留工具与恢复记录，停止卸载。
+卸载前先恢复原绑定 home：
 
 ```sh
 agent-fit restore --dry-run
 agent-fit restore && npm uninstall -g @fanglinwei/agent-fit
 ```
 
-独立 home 的预览和实际恢复都必须传入相同的 `--codex-home`，多个 home 逐一恢复成功后才可卸载。恢复会保留安装前内容、无关文件和管理区块外修改；文件漂移或损坏的恢复基线会阻止覆盖。恢复完成后重启 Codex。
+预览不算恢复完成；独立 home 的两次命令使用相同路径，多个 home 全部实际恢复成功后才卸载。失败或结果未知时保留工具和恢复记录。恢复完成后重启 Codex，完整保护边界见[恢复说明](docs/usage.md#恢复与卸载)。
 
 ## 文档与开发
 
-- [完整使用说明](docs/usage.md)：命令、作用域、候选、自定义、账号、检测和恢复。
-- [文档导航](docs/README.md)：规则、实现与研究记录。
-- [实施验收记录](docs/implementation-review.md)：已验证范围及使用边界。
-- [GitHub Releases](https://github.com/fanglinwei/agent-fit/releases)：版本与发布说明。
+- [使用说明](docs/usage.md)：CLI、网页、作用域、自定义、模型检查与故障处理。
+- [文档导航](docs/README.md)：规则、验证边界及历史证据入口。
+- [验证范围](docs/implementation-review.md)：已有验收记录与未覆盖范围。
 
 ```sh
 npm ci --ignore-scripts
@@ -176,8 +66,6 @@ npm test
 npm pack
 ```
 
-本地打包产物为 `fanglinwei-agent-fit-0.8.0.tgz`，可用 `npm install -g ./fanglinwei-agent-fit-0.8.0.tgz` 安装。浏览器集成使用已有 Playwright 与 Chrome，运行方法见[开发验证](docs/usage.md#开发验证)。唯一运行依赖为 [smol-toml](https://github.com/squirrelchat/smol-toml)。
-
-## License
+打包生成 `fanglinwei-agent-fit-0.8.0.tgz`。浏览器检查见[开发验证](docs/usage.md#开发验证)；唯一运行依赖为 [smol-toml](https://github.com/squirrelchat/smol-toml)。
 
 [MIT](LICENSE) © 2026 fanglinwei.
