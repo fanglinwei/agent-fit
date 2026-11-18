@@ -6,8 +6,10 @@
 
 需要 Node.js 22+。npm 包名为 [`@fanglinwei/agent-fit`](https://www.npmjs.com/package/@fanglinwei/agent-fit)，命令与 Skill 名为 `agent-fit`。
 
+从 [GitHub Releases](https://github.com/fanglinwei/agent-fit/releases/latest) 下载本版安装包：
+
 ```sh
-npm install -g @fanglinwei/agent-fit
+npm install -g ./fanglinwei-agent-fit-0.9.0.tgz
 agent-fit setup --mode official --dry-run
 agent-fit setup --mode official
 agent-fit serve --open
@@ -78,6 +80,6 @@ npm test
 npm pack
 ```
 
-打包生成 `fanglinwei-agent-fit-0.8.1.tgz`。浏览器检查见[开发验证](docs/usage.md#开发验证)；唯一运行依赖为 [smol-toml](https://github.com/squirrelchat/smol-toml)。
+打包生成 `fanglinwei-agent-fit-0.9.0.tgz`。浏览器检查见[开发验证](docs/usage.md#开发验证)；唯一运行依赖为 [smol-toml](https://github.com/squirrelchat/smol-toml)。
 
 [MIT](LICENSE) © 2026 fanglinwei.

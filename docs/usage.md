@@ -1,15 +1,15 @@
 # 使用说明
 
-`agent-fit` 0.8.1，npm 包名为 `@fanglinwei/agent-fit`，命令和 Skill 名仍为 `agent-fit`。首版支持 Codex；Node.js 22+。命令、网页和生成的 Skill 使用同一套档位数据。
+`agent-fit` 0.9.0，npm 包名为 `@fanglinwei/agent-fit`，命令和 Skill 名仍为 `agent-fit`。首版支持 Codex；Node.js 22+。命令、网页和生成的 Skill 使用同一套档位数据。
 
 工具只处理当前格式与版本的配置；独立 home 全程使用显式指定的路径。
 
 ## 安装与配置
 
-从 GitHub v0.8.1 Release 下载发行包，或在项目目录运行 `npm pack` 后使用 `npm install -g ./fanglinwei-agent-fit-0.8.1.tgz` 安装。npm registry 获取的是该渠道当前已发布版本；两种方式都需要 Node/npm。本版按全新安装处理，不增加旧配置兼容。已有其他版本配置时，先保留所需自定义方案，用原版本 CLI 对原绑定 home 预览并实际 restore，之后再安装新版并 setup；不自动迁移旧档位或恢复记录。
+从 GitHub v0.9.0 Release 下载发行包，或在项目目录运行 `npm pack` 后使用 `npm install -g ./fanglinwei-agent-fit-0.9.0.tgz` 安装。npm registry 获取的是该渠道当前已发布版本；两种方式都需要 Node/npm。本版按全新安装处理，不增加旧配置兼容。已有其他版本配置时，先保留所需自定义方案，用原版本 CLI 对原绑定 home 预览并实际 restore，之后再安装新版并 setup；不自动迁移旧档位或恢复记录。
 
 ```sh
-npm install -g @fanglinwei/agent-fit
+npm install -g ./fanglinwei-agent-fit-0.9.0.tgz
 agent-fit setup --mode official --dry-run
 agent-fit setup --mode official
 ```
@@ -161,7 +161,7 @@ agent-fit explain --level L4 --role task_review
 无需全局安装的 npm 查询，以及本地包查询：
 
 ```sh
-npm exec --package="/path/to/fanglinwei-agent-fit-0.8.1.tgz" -- agent-fit status --details
+npm exec --package="/path/to/fanglinwei-agent-fit-0.9.0.tgz" -- agent-fit status --details
 ```
 
 ## 委派收益检查
