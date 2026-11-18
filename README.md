@@ -37,6 +37,18 @@ L1–L4 表示任务推理需求，`--task` 查询同级候选；cut/official �
 
 有效档位按 **会话 > 项目 > 全局** 整份选择。CLI 默认全局，聊天中用 `$agent-fit` 切档默认仅当前会话；项目和会话操作见[作用域说明](docs/usage.md#全局项目与会话)。自定义、账号与手动模型检查也见使用说明；配置操作不自动发送模型请求。
 
+## 子代理如何分工
+
+主代理先用工具和按需加载的 Skills 完成能直接处理的工作。需要委派时，先说明要解决的具体约束，再按当前档位选择模型与推理强度；岗位名称和阶段数量不作为拆分依据。
+
+- **委派须有收益**：上下文隔离、并行、独立验证或能力与成本匹配的收益，需要覆盖启动、交接、等待、汇总、验证和返工开销。用户明确要求的委派与独立复核仍须执行。
+- **交接能够独立理解**：提供目标、可访问的权威材料及版本、已有修改、边界和验收。独立审查区分作者解释与已证实事实，不以作者结论为前提。
+- **隔离分别核实**：新上下文、独立文件与受限权限是三件事。新线程不自动创建工作树或沙箱，也不能保证消除同模型盲区；共享产出指定唯一负责人。
+- **结果精炼且可复核**：回传结论、产物、证据位置和验证状态，保留失败、反例与未知项。主代理负责最终设计、集成和关键验收。
+- **完成即返回，按需复用**：复用须有上下文收益且满足独立性要求。原任务接续沿用快照与累计次数，新任务重新查询配置；所有派发仍受授权和预算约束。
+
+完整规则以 [Skill](adapters/codex/skills/agent-fit/SKILL.md) 和[派发契约](adapters/codex/skills/agent-fit/references/dispatch-contract.md)为准。CLI 与规则辅助决策，不拦截宿主派发，也不强制提供文件或权限隔离。
+
 ## Marketplace 插件
 
 在 Codex 插件管理中添加仓库 `https://github.com/fanglinwei/agent-fit` 为 marketplace 来源，安装并启用 **Agent Fit**，然后重启 Codex。本地验证也可将当前仓库作为来源。
@@ -66,6 +78,6 @@ npm test
 npm pack
 ```
 
-打包生成 `fanglinwei-agent-fit-0.8.0.tgz`。浏览器检查见[开发验证](docs/usage.md#开发验证)；唯一运行依赖为 [smol-toml](https://github.com/squirrelchat/smol-toml)。
+打包生成 `fanglinwei-agent-fit-0.8.1.tgz`。浏览器检查见[开发验证](docs/usage.md#开发验证)；唯一运行依赖为 [smol-toml](https://github.com/squirrelchat/smol-toml)。
 
 [MIT](LICENSE) © 2026 fanglinwei.

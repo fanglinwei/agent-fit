@@ -1,12 +1,12 @@
 # 使用说明
 
-`agent-fit` 0.8.0，npm 包名为 `@fanglinwei/agent-fit`，命令和 Skill 名仍为 `agent-fit`。首版支持 Codex；Node.js 22+。命令、网页和生成的 Skill 使用同一套档位数据。
+`agent-fit` 0.8.1，npm 包名为 `@fanglinwei/agent-fit`，命令和 Skill 名仍为 `agent-fit`。首版支持 Codex；Node.js 22+。命令、网页和生成的 Skill 使用同一套档位数据。
 
 工具只处理当前格式与版本的配置；独立 home 全程使用显式指定的路径。
 
 ## 安装与配置
 
-从 GitHub v0.8.0 Release 下载发行包，或在项目目录运行 `npm pack` 后使用 `npm install -g ./fanglinwei-agent-fit-0.8.0.tgz` 安装。npm registry 获取的是该渠道当前已发布版本；两种方式都需要 Node/npm。本版按全新安装处理，不增加旧配置兼容。已有其他版本配置时，先保留所需自定义方案，用原版本 CLI 对原绑定 home 预览并实际 restore，之后再安装新版并 setup；不自动迁移旧档位或恢复记录。
+从 GitHub v0.8.1 Release 下载发行包，或在项目目录运行 `npm pack` 后使用 `npm install -g ./fanglinwei-agent-fit-0.8.1.tgz` 安装。npm registry 获取的是该渠道当前已发布版本；两种方式都需要 Node/npm。本版按全新安装处理，不增加旧配置兼容。已有其他版本配置时，先保留所需自定义方案，用原版本 CLI 对原绑定 home 预览并实际 restore，之后再安装新版并 setup；不自动迁移旧档位或恢复记录。
 
 ```sh
 npm install -g @fanglinwei/agent-fit
@@ -161,7 +161,7 @@ agent-fit explain --level L4 --role task_review
 无需全局安装的 npm 查询，以及本地包查询：
 
 ```sh
-npm exec --package="/path/to/fanglinwei-agent-fit-0.8.0.tgz" -- agent-fit status --details
+npm exec --package="/path/to/fanglinwei-agent-fit-0.8.1.tgz" -- agent-fit status --details
 ```
 
 ## 委派收益检查
@@ -169,6 +169,10 @@ npm exec --package="/path/to/fanglinwei-agent-fit-0.8.0.tgz" -- agent-fit status
 主代理先核对委派授权，再比较直接完成、工具并行和子代理委派。计入启动、交接、等待、汇总、验证与返工；收益不明确时由主会话完成。工具并行不能替代独立复核，项目要求的独立复核仍须满足。
 
 收益判断与并行约束由 [Skill 的委派收益检查](../adapters/codex/skills/agent-fit/SKILL.md#委派收益检查)统一规定。CLI 不测量收益、不派发任务；没有对照测量不宣称实际加速。
+
+拆分针对上下文、并行、独立验证、权限或能力与成本约束，不按岗位凑齐角色。主会话配合工具和按需加载的 Skills 足以完成时无需拆分；明确委派和强制独立复核的原要求仍保留。交接提供自包含任务、可访问的权威材料和验收，审查不以作者结论为前提，回传精炼结论及可复核证据；完成即返回，复用须有上下文收益且满足原独立性要求，细节见[派发模板](../adapters/codex/skills/agent-fit/references/dispatch-contract.md)。
+
+上下文、文件和权限隔离分别核实：新线程或 `fork_turns="none"` 不自动创建独立工作树或受限沙箱，也不能保证独立判断。指令限制不等于环境强制隔离；缺少所需隔离时停止受影响部分，不能借此扩大权限。
 
 ## 任务等级与委派职责
 
@@ -277,23 +281,6 @@ agent-fit explain --level L3 --task writing --role task_review --json
 ```
 
 聊天中补齐 Skill 要求的 session、project 与 thread 参数。已有自定义定义和任务快照不自动合并新候选；可从当前内置定义创建新档位，或通过完整定义编辑。配置与规则同步后重启一次 Codex，随后按新任务查询；不需要先追加模型评测。
-
-### Terra 历史候选评估
-
-以下保留早期评估复现步骤，不是当前推荐分配。包内 [terra-evaluation.json](../adapters/codex/profiles/terra-evaluation.json) 只将 official 的 L2 bounded、L3 complex 改为 Terra 6.1/medium，实验路由的备用为 null，以分别观察原验收和失败；其他路由保留冻结原值。它不含后来的 visual/computer/writing，保留历史快照，不证明 Terra 比 Luna 或 Sol 更合适。
-
-以下命令在包根目录执行。先替换 home、项目及目标聊天 ID；只创建、保存和预览会话自定义档位，不执行 mode set，不修改当前选择。导入的是完整冻结定义，不与本机已有配置逐字段合并。
-
-```sh
-evaluation_home=/path/to/codex-home
-evaluation_project=/path/to/project
-evaluation_thread=TARGET_THREAD_ID
-agent-fit mode create "Terra 评估" --from official --scope session --codex-home "$evaluation_home" --project "$evaluation_project" --thread "$evaluation_thread"
-agent-fit mode configure "Terra 评估" --definition-stdin --scope session --codex-home "$evaluation_home" --project "$evaluation_project" --thread "$evaluation_thread" < adapters/codex/profiles/terra-evaluation.json
-agent-fit explain --mode "Terra 评估" --level L2 --task bounded --role task_execute --scope session --codex-home "$evaluation_home" --project "$evaluation_project" --thread "$evaluation_thread" --json
-```
-
-L3 预览改为 `--level L3 --task complex`。逐条检查退出码、errors、规则完整性、目标上下文与完整 task_profile；effective_scope 仍表示当前选择的继承来源，不表示预览定义已激活。实际对照使用 task_delegate 显式组合，按 [校准指南](../adapters/codex/skills/agent-fit/references/calibration.md#新模型候选与默认晋升) 冻结样本、预算与验收；实证比较与备用适配分别判定。历史对照不是使用当前专长路线的前置条件。
 
 ### 配置与模型检查分开执行
 
