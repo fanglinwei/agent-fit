@@ -1,4 +1,5 @@
 import './isolate-home.mjs';
+import bindings from '../adapters/codex/model-bindings.json' with { type: 'json' };
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { mkdtemp, readFile, rm } from 'node:fs/promises';
@@ -9,13 +10,13 @@ import { explainSelection, resolveDefinition, ROLES, validateDefinition } from '
 import { mutate, readSnapshot } from '../lib/install.mjs';
 
 const cases = [
-  ['L1', 'mechanical', 'gpt-6-luna', 'medium'],
-  ['L2', 'bounded', 'gpt-6-luna', 'high'],
-  ['L1', 'scan', 'gpt-6-luna', 'xhigh'],
-  ['L1', 'deep', 'gpt-6-luna', 'max'],
-  ['L3', 'complex', 'gpt-6.1-sol', 'medium'],
-  ['L3', 'uncertain', 'gpt-6-astra', 'low'],
-  ['L3', 'reasoning', 'gpt-6-astra', 'medium'],
+  ['L1', 'mechanical', bindings.economy, 'medium'],
+  ['L2', 'bounded', bindings.economy, 'high'],
+  ['L1', 'scan', bindings.economy, 'xhigh'],
+  ['L1', 'deep', bindings.economy, 'max'],
+  ['L3', 'complex', bindings.general, 'medium'],
+  ['L3', 'uncertain', bindings.frontier, 'low'],
+  ['L3', 'reasoning', bindings.frontier, 'medium'],
 ];
 
 test('task candidates cover the task gradient without changing complexity or responsibility', () => {
@@ -24,12 +25,12 @@ test('task candidates cover the task gradient without changing complexity or res
     assert.deepEqual(selected.primary, { model, effort }, `${mode}/${level}/${task}`);
     assert.equal(selected.level, level); assert.equal(selected.task, task);
     assert.equal(selected.permission_contract, 'readonly_review');
-    if (model === 'gpt-6-astra') assert.ok(['low', 'medium'].includes(effort));
+    if (model === bindings.frontier) assert.ok(['low', 'medium'].includes(effort));
   }
   const selected = explainSelection({ definition: resolveDefinition('official'), level: 'L1', task: 'mechanical', role: 'task_scan', active: true });
   assert.equal(selected.dispatch_role, 'task_delegate', 'a fixed Luna/high role cannot run the medium candidate');
   for (const mode of ['cut', 'official']) for (const level of Object.values(resolveDefinition(mode).levels)) for (const candidate of Object.values(level.tasks ?? {})) {
-    for (const pair of [candidate, candidate.fallback].filter(Boolean)) if (pair.model === 'gpt-6-astra') assert.ok(['low', 'medium'].includes(pair.effort), 'ordinary candidates and fallbacks cannot bypass the Astra cap');
+    for (const pair of [candidate, candidate.fallback].filter(Boolean)) if (pair.model === bindings.frontier) assert.ok(['low', 'medium'].includes(pair.effort), 'ordinary candidates and fallbacks cannot bypass the Astra cap');
   }
 });
 
@@ -38,7 +39,7 @@ test('explicit maximum profiles keep their combinations and latency requires a c
     const definition = resolveDefinition(mode);
     for (const task of ['uncertain', 'reasoning', 'visual', 'computer', 'writing']) {
       const selected = explainSelection({ definition, level: 'L3', task, selected: true });
-      assert.deepEqual(selected.primary, { model: 'gpt-6-astra', effort: 'ultra' });
+      assert.deepEqual(selected.primary, { model: bindings.frontier, effort: 'ultra' });
       assert.ok(selected.reason_codes.includes('PROFILE_MAXIMUM_AUTHORIZED'));
       assert.ok(explainSelection({ definition, level: 'L3', task }).reason_codes.includes('MAXIMUM_PROFILE_PREVIEW'));
     }
@@ -49,19 +50,19 @@ test('explicit maximum profiles keep their combinations and latency requires a c
   custom.levels.L1.tasks.latency = { model: 'explicit-terra-id', effort: 'high', fallback: null };
   const levels = validateDefinition({ levels: custom.levels });
   assert.deepEqual(explainSelection({ definition: { ...custom, levels }, level: 'L1', task: 'latency' }).primary, { model: 'explicit-terra-id', effort: 'high' });
-  levels.L1.tasks.mechanical.fallback = { model: 'gpt-6-luna', effort: 'medium' };
+  levels.L1.tasks.mechanical.fallback = { model: bindings.economy, effort: 'medium' };
   assert.throws(() => validateDefinition({ levels }));
 });
 
 test('candidate definitions reject invalid structures and do not invent missing snapshot routes', () => {
   const definition = resolveDefinition('official');
-  for (const tasks of [null, [], '{', { unknown: { model: 'x', effort: 'low', fallback: null } }, { uncertain: { model: 'gpt-6-astra', effort: 'low', fallback: null } }, { mechanical: { model: 'x', effort: 'low' } }, { mechanical: { model: 'x', effort: 'low', fallback: null, instructions: 'unexpected' } }]) {
+  for (const tasks of [null, [], '{', { unknown: { model: 'x', effort: 'low', fallback: null } }, { uncertain: { model: bindings.frontier, effort: 'low', fallback: null } }, { mechanical: { model: 'x', effort: 'low' } }, { mechanical: { model: 'x', effort: 'low', fallback: null, instructions: 'unexpected' } }]) {
     const levels = structuredClone(definition.levels); levels.L1.tasks = tasks;
     assert.throws(() => validateDefinition({ levels }));
   }
   delete definition.levels.L1.tasks;
   assert.throws(() => explainSelection({ definition, level: 'L1', task: 'mechanical' }), error => error.code === 'TASK_ROUTE_NOT_CONFIGURED');
-  assert.deepEqual(explainSelection({ definition, level: 'L1' }).primary, { model: 'gpt-6-luna', effort: 'high' });
+  assert.deepEqual(explainSelection({ definition, level: 'L1' }).primary, { model: bindings.economy, effort: 'high' });
   definition.levels.L1.tasks = {};
   assert.deepEqual(validateDefinition({ levels: definition.levels }).L1.tasks, {});
 });
@@ -117,7 +118,7 @@ test('custom candidate imports preserve unrelated routes without activating or b
     const query = ['explain', '--level', level, '--task', task, '--role', role];
     const active = run(query);
     assert.equal(active.mode_id, 'official');
-    assert.deepEqual(active.primary, { model: level === 'L2' ? 'gpt-6-luna' : 'gpt-6.1-sol', effort: level === 'L2' ? 'high' : 'medium' });
+    assert.deepEqual(active.primary, { model: level === 'L2' ? bindings.economy : bindings.general, effort: level === 'L2' ? 'high' : 'medium' });
     const candidate = run([...query, '--mode', 'candidate']);
     assert.equal(candidate.mode_kind, 'custom');
     assert.equal(candidate.skill_integrity, 'clean');
@@ -142,8 +143,8 @@ test('Terra specialists preserve level, permissions and independent fallback wit
       for (const [level, effort, backup] of [['L1', 'low', 'medium'], ['L2', 'medium', 'medium'], ['L3', 'high', 'high']]) {
         for (const [role, contract] of [['task_scan', 'readonly_evidence'], ['task_execute', 'scoped_output'], ['task_review', 'readonly_review']]) {
           const selected = explainSelection({ definition, level, task, role, active: true });
-          assert.deepEqual(selected.primary, { model: 'gpt-6.1-terra', effort });
-          assert.deepEqual(selected.fallback, { model: 'gpt-6.1-sol', effort: backup });
+          assert.deepEqual(selected.primary, { model: bindings.visual_work, effort });
+          assert.deepEqual(selected.fallback, { model: bindings.general, effort: backup });
           assert.ok(selected.fallback_conditions.includes('TASK_REQUIREMENTS_AND_TOOL_CAPABILITIES_MET'));
           assert.equal(selected.level, level); assert.equal(selected.task, task);
           assert.equal(selected.dispatch_role, 'task_delegate'); assert.equal(selected.permission_contract, contract);
@@ -155,8 +156,8 @@ test('Terra specialists preserve level, permissions and independent fallback wit
       assert.throws(() => validateDefinition({ levels: invalid }));
     }
     for (const [level, pair] of Object.entries(definition.levels)) {
-      assert.notEqual(pair.model, 'gpt-6.1-terra');
-      for (const task of ['bounded', 'complex']) if (pair.tasks?.[task]) assert.notEqual(pair.tasks[task].model, 'gpt-6.1-terra');
+      assert.notEqual(pair.model, bindings.visual_work);
+      for (const task of ['bounded', 'complex']) if (pair.tasks?.[task]) assert.notEqual(pair.tasks[task].model, bindings.visual_work);
     }
   }
 });

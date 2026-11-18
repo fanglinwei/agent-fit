@@ -1,4 +1,5 @@
 import './isolate-home.mjs';
+import bindings from '../adapters/codex/model-bindings.json' with { type: 'json' };
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { spawn } from 'node:child_process';
@@ -233,7 +234,7 @@ test('missing authorization sends no inference or agent requests even with a com
   assert.equal(report.exit_code, 1);
   assert.equal(report.catalog.status, 'complete');
   assert.ok(codes(report).includes('PROBE_AUTH_UNAVAILABLE'));
-  assert.deepEqual(report.checked_pairs.map(pair => `${pair.model}/${pair.effort}`).sort(), ['gpt-6-luna/medium', 'gpt-6-luna/high', 'gpt-6-luna/xhigh', 'gpt-6-luna/max', 'gpt-6.1-sol/medium', 'gpt-6.1-sol/high', 'gpt-6.1-sol/xhigh', 'gpt-6-astra/low', 'gpt-6-astra/medium', 'gpt-6.1-terra/low', 'gpt-6.1-terra/medium', 'gpt-6.1-terra/high'].sort());
+  assert.deepEqual(report.checked_pairs.map(pair => `${pair.model}/${pair.effort}`).sort(), [`${bindings.economy}/medium`, `${bindings.economy}/high`, `${bindings.economy}/xhigh`, `${bindings.economy}/max`, `${bindings.general}/medium`, `${bindings.general}/high`, `${bindings.general}/xhigh`, `${bindings.frontier}/low`, `${bindings.frontier}/medium`, `${bindings.visual_work}/low`, `${bindings.visual_work}/medium`, `${bindings.visual_work}/high`].sort());
   assert.ok(report.checked_pairs.every(pair => pair.request_status === 'not_checked' && pair.access === 'unknown' && pair.actual_model === null));
   assert.ok(server.calls.every(call => ['initialize', 'initialized', 'account/read', 'config/read', 'model/list'].includes(call.method)));
   assert.equal(report.codex_version, '0.156.1');
@@ -317,7 +318,7 @@ test('a supplied home with spaces and quote characters remains data', async t =>
 
 test('fire verification failure preserves unknown access and reports the user or parent fallback', async t => {
   const { home } = await fixture(t);
-  const server = fakeServer({ pages: [{ data: [model('gpt-6-astra', ['ultra'])] }] });
+  const server = fakeServer({ pages: [{ data: [model(bindings.frontier, ['ultra'])] }] });
   const report = await checkAccountModels({ home, verify: true }, { spawn: server.spawn, readSnapshot: async () => ({ configuration_revision: 'initial', mode: BUILTINS[3] }) });
   assert.equal(report.exit_code, 1);
   assert.equal(report.checked_pairs.length, 1);
@@ -366,7 +367,7 @@ test('manual primary verification uses the selected session profile, deduplicate
     },
   });
   assert.equal(report.mode.id, 'high'); assert.equal(report.status, 'passed');
-  assert.deepEqual(requests, [['gpt-6-luna', 'max'], ['gpt-6.1-sol', 'ultra'], ['gpt-6-astra', 'ultra']]);
+  assert.deepEqual(requests, [[bindings.economy, 'max'], [bindings.general, 'ultra'], [bindings.frontier, 'ultra']]);
   assert.equal(report.checked_pairs.length, 3);
 });
 function providerInternal(server,fetch) { return {spawn:server.spawn,env:{PROBE_TEST_KEY:PRIVATE},readSnapshot:async()=>({configuration_revision:'stable',mode:BUILTINS[3]}),fetch}; }

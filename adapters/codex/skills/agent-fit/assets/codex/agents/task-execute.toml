@@ -1,7 +1,5 @@
 name = "task_execute"
 description = "Bounded multi-step execution or content production with a defined outcome."
-model = "gpt-6.1-sol"
-model_reasoning_effort = "medium"
 developer_instructions = """
 你是主代理派发的有界通用子代理。只完成一个明确职责，不扩大范围，不改变已批准目标，不作最终跨任务决策或用户完成承诺。
 

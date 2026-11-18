@@ -107,19 +107,19 @@ L1–L4 保留为推理复杂度；在最终等级内通过 `--task` 选择模�
 
 | 类型 | 等级 | cut / official 主候选 |
 | --- | --- | --- |
-| `mechanical`：确定性机械任务 | L1 | Luna / medium |
-| `bounded`：普通有界任务 | L2 | Luna / high |
-| `scan`：大型有界扫描或审查 | L1/L2 | Luna / xhigh |
-| `deep`：大型确定性深度处理 | L1/L2 | Luna / max |
-| `complex`：有界复杂任务 | L2/L3 | Sol / medium |
-| `uncertain`：高歧义、高耦合或高后果且难验收 | L3/L4 | Astra / low |
-| `reasoning`：复杂推理或已证实推理不足 | L3/L4 | Astra / medium |
-| `visual`：视觉理解与图像推理 | L1/L2/L3 | Terra 6.1 / low、medium、high |
-| `computer`：有界电脑操作 | L1/L2/L3 | Terra 6.1 / low、medium、high |
-| `writing`：自然写作与修订 | L1/L2/L3 | Terra 6.1 / low、medium、high |
+| `mechanical`：确定性机械任务 | L1 | 经济用途 / medium |
+| `bounded`：普通有界任务 | L2 | 经济用途 / high |
+| `scan`：大型有界扫描或审查 | L1/L2 | 经济用途 / xhigh |
+| `deep`：大型确定性深度处理 | L1/L2 | 经济用途 / max |
+| `complex`：有界复杂任务 | L2/L3 | 通用用途 / medium |
+| `uncertain`：高歧义、高耦合或高后果且难验收 | L3/L4 | 旗舰用途 / low |
+| `reasoning`：复杂推理或已证实推理不足 | L3/L4 | 旗舰用途 / medium |
+| `visual`：视觉理解与图像推理 | L1/L2/L3 | 专长用途 / low、medium、high |
+| `computer`：有界电脑操作 | L1/L2/L3 | 专长用途 / low、medium、high |
+| `writing`：自然写作与修订 | L1/L2/L3 | 专长用途 / low、medium、high |
 | `latency`：明确追求低延迟 | 任意等级 | 须显式配置，不保证实际延迟 |
 
-这些是待校准的本地策略，不代表已经验证模型能力或延迟。普通自动 Astra 路由默认 low，复杂推理或有证据的质量升级最多 medium；更高强度需要明确授权。**用户明确选择 high/fire 即授权其展示的最高强度，包含 Astra/ultra**；预览或保存不构成选择，预算、宿主支持和 fire 会话验证继续适用。已选择的自定义档位执行明确保存的组合。
+这些是待校准的本地策略，不代表已经验证模型能力或延迟。普通旗舰候选默认 low，复杂推理或有证据的质量升级最多 medium；更高强度需要明确授权。**用户明确选择 high/fire 即授权其展示的高强度组合**；预览或保存不构成选择，预算、宿主支持和 fire 会话验证继续适用。已选择的自定义档位执行明确保存的组合。
 
 先判断等级，再核对组合的工具、输入、上下文与验收能力。无法明确匹配任务候选时使用本级基线，仍需能力检查；候选适用依据与 L2/L3 complex 的边界见 [任务路由](../adapters/codex/skills/agent-fit/references/task-routing.md#基线与候选的选择边界)。同一组合改标签不构成质量升级，也不存在固定的跨模型升级顺序。
 
@@ -132,11 +132,11 @@ agent-fit explain --level L3 --task reasoning --role task_execute --json
 
 聊天仍须使用会话作用域及目标项目、线程上下文。`--task` 只查表，不自动分类、切档或发模型请求；不传时返回原等级基线。类型与等级不匹配会被拒绝；明确请求但快照未配置时返回 `TASK_ROUTE_NOT_CONFIGURED`，不能借用包内新值或自行拼组合。已部署快照缺少候选时，先预览并更新配置再查询；基础规则更新后需重启。
 
-每级可选 `tasks`，键为上表类型，每项完整包含 `model`、`effort`、`fallback`（可为 null）。复制档位、三层作用域和任务快照均保留候选；单级 CLI 配置只改基线，候选通过整表 JSON 或网页“任务候选 JSON”编辑，`{}` 清空本级候选。Terra 的三个专长候选分别带有 Sol 6.1 备用；latency 仍须独立显式配置，不能凭模型名承诺低延迟。
+每级可选 `tasks`，键为上表类型，每项完整包含 `model`、`effort`、`fallback`（可为 null）。复制档位、三层作用域和任务快照均保留候选；单级 CLI 配置只改基线，候选通过整表 JSON 或网页“任务候选 JSON”编辑，`{}` 清空本级候选。三个专长候选各带有通用备用组合；latency 仍须独立显式配置，不能凭模型名承诺低延迟。
 
 三个作用域的复制内容均与同一作用域下 `mode show <源档位>` 显示的完整定义一致。源档位对应已部署快照时复制该快照；旧快照没有的候选不会因复制而自动加入。
 
-候选使用自己的备用。质量升级可以在原 L3/L4 中由 uncertain 的 Astra/low 转向 reasoning 的 Astra/medium；先证实推理不足，继续沿用原快照、职责与验收，计入同一任务最多三次委派。不能用故障备用代替质量升级，也不自动转到更高强度。
+候选使用自己的备用。质量升级可以在原 L3/L4 中由 uncertain 的旗舰模型/low 转向 reasoning 的旗舰模型/medium；先证实推理不足，继续沿用原快照、职责与验收，计入同一任务最多三次委派。不能用故障备用代替质量升级，也不自动转到更高强度。
 
 当前档位的手动主模型检测同时覆盖基线和任务候选，按组合去重、排除备用，确认框列出数量。配置、切档、查询与账号页面仍不自动检测。
 
@@ -180,12 +180,12 @@ L1–L4 表示推理需求，职责限定允许的动作。主代理判定等级
 
 | 等级 | 需求 | cut | official | high | fire |
 | --- | --- | --- | --- | --- | --- |
-| L1 | 方法、输入与验收明确 | Luna / high | Luna / high | Luna / max | Astra / ultra |
-| L2 | 有边界的局部分析或有限方案选择 | Luna / high | Sol 6.1 / medium | Sol 6.1 / ultra | Astra / ultra |
-| L3 | 权衡相互影响的约束或矛盾证据 | Sol 6.1 / medium | Sol 6.1 / high | Astra / ultra | Astra / ultra |
-| L4 | 关键假设未知或强耦合的开放问题 | Sol 6.1 / high | Sol 6.1 / xhigh | Astra / ultra | Astra / ultra |
+| L1 | 方法、输入与验收明确 | 经济用途 / high | 经济用途 / high | 经济用途 / max | 旗舰用途 / ultra |
+| L2 | 有边界的局部分析或有限方案选择 | 经济用途 / high | 通用用途 / medium | 通用用途 / ultra | 旗舰用途 / ultra |
+| L3 | 权衡相互影响的约束或矛盾证据 | 通用用途 / medium | 通用用途 / high | 旗舰用途 / ultra | 旗舰用途 / ultra |
+| L4 | 关键假设未知或强耦合的开放问题 | 通用用途 / high | 通用用途 / xhigh | 旗舰用途 / ultra | 旗舰用途 / ultra |
 
-完整模型 id 为 `gpt-6-luna`、`gpt-6.1-sol`、`gpt-6-astra`，备用另使用 `gpt-6-sol`。cut/L2 面向易核验产出，复杂部分提高等级。相邻等级可共用组合；跨模型同名 effort 不证明等效，模型名称不证明能力、价格或权限。`official` 是依据[官方建议](https://learn.chatgpt.com/docs/agent-configuration/subagents#choosing-models-and-reasoning)制定的本地映射，官方没有固定 L1–L4 表。
+上表使用用途，具体模型以绑定 home 的 `mode show` 或 `explain` 为准。cut/L2 面向易核验产出，复杂部分提高等级。相邻等级可共用组合；跨模型同名 effort 不证明等效，模型名称不证明能力、价格或权限。`official` 是依据[官方建议](https://learn.chatgpt.com/docs/agent-configuration/subagents#choosing-models-and-reasoning)制定的本地映射，官方没有固定 L1–L4 表。
 
 | 职责 | 允许范围 | 固定绑定 |
 | --- | --- | --- |
@@ -216,9 +216,9 @@ L1–L4 表示推理需求，职责限定允许的动作。主代理判定等级
 
 | 档位 | L1 备用 | L2 备用 | L3 备用 | L4 备用 |
 | --- | --- | --- | --- | --- |
-| cut | Sol 6.1/medium | Sol 6.1/medium | Sol 6/medium | Sol 6/high |
-| official | Sol 6.1/medium | Sol 6/medium | Sol 6/high | Sol 6/xhigh |
-| high | Sol 6.1/high | Sol 6/ultra | Sol 6.1/ultra | Sol 6.1/ultra |
+| cut | 通用用途/medium | 通用用途/medium | 通用备用用途/medium | 通用备用用途/high |
+| official | 通用用途/medium | 通用备用用途/medium | 通用备用用途/high | 通用备用用途/xhigh |
+| high | 通用用途/high | 通用备用用途/ultra | 通用用途/ultra | 通用用途/ultra |
 | fire | 用户指定，否则继承父代理 | 同左 | 同左 | 同左 |
 
 候选使用自己的备用，主代理从原任务完整快照取值。已选择的 cut/official/high 或自定义档位，在授权、预算、能力和宿主均允许时可使用本级非空 fallback；仅保存或预览不算选择，null 不借用其他档位。用户锁定模型或禁止备用优先。
@@ -268,11 +268,11 @@ JSON
 
 最高 64 KiB UTF-8 JSON；必须明确全部等级与备用/null；每级可选 tasks，候选也须完整提供 model、effort 和 fallback/null，拒绝未知字段、无效类型/等级、缺级、半对参数或主备用相同。与单级参数互斥。活动定义与部署角色同一事务保存；非活动定义只保存，不激活。
 
-### Terra 专长路线
+### 专长路线
 
-[官方指南](https://learn.chatgpt.com/docs/models)将 Terra 6.1 用于日常写作、视觉工作和支持的应用操作；[模型说明](https://developers.openai.com/api/docs/models/gpt-6.1-terra)强调视觉推理、电脑操作与自然写作。cut/official 的 visual/computer/writing 使用本地 L1 low、L2 medium、L3 high，故障备用分别为 Sol 6.1 medium、medium、high。官方未制定此等级表，当前映射不代表实测性能优势。high/fire 按原最高强度策略处理这三类任务，L4 不提供 Terra 专长路线。
+cut/official 的 visual/computer/writing 使用同一专长用途，L1 low、L2 medium、L3 high；故障备用为通用模型 medium、medium、high。high/fire 按原高强度策略处理这三类任务，L4 不提供专长路线。
 
-先确定复杂度与保障要求，再核对主要工作是否属于专长、关键事实和约束是否已知、结果是否可核验。开放研究、强耦合或高后果且难验收的任务仍使用基线或 uncertain/reasoning；含有图片或产出文章不足以选择 Terra。电脑操作仍须原工具与写入授权，不能扩大只读职责。
+先确定复杂度与保障要求，再核对主要工作是否属于专长、关键事实和约束是否已知、结果是否可核验。开放研究、强耦合或高后果且难验收的任务仍使用基线或 uncertain/reasoning；含有图片或产出文章不足以选择专长候选。电脑操作仍须原工具与写入授权，不能扩大只读职责。
 
 ```sh
 agent-fit explain --level L1 --task visual --role task_scan --json
@@ -281,6 +281,20 @@ agent-fit explain --level L3 --task writing --role task_review --json
 ```
 
 聊天中补齐 Skill 要求的 session、project 与 thread 参数。已有自定义定义和任务快照不自动合并新候选；可从当前内置定义创建新档位，或通过完整定义编辑。配置与规则同步后重启一次 Codex，随后按新任务查询；不需要先追加模型评测。
+
+### 模型绑定与换代
+
+内置策略在 [modes.json](../adapters/codex/modes.json) 中引用用途别名，包内默认模型 id 集中在 [model-bindings.json](../adapters/codex/model-bindings.json)。同用途换代无需改写策略或更新共享 Skill。五种用途为 `economy`（经济）、`general`（通用）、`general_backup`（通用备用）、`frontier`（旗舰）、`visual_work`（视觉、电脑操作和写作）。
+
+```sh
+agent-fit models check --codex-home "$CODEX_HOME"
+agent-fit models bind general "$NEW_MODEL" --dry-run --codex-home "$CODEX_HOME"
+agent-fit models bind general "$NEW_MODEL" --apply "$PREVIEW_TOKEN" --codex-home "$CODEX_HOME"
+```
+
+从目录选定具体 id 后，预览会列出每个受影响档位、等级或任务类型的主选和备用变更；令牌对应这个 home、当前配置和这份变化。确认模型能力、预算及变化范围后，用预览返回的令牌应用（JSON 字段 `data.model_binding.preview_token`）。应用会重新查目录；配置有变化、目录未完成，或新组合不在可见目录及支持的 effort 中，均不会写入。不会自动晋升新模型、调整 effort 或调用推理。自定义供应商的目录不提供 effort，不能用于此命令；需要时可直接保存自定义档位中的具体组合。
+
+更新存入绑定 home 的 `.agent-fit/model-bindings.json`，覆盖包内默认绑定。该 home 后续所有作用域的内置档位使用更新后的组合；当前全局内置档位如受影响，其快照和角色配置一并更新。已开始任务、自定义档位和其他 home 的组合不变。需要撤销某条绑定时，用原模型 id 重新预览并应用。模型目录不证明能力或实际调用；`fire` 仍须按新组合重新验证。
 
 ### 配置与模型检查分开执行
 
@@ -314,7 +328,7 @@ agent-fit models check --verify
 agent-fit models check --verify --discover
 ```
 
-配置操作不附带账号或模型检查；仅在用户显式执行模型检查命令，或在档位页确认检测时查询所选 home。
+日常配置操作不附带账号或模型检查；显式检查、绑定预览与应用会查询所选 home 的目录。
 
 检查通过 stdio app-server 在空临时目录读取当前 home 的账号与生效配置，无认证刷新参数、无项目加载，不输出原始 RPC、stderr、邮箱、账号 ID 或凭据。官方默认上下文的目录使用 Codex `model/list`，最多 100 页，单帧 1 MiB、总接收 8 MiB。第三方供应商或自定义 API 地址使用同一供应商的 `GET /models` 获取候选，不使用 Codex 目录补齐。沿用同一配置的地址、请求头、查询参数和授权，最多 1000 个候选、响应最多 2 MiB；只保留模型标识，不猜测推理强度。当前支持完整单页列表；有后续分页会明确标记未完成并停止批量验证。目录整轮共享 30 秒期限。自定义供应商的空账号不直接判无权限。
 

@@ -1,4 +1,5 @@
 import './isolate-home.mjs';
+import bindings from '../adapters/codex/model-bindings.json' with { type: 'json' };
 import test, { afterEach } from 'node:test';
 import assert from 'node:assert/strict';
 import fs from 'node:fs/promises';
@@ -102,9 +103,9 @@ test('status compares role identity and both model axes against the active respo
   const { home } = await fixture(); await mutate(home, 'setup');
   const report = await statusReport(home, { details: true });
   assert.deepEqual(report.roles.map(role => [role.name, role.configured_name, role.task_level, role.expected_model, role.expected_effort, role.matches_mode]), [
-    ['task_scan', 'task_scan', 'L1', 'gpt-6-luna', 'high', true],
-    ['task_execute', 'task_execute', 'L2', 'gpt-6.1-sol', 'medium', true],
-    ['task_review', 'task_review', 'L3', 'gpt-6.1-sol', 'high', true],
+    ['task_scan', 'task_scan', 'L1', bindings.economy, 'high', true],
+    ['task_execute', 'task_execute', 'L2', bindings.general, 'medium', true],
+    ['task_review', 'task_review', 'L3', bindings.general, 'high', true],
     ['task_delegate', 'task_delegate', null, null, null, true],
   ]);
   assert.equal(report.runtime_verification, 'unverified');
@@ -113,7 +114,7 @@ test('status compares role identity and both model axes against the active respo
 test('semantic role mismatches block writes even when the file digest agrees', async () => {
   const cases = [
     ['task_scan', text => text.replace('name = "task_scan"', 'name = "task_execute"')],
-    ['task_execute', text => text.replace('model = "gpt-6.1-sol"', 'model = "other-model"')],
+    ['task_execute', text => text.replace(`model = "${bindings.general}"`, 'model = "other-model"')],
     ['task_review', text => text.replace(/^model_reasoning_effort = .*\n/m, '')],
     ['task_delegate', text => 'model = "fixed-model"\n' + text],
     ['task_delegate', text => 'model_reasoning_effort = "high"\n' + text],
@@ -364,7 +365,7 @@ test('stable installed mode data is read from its owned deployed snapshot instea
   current.levels.L1.model = 'installed-snapshot-model'; const bytes = Buffer.from(JSON.stringify(current)); await fs.writeFile(target, bytes);
   const stateTarget = path.join(home, '.agent-fit/state.json'); const state = JSON.parse(await fs.readFile(stateTarget, 'utf8')); state.files['.agent-fit/current-mode.json'] = createHash('sha256').update(bytes).digest('hex');
   for (const relative of ['agents/task-scan.toml']) {
-    const rolePath = path.join(home, relative), role = (await fs.readFile(rolePath, 'utf8')).replace('model = "gpt-6-luna"', 'model = "installed-snapshot-model"');
+    const rolePath = path.join(home, relative), role = (await fs.readFile(rolePath, 'utf8')).replace(`model = "${bindings.economy}"`, 'model = "installed-snapshot-model"');
     await fs.writeFile(rolePath, role); state.files[relative] = createHash('sha256').update(role).digest('hex');
   }
   await fs.writeFile(stateTarget, JSON.stringify(state));

@@ -298,7 +298,7 @@ function showTab(tab) {
 function renderModePicker() {
   const focusedMode = $('mode-radios').contains(document.activeElement) ? document.activeElement.id : null;
   const isCustom = state.modes.find(mode => mode.id === state.selected)?.kind === 'custom';
-  const descriptions = { cut: '节省优先，按任务选同级候选', official: '四级基线与任务候选', high: '选档即授权最高强度，含 Astra/ultra', fire: '选档即授权 Astra/ultra，仍须先验证', custom: '自行设置模型、候选与备用' };
+  const descriptions = { cut: '节省优先，按任务选同级候选', official: '四级基线与任务候选', high: '选档即授权所示高强度组合', fire: '选档即授权所示高强度组合，仍须先验证', custom: '自行设置模型、候选与备用' };
   const radios = state.modes.filter(mode => mode.kind !== 'custom').map(mode => ({ value: mode.id, label: `${mode.name} · ${mode.id}` }));
   radios.push({ value: 'custom', label: '自定义' });
   replace('mode-radios', radios.map(option => node('label', {}, node('input', { id: `mode-${option.value}`, type: 'radio', name: 'mode', value: option.value, 'aria-label': option.label, 'aria-describedby': `mode-${option.value}-note`, checked: option.value === 'custom' ? isCustom : state.selected === option.value, disabled: state.busy || !state.connected, on: { change: () => { if (option.value !== 'custom') selectMode(option.value); else { const target = state.modes.find(mode => mode.kind === 'custom'); if (target) selectMode(target.id); else { renderModePicker(); createMode(); } } } } }), node('span', { class: 'mode-name' }, option.label), node('span', { id: `mode-${option.value}-note`, class: 'mode-description' }, descriptions[option.value] ?? '查看模型分配'))));
@@ -346,7 +346,7 @@ function renderLevels() {
       const candidates = node('details', { class: 'technical task-candidates' }, node('summary', {}, '同级任务候选'), node('p', {}, '先选复杂度与保障下限，再按任务特征选择；未指定任务类型时使用上方基线。'));
       if (custom()) {
         const id = `${level}-tasks`;
-        candidates.append(node('label', { htmlFor: id }, '任务候选 JSON'), node('p', { class: 'muted' }, `本等级支持：${Object.entries(TASK_LEVELS).filter(([, levels]) => levels.includes(level)).map(([task]) => task).join('、')}。每项包含 model、effort、fallback；{} 清空候选。明确保存并选择的组合即为授权，含高强度 Astra。`), node('textarea', { id, value: typeof tasks === 'string' ? tasks : JSON.stringify(tasks ?? {}, null, 2), rows: 8, maxLength: 65536, spellcheck: false, 'data-level': level, 'aria-describedby': `${level}-error`, on: { input: event => {
+        candidates.append(node('label', { htmlFor: id }, '任务候选 JSON'), node('p', { class: 'muted' }, `本等级支持：${Object.entries(TASK_LEVELS).filter(([, levels]) => levels.includes(level)).map(([task]) => task).join('、')}。每项包含 model、effort、fallback；{} 清空候选。明确保存并选择的组合即为授权。`), node('textarea', { id, value: typeof tasks === 'string' ? tasks : JSON.stringify(tasks ?? {}, null, 2), rows: 8, maxLength: 65536, spellcheck: false, 'data-level': level, 'aria-describedby': `${level}-error`, on: { input: event => {
           try { const parsed = JSON.parse(event.target.value); state.draft.levels[level].tasks = parsed && typeof parsed === 'object' && !Array.isArray(parsed) ? parsed : event.target.value; } catch { state.draft.levels[level].tasks = event.target.value; }
           state.preview = null; updateLevelSummary(level); renderChanges(); renderControls(); renderPreview();
           $(`${level}-error`).hidden = true; event.target.removeAttribute('aria-invalid');
@@ -513,7 +513,7 @@ function renderRules() {
   $('rules-view-note').textContent = preview ? `只读预览「${definition?.name ?? '未知'}」，尚未生效。查看不会切换档位。` : `正在展示「${active.name}」的已保存生效配置；未保存草稿不参与路由。`;
   $('rules-view-note').dataset.preview = String(preview);
   $('rules-maximum').hidden = !maximumMode(definition);
-  replace('rules-maximum', maximumMode(definition) ? [node('p', {}, preview ? '最高强度预览：查看不构成授权，明确选择此档位后才授权所示最高强度。' : '已选择最高强度档位：明确选档即授权所示组合，包含 Astra / ultra。'), node('p', {}, '普通任务沿用本级最高组合；低延迟仍须显式配置候选。'), definition.id === 'fire' ? node('p', {}, 'fire 每个会话首次使用前实际验证；模型、强度、供应商或账号变化后重新验证。失败时使用用户指定模型与强度，否则继承父代理。') : null] : []);
+  replace('rules-maximum', maximumMode(definition) ? [node('p', {}, preview ? '最高强度预览：查看不构成授权，明确选择此档位后才授权所示最高强度。' : '已选择最高强度档位：明确选档即授权所示高强度组合。'), node('p', {}, '普通任务沿用本级最高组合；低延迟仍须显式配置候选。'), definition.id === 'fire' ? node('p', {}, 'fire 每个会话首次使用前实际验证；模型、强度、供应商或账号变化后重新验证。失败时使用用户指定模型与强度，否则继承父代理。') : null] : []);
   replace('route-overview', definition ? LEVELS.map((level, index) => node('button', { type: 'button', class: 'route-overview-item', 'data-route': '', 'data-level': level, 'data-task': '', 'aria-controls': 'route-detail', 'aria-pressed': 'false', on: { click: () => explain(level) } }, node('span', { class: 'route-overview-heading' }, node('strong', {}, level), LEVEL_LABELS[index]), node('strong', { class: 'route-overview-model', title: pairText(definition.levels[level]) }, routePair(definition.levels[level])), node('span', { class: 'muted' }, '等级默认'))) : []);
   replace('route-levels', definition ? LEVELS.map((level, index) => {
     const tasks = ['', ...Object.keys(TASK_LEVELS).filter(task => TASK_LEVELS[task].includes(level))];

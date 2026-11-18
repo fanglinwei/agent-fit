@@ -1,4 +1,5 @@
 import './isolate-home.mjs';
+import bindings from '../adapters/codex/model-bindings.json' with { type: 'json' };
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { spawnSync } from 'node:child_process';
@@ -65,11 +66,11 @@ test('explain keeps the explicit mode and level together across L4 review previe
   const dir = await mkdtemp(path.join(os.tmpdir(), 'delegation-routing-')); t.after(() => rm(dir, { recursive: true, force: true }));
   const home = path.join(dir, 'uninstalled');
   for (const [mode, model, effort] of [
-    ['high', 'gpt-6-astra', 'ultra'],
-    ['official', 'gpt-6.1-sol', 'xhigh'],
-    ['cut', 'gpt-6.1-sol', 'high'],
-    ['fire', 'gpt-6-astra', 'ultra'],
-    ['high', 'gpt-6-astra', 'ultra'],
+    ['high', bindings.frontier, 'ultra'],
+    ['official', bindings.general, 'xhigh'],
+    ['cut', bindings.general, 'high'],
+    ['fire', bindings.frontier, 'ultra'],
+    ['high', bindings.frontier, 'ultra'],
   ]) {
     const result = run(home, ['explain', '--mode', mode, '--level', 'L4', '--role', 'task_review']);
     assert.equal(result.status, 0, result.stdout);
@@ -91,13 +92,13 @@ test('explain separates active, builtin preview and custom selections without ch
   const { mutate } = await import('../lib/install.mjs');
   await mutate(home, 'setup');
   await mutate(home, 'create', { name: '查询预检', from: 'official' });
-  await mutate(home, 'configure', { mode: '查询预检', level: 'L1', model: 'gpt-6.1-sol', effort: 'high' });
+  await mutate(home, 'configure', { mode: '查询预检', level: 'L1', model: bindings.general, effort: 'high' });
   const before = run(home, ['status']).report.data;
   const customId = run(home, ['mode', 'show', '查询预检']).report.data.definition.id;
   for (const [selector, level, mode, model, effort, dispatchRole] of [
-    [null, 'L4', 'official', 'gpt-6.1-sol', 'xhigh', 'task_delegate'],
-    ['high', 'L4', 'high', 'gpt-6-astra', 'ultra', 'task_delegate'],
-    ['查询预检', 'L1', customId, 'gpt-6.1-sol', 'high', 'task_delegate'],
+    [null, 'L4', 'official', bindings.general, 'xhigh', 'task_delegate'],
+    ['high', 'L4', 'high', bindings.frontier, 'ultra', 'task_delegate'],
+    ['查询预检', 'L1', customId, bindings.general, 'high', 'task_delegate'],
   ]) {
     const result = run(home, ['explain', '--level', level, '--role', 'task_review', ...(selector ? ['--mode', selector] : [])]);
     assert.equal(result.status, 0, result.stdout);
@@ -129,11 +130,11 @@ test('inactive and uninstalled previews use an unpinned role while active select
   const before = run(home, ['status']).report.data.configuration_revision;
   const roleBefore = await readFile(path.join(home, 'agents/task-execute.toml'), 'utf8');
   for (const [mode, level, role, model, effort, dispatchRole, contract] of [
-    [null, 'L2', 'task_execute', 'gpt-6.1-sol', 'medium', 'task_execute', 'scoped_output'],
-    ['official', 'L2', 'task_execute', 'gpt-6.1-sol', 'medium', 'task_execute', 'scoped_output'],
-    ['high', 'L2', 'task_execute', 'gpt-6.1-sol', 'ultra', 'task_delegate', 'scoped_output'],
-    ['cut', 'L1', 'task_scan', 'gpt-6-luna', 'high', 'task_delegate', 'readonly_evidence'],
-    ['候选', 'L2', 'task_execute', 'gpt-6.1-sol', 'medium', 'task_delegate', 'scoped_output'],
+    [null, 'L2', 'task_execute', bindings.general, 'medium', 'task_execute', 'scoped_output'],
+    ['official', 'L2', 'task_execute', bindings.general, 'medium', 'task_execute', 'scoped_output'],
+    ['high', 'L2', 'task_execute', bindings.general, 'ultra', 'task_delegate', 'scoped_output'],
+    ['cut', 'L1', 'task_scan', bindings.economy, 'high', 'task_delegate', 'readonly_evidence'],
+    ['候选', 'L2', 'task_execute', bindings.general, 'medium', 'task_delegate', 'scoped_output'],
   ]) {
     result = run(home, ['explain', '--level', level, '--role', role, ...(mode ? ['--mode', mode] : [])]);
     assert.equal(result.status, 0, result.stdout); assert.deepEqual(result.report.errors, []);
@@ -165,7 +166,7 @@ test('retired builtin names fail across CLI selectors without changing configura
   assert.equal(run(home, ['explain', '--level', 'L1']).status, 0);
   for (const args of [['mode', 'list'], ['mode', 'show', 'official'], ['status']]) {
     const output = spawnSync(process.execPath, [CLI, ...args, '--codex-home', home], { encoding: 'utf8', env: { ...process.env, PATH: '/nonexistent' } });
-    assert.equal(output.status, 0); assert.doesNotMatch(output.stdout, /economy|balanced|performance/);
+    assert.equal(output.status, 0); assert.doesNotMatch(output.stdout, /^(?:\*? )?(?:economy|balanced|performance)(?:\s|$)/m);
   }
 });
 
@@ -189,7 +190,7 @@ test('real CLI JSON errors redact malformed private config and reject stale revi
   result = run(home, ['explain', '--mode', 'high', '--level', 'L4', '--role', 'task_review']);
   assert.equal(result.status, 1);
   assert.equal(result.report.data.mode_id, 'high');
-  assert.deepEqual(result.report.data.primary, { model: 'gpt-6-astra', effort: 'ultra' });
+  assert.deepEqual(result.report.data.primary, { model: bindings.frontier, effort: 'ultra' });
   assert.ok(result.report.errors.some(error => error.code === 'MANAGED_FILE_DRIFT'));
 });
 

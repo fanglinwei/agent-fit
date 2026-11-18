@@ -18,6 +18,15 @@ CLI 不带 --scope 保持全局兼容；聊天切换默认显式 --scope session
 
 固定角色配置可能覆盖派发参数；作用域查询统一返回未固定模型的 task_delegate，显式传入组合并保留原职责。用户指定配置或需要继承时使用未固定 model/effort 的 task_delegate，并核对宿主默认。任务等级与权限职责互相独立。
 
+## 模型绑定
+
+内置档位用用途别名配置基线、候选和备用。查询、生成角色和任务冻结快照均使用解析后的具体 model 和 effort。按用户授权对同一个 home 执行：
+
+1. `agent-fit models bind <用途> <模型 ID> --dry-run --codex-home <绑定 home>` 查看受影响的主选、备用和应用令牌。
+2. 核对新模型的任务适配、预算和变化范围；明确授权后以相同参数使用 `--apply <预览令牌>`。配置变化、目录不完整或任何受影响组合缺少原 effort 时，停止写入。目录检查不发起推理，不证明运行权限或能力。
+
+用途有 `economy`（经济）、`general`（通用）、`general_backup`（通用备用）、`frontier`（旗舰）和 `visual_work`（视觉、电脑操作、写作）。调整对该 home 下所有作用域的内置档位生效，不改自定义固定组合或已开始任务快照。原 fire 门槛继续适用。
+
 ## 配置查询与失败分流
 
 主代理先确定复杂度等级与原职责，再执行 `agent-fit explain --codex-home <绑定 home> --scope session --project <项目根> --level <等级> --role <原职责> --json`。JSON 顶层为 `report_schema_version`、`data`、`errors`，先检查进程退出码与 `errors`，再读取 `data`。先核对 `data.scope`、`data.context`、`data.effective_scope` 与目标聊天及项目一致，`data.skill_integrity` 须为 clean，保存 `configuration_revision`、`skill_revision` 与完整 `task_profile` 作为该任务后续接续依据。其余所需字段为 `data.mode_id`、`data.level`、`data.requested_role`、`data.primary.model`、`data.primary.effort`、`data.dispatch_role`、`data.permission_contract`；全部按本次选择和职责核对，不能只判断 stdout 非空或 `data` 存在。
@@ -39,7 +48,7 @@ CLI 不带 --scope 保持全局兼容；聊天切换默认显式 --scope session
 
 完整用法、模式表、备用条件与故障处理见项目 docs/usage.md。
 
-fire 每个会话首次委派前须验证 Astra/ultra 的实际调用与可信模型身份；模型、effort、供应商或账号变化后重验。检查失败或无法完成时使用用户指定组合，否则继承父代理实际组合，并使用 task_delegate 保留原职责。全局子代理默认可能覆盖继承，须核对有效组合；没有可信父代理组合时阻断该委派。验证结果不跨会话缓存。
+fire 每个会话首次委派前须验证当前任务组合的实际调用与可信模型身份；模型、effort、供应商或账号变化后重验。检查失败或无法完成时使用用户指定组合，否则继承父代理实际组合，并使用 task_delegate 保留原职责。全局子代理默认可能覆盖继承，须核对有效组合；没有可信父代理组合时阻断该委派。验证结果不跨会话缓存。
 
 同级任务候选见 [任务路由](task-routing.md)。任务快照中的 levels 每级可含 tasks，各候选保存独立备用；explain 的 task 及 primary 必须对应所选候选。无候选的旧定义仍可查等级基线；显式候选缺失时不猜值。候选编辑与普通路由数据更新无需重启；基础 Skill/AGENTS 规则更新仍需重启。
 

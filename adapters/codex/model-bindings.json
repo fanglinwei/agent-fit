@@ -1,0 +1,7 @@
+{
+  "economy": "gpt-6-luna",
+  "general": "gpt-6.1-sol",
+  "general_backup": "gpt-6-sol",
+  "frontier": "gpt-6-astra",
+  "visual_work": "gpt-6.1-terra"
+}

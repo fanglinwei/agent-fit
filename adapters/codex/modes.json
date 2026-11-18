@@ -13,208 +13,208 @@
       "name": "经济",
       "levels": {
         "L1": {
-          "model": "gpt-6-luna",
+          "slot": "economy",
           "effort": "high",
           "fallback": {
-            "model": "gpt-6.1-sol",
+            "slot": "general",
             "effort": "medium"
           },
           "tasks": {
             "mechanical": {
-              "model": "gpt-6-luna",
+              "slot": "economy",
               "effort": "medium",
               "fallback": {
-                "model": "gpt-6.1-sol",
+                "slot": "general",
                 "effort": "medium"
               }
             },
             "scan": {
-              "model": "gpt-6-luna",
+              "slot": "economy",
               "effort": "xhigh",
               "fallback": {
-                "model": "gpt-6.1-sol",
+                "slot": "general",
                 "effort": "medium"
               }
             },
             "deep": {
-              "model": "gpt-6-luna",
+              "slot": "economy",
               "effort": "max",
               "fallback": {
-                "model": "gpt-6.1-sol",
+                "slot": "general",
                 "effort": "high"
               }
             },
             "visual": {
-              "model": "gpt-6.1-terra",
+              "slot": "visual_work",
               "effort": "low",
               "fallback": {
-                "model": "gpt-6.1-sol",
+                "slot": "general",
                 "effort": "medium"
               }
             },
             "computer": {
-              "model": "gpt-6.1-terra",
+              "slot": "visual_work",
               "effort": "low",
               "fallback": {
-                "model": "gpt-6.1-sol",
+                "slot": "general",
                 "effort": "medium"
               }
             },
             "writing": {
-              "model": "gpt-6.1-terra",
+              "slot": "visual_work",
               "effort": "low",
               "fallback": {
-                "model": "gpt-6.1-sol",
+                "slot": "general",
                 "effort": "medium"
               }
             }
           }
         },
         "L2": {
-          "model": "gpt-6-luna",
+          "slot": "economy",
           "effort": "high",
           "fallback": {
-            "model": "gpt-6.1-sol",
+            "slot": "general",
             "effort": "medium"
           },
           "tasks": {
             "bounded": {
-              "model": "gpt-6-luna",
+              "slot": "economy",
               "effort": "high",
               "fallback": {
-                "model": "gpt-6.1-sol",
+                "slot": "general",
                 "effort": "medium"
               }
             },
             "complex": {
-              "model": "gpt-6.1-sol",
+              "slot": "general",
               "effort": "medium",
               "fallback": {
-                "model": "gpt-6-sol",
+                "slot": "general_backup",
                 "effort": "medium"
               }
             },
             "scan": {
-              "model": "gpt-6-luna",
+              "slot": "economy",
               "effort": "xhigh",
               "fallback": {
-                "model": "gpt-6.1-sol",
+                "slot": "general",
                 "effort": "medium"
               }
             },
             "deep": {
-              "model": "gpt-6-luna",
+              "slot": "economy",
               "effort": "max",
               "fallback": {
-                "model": "gpt-6.1-sol",
+                "slot": "general",
                 "effort": "high"
               }
             },
             "visual": {
-              "model": "gpt-6.1-terra",
+              "slot": "visual_work",
               "effort": "medium",
               "fallback": {
-                "model": "gpt-6.1-sol",
+                "slot": "general",
                 "effort": "medium"
               }
             },
             "computer": {
-              "model": "gpt-6.1-terra",
+              "slot": "visual_work",
               "effort": "medium",
               "fallback": {
-                "model": "gpt-6.1-sol",
+                "slot": "general",
                 "effort": "medium"
               }
             },
             "writing": {
-              "model": "gpt-6.1-terra",
+              "slot": "visual_work",
               "effort": "medium",
               "fallback": {
-                "model": "gpt-6.1-sol",
+                "slot": "general",
                 "effort": "medium"
               }
             }
           }
         },
         "L3": {
-          "model": "gpt-6.1-sol",
+          "slot": "general",
           "effort": "medium",
           "fallback": {
-            "model": "gpt-6-sol",
+            "slot": "general_backup",
             "effort": "medium"
           },
           "tasks": {
             "complex": {
-              "model": "gpt-6.1-sol",
+              "slot": "general",
               "effort": "medium",
               "fallback": {
-                "model": "gpt-6-sol",
+                "slot": "general_backup",
                 "effort": "medium"
               }
             },
             "uncertain": {
-              "model": "gpt-6-astra",
+              "slot": "frontier",
               "effort": "low",
               "fallback": {
-                "model": "gpt-6.1-sol",
+                "slot": "general",
                 "effort": "high"
               }
             },
             "reasoning": {
-              "model": "gpt-6-astra",
+              "slot": "frontier",
               "effort": "medium",
               "fallback": {
-                "model": "gpt-6.1-sol",
+                "slot": "general",
                 "effort": "xhigh"
               }
             },
             "visual": {
-              "model": "gpt-6.1-terra",
+              "slot": "visual_work",
               "effort": "high",
               "fallback": {
-                "model": "gpt-6.1-sol",
+                "slot": "general",
                 "effort": "high"
               }
             },
             "computer": {
-              "model": "gpt-6.1-terra",
+              "slot": "visual_work",
               "effort": "high",
               "fallback": {
-                "model": "gpt-6.1-sol",
+                "slot": "general",
                 "effort": "high"
               }
             },
             "writing": {
-              "model": "gpt-6.1-terra",
+              "slot": "visual_work",
               "effort": "high",
               "fallback": {
-                "model": "gpt-6.1-sol",
+                "slot": "general",
                 "effort": "high"
               }
             }
           }
         },
         "L4": {
-          "model": "gpt-6.1-sol",
+          "slot": "general",
           "effort": "high",
           "fallback": {
-            "model": "gpt-6-sol",
+            "slot": "general_backup",
             "effort": "high"
           },
           "tasks": {
             "uncertain": {
-              "model": "gpt-6-astra",
+              "slot": "frontier",
               "effort": "low",
               "fallback": {
-                "model": "gpt-6.1-sol",
+                "slot": "general",
                 "effort": "high"
               }
             },
             "reasoning": {
-              "model": "gpt-6-astra",
+              "slot": "frontier",
               "effort": "medium",
               "fallback": {
-                "model": "gpt-6.1-sol",
+                "slot": "general",
                 "effort": "xhigh"
               }
             }
@@ -227,208 +227,208 @@
       "name": "官方",
       "levels": {
         "L1": {
-          "model": "gpt-6-luna",
+          "slot": "economy",
           "effort": "high",
           "fallback": {
-            "model": "gpt-6.1-sol",
+            "slot": "general",
             "effort": "medium"
           },
           "tasks": {
             "mechanical": {
-              "model": "gpt-6-luna",
+              "slot": "economy",
               "effort": "medium",
               "fallback": {
-                "model": "gpt-6.1-sol",
+                "slot": "general",
                 "effort": "medium"
               }
             },
             "scan": {
-              "model": "gpt-6-luna",
+              "slot": "economy",
               "effort": "xhigh",
               "fallback": {
-                "model": "gpt-6.1-sol",
+                "slot": "general",
                 "effort": "medium"
               }
             },
             "deep": {
-              "model": "gpt-6-luna",
+              "slot": "economy",
               "effort": "max",
               "fallback": {
-                "model": "gpt-6.1-sol",
+                "slot": "general",
                 "effort": "high"
               }
             },
             "visual": {
-              "model": "gpt-6.1-terra",
+              "slot": "visual_work",
               "effort": "low",
               "fallback": {
-                "model": "gpt-6.1-sol",
+                "slot": "general",
                 "effort": "medium"
               }
             },
             "computer": {
-              "model": "gpt-6.1-terra",
+              "slot": "visual_work",
               "effort": "low",
               "fallback": {
-                "model": "gpt-6.1-sol",
+                "slot": "general",
                 "effort": "medium"
               }
             },
             "writing": {
-              "model": "gpt-6.1-terra",
+              "slot": "visual_work",
               "effort": "low",
               "fallback": {
-                "model": "gpt-6.1-sol",
+                "slot": "general",
                 "effort": "medium"
               }
             }
           }
         },
         "L2": {
-          "model": "gpt-6.1-sol",
+          "slot": "general",
           "effort": "medium",
           "fallback": {
-            "model": "gpt-6-sol",
+            "slot": "general_backup",
             "effort": "medium"
           },
           "tasks": {
             "bounded": {
-              "model": "gpt-6-luna",
+              "slot": "economy",
               "effort": "high",
               "fallback": {
-                "model": "gpt-6.1-sol",
+                "slot": "general",
                 "effort": "medium"
               }
             },
             "complex": {
-              "model": "gpt-6.1-sol",
+              "slot": "general",
               "effort": "medium",
               "fallback": {
-                "model": "gpt-6-sol",
+                "slot": "general_backup",
                 "effort": "medium"
               }
             },
             "scan": {
-              "model": "gpt-6-luna",
+              "slot": "economy",
               "effort": "xhigh",
               "fallback": {
-                "model": "gpt-6.1-sol",
+                "slot": "general",
                 "effort": "medium"
               }
             },
             "deep": {
-              "model": "gpt-6-luna",
+              "slot": "economy",
               "effort": "max",
               "fallback": {
-                "model": "gpt-6.1-sol",
+                "slot": "general",
                 "effort": "high"
               }
             },
             "visual": {
-              "model": "gpt-6.1-terra",
+              "slot": "visual_work",
               "effort": "medium",
               "fallback": {
-                "model": "gpt-6.1-sol",
+                "slot": "general",
                 "effort": "medium"
               }
             },
             "computer": {
-              "model": "gpt-6.1-terra",
+              "slot": "visual_work",
               "effort": "medium",
               "fallback": {
-                "model": "gpt-6.1-sol",
+                "slot": "general",
                 "effort": "medium"
               }
             },
             "writing": {
-              "model": "gpt-6.1-terra",
+              "slot": "visual_work",
               "effort": "medium",
               "fallback": {
-                "model": "gpt-6.1-sol",
+                "slot": "general",
                 "effort": "medium"
               }
             }
           }
         },
         "L3": {
-          "model": "gpt-6.1-sol",
+          "slot": "general",
           "effort": "high",
           "fallback": {
-            "model": "gpt-6-sol",
+            "slot": "general_backup",
             "effort": "high"
           },
           "tasks": {
             "complex": {
-              "model": "gpt-6.1-sol",
+              "slot": "general",
               "effort": "medium",
               "fallback": {
-                "model": "gpt-6-sol",
+                "slot": "general_backup",
                 "effort": "medium"
               }
             },
             "uncertain": {
-              "model": "gpt-6-astra",
+              "slot": "frontier",
               "effort": "low",
               "fallback": {
-                "model": "gpt-6.1-sol",
+                "slot": "general",
                 "effort": "high"
               }
             },
             "reasoning": {
-              "model": "gpt-6-astra",
+              "slot": "frontier",
               "effort": "medium",
               "fallback": {
-                "model": "gpt-6.1-sol",
+                "slot": "general",
                 "effort": "xhigh"
               }
             },
             "visual": {
-              "model": "gpt-6.1-terra",
+              "slot": "visual_work",
               "effort": "high",
               "fallback": {
-                "model": "gpt-6.1-sol",
+                "slot": "general",
                 "effort": "high"
               }
             },
             "computer": {
-              "model": "gpt-6.1-terra",
+              "slot": "visual_work",
               "effort": "high",
               "fallback": {
-                "model": "gpt-6.1-sol",
+                "slot": "general",
                 "effort": "high"
               }
             },
             "writing": {
-              "model": "gpt-6.1-terra",
+              "slot": "visual_work",
               "effort": "high",
               "fallback": {
-                "model": "gpt-6.1-sol",
+                "slot": "general",
                 "effort": "high"
               }
             }
           }
         },
         "L4": {
-          "model": "gpt-6.1-sol",
+          "slot": "general",
           "effort": "xhigh",
           "fallback": {
-            "model": "gpt-6-sol",
+            "slot": "general_backup",
             "effort": "xhigh"
           },
           "tasks": {
             "uncertain": {
-              "model": "gpt-6-astra",
+              "slot": "frontier",
               "effort": "low",
               "fallback": {
-                "model": "gpt-6.1-sol",
+                "slot": "general",
                 "effort": "high"
               }
             },
             "reasoning": {
-              "model": "gpt-6-astra",
+              "slot": "frontier",
               "effort": "medium",
               "fallback": {
-                "model": "gpt-6.1-sol",
+                "slot": "general",
                 "effort": "xhigh"
               }
             }
@@ -441,34 +441,34 @@
       "name": "高级",
       "levels": {
         "L1": {
-          "model": "gpt-6-luna",
+          "slot": "economy",
           "effort": "max",
           "fallback": {
-            "model": "gpt-6.1-sol",
+            "slot": "general",
             "effort": "high"
           }
         },
         "L2": {
-          "model": "gpt-6.1-sol",
+          "slot": "general",
           "effort": "ultra",
           "fallback": {
-            "model": "gpt-6-sol",
+            "slot": "general_backup",
             "effort": "ultra"
           }
         },
         "L3": {
-          "model": "gpt-6-astra",
+          "slot": "frontier",
           "effort": "ultra",
           "fallback": {
-            "model": "gpt-6.1-sol",
+            "slot": "general",
             "effort": "ultra"
           }
         },
         "L4": {
-          "model": "gpt-6-astra",
+          "slot": "frontier",
           "effort": "ultra",
           "fallback": {
-            "model": "gpt-6.1-sol",
+            "slot": "general",
             "effort": "ultra"
           }
         }
@@ -479,22 +479,22 @@
       "name": "全开",
       "levels": {
         "L1": {
-          "model": "gpt-6-astra",
+          "slot": "frontier",
           "effort": "ultra",
           "fallback": null
         },
         "L2": {
-          "model": "gpt-6-astra",
+          "slot": "frontier",
           "effort": "ultra",
           "fallback": null
         },
         "L3": {
-          "model": "gpt-6-astra",
+          "slot": "frontier",
           "effort": "ultra",
           "fallback": null
         },
         "L4": {
-          "model": "gpt-6-astra",
+          "slot": "frontier",
           "effort": "ultra",
           "fallback": null
         }

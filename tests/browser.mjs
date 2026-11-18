@@ -1,4 +1,5 @@
 import { isolatedUserHome } from './isolate-home.mjs';
+import bindings from '../adapters/codex/model-bindings.json' with { type: 'json' };
 import { createRequire } from 'node:module';
 import { mkdtemp, realpath, readFile, writeFile, rm } from 'node:fs/promises';
 import os from 'node:os';
@@ -72,7 +73,7 @@ try {
  const checkedSnapshot=JSON.parse(checkedStatus.stdout).data;
  const requestedPairs=[...new Map(Object.values(checkedSnapshot.mode.levels).flatMap(pair=>[pair,...Object.values(pair.tasks??{})]).map(pair=>[`${pair.model}/${pair.effort}`,{model:pair.model,effort:pair.effort}])).values()];
  assert.equal(requestedPairs.length,12,'baseline and task candidates are deduplicated before confirmation');
- assert.ok(requestedPairs.some(pair=>pair.model==='gpt-6-astra'&&pair.effort==='low'));
+ assert.ok(requestedPairs.some(pair=>pair.model===bindings.frontier&&pair.effort==='low'));
  let checkData={configuration_revision:checkedSnapshot.configuration_revision,source_revision:checkedSnapshot.configuration_revision,configuration_changed:false,status:'passed',diagnostics:[],checked_pairs:requestedPairs.map(pair=>({...pair,request_status:'succeeded',access:'available',identity_status:'matched',reason_code:'PROBE_VERIFIED'}))};
  let checkExit=0;
  let releaseCheck;
@@ -132,7 +133,7 @@ try {
  await page.keyboard.press('ArrowRight');
  await page.waitForFunction(()=>document.querySelector('#editing-title').textContent.includes('全开'));
  assert.equal(await page.locator(':focus').getAttribute('id'),'mode-fire');
- assert.deepEqual(await page.locator('.model-value').allTextContents(),Array(4).fill('gpt-6-astra'));
+ assert.deepEqual(await page.locator('.model-value').allTextContents(),Array(4).fill(bindings.frontier));
  assert.deepEqual(await page.locator('.effort-value').allTextContents(),Array(4).fill('ultra'));
  assert.match(await page.locator('#L1-fallback-summary').innerText(),/用户指定，否则继承父代理/);
  if (process.env.BROWSER_ARTIFACT_DIR) await page.screenshot({path:path.join(process.env.BROWSER_ARTIFACT_DIR,'fire.png'),fullPage:true});
@@ -142,21 +143,21 @@ try {
  assert.match(await page.locator('#rules-context').innerText(),/生效档位：官方/);
  assert.match(await page.locator('#rules-view-note').innerText(),/已保存生效配置/);
  assert.equal(await page.locator('#rules-mode').inputValue(),'','rules default to active config, independently of editor preview');
- assert.match(await page.locator('#routes-L1 .route-baseline').innerText(),/Luna \/ high/);
- assert.match(await page.locator('#routes-L1 [data-task="mechanical"]').innerText(),/Luna \/ medium/);
- assert.match(await page.locator('#routes-L1 [data-task="visual"]').innerText(),/Terra 6.1 \/ low/);
- assert.match(await page.locator('#routes-L2 [data-task="computer"]').innerText(),/Terra 6.1 \/ medium/);
+ assert.equal(await page.locator('#routes-L1 .route-baseline .route-model').getAttribute('title'),bindings.economy+' / high');
+ assert.equal(await page.locator('#routes-L1 [data-task="mechanical"] .route-model').getAttribute('title'),bindings.economy+' / medium');
+ assert.equal(await page.locator('#routes-L1 [data-task="visual"] .route-model').getAttribute('title'),bindings.visual_work+' / low');
+ assert.equal(await page.locator('#routes-L2 [data-task="computer"] .route-model').getAttribute('title'),bindings.visual_work+' / medium');
  await page.locator('#routes-L3 [data-task="writing"]').click();
- await page.waitForFunction(()=>document.querySelector('#explanation').textContent.includes('gpt-6.1-sol / high'));
+ await page.waitForFunction(text=>document.querySelector('#explanation').textContent.includes(text), bindings.general+' / high');
  assert.match(await page.locator('#route-detail-title').innerText(),/L3 · 自然写作与修订/);
- assert.match(await page.locator('#explanation').innerText(),/gpt-6.1-sol \/ high/);
+ assert.ok((await page.locator('#explanation').innerText()).includes(bindings.general+' / high'));
  assert.match(await page.locator('#routes-L1 div.route-row').innerText(),/低延迟[\s\S]*未配置/);
  assert.equal(await page.locator('#explain-level, #explain-task, #explain-mode, #explain').count(),0);
  await page.locator('#routes-L1 [data-task="mechanical"]').focus();
  await page.keyboard.press('Enter');
  await page.waitForFunction(()=>document.querySelector('#explanation').textContent.includes('命中此等级已配置的任务候选'));
  assert.equal(await page.evaluate(()=>document.activeElement?.dataset.task),'mechanical','keyboard query restores focus after loading');
- assert.match(await page.locator('#route-selection').innerText(),/Luna \/ medium/);
+ assert.equal(await page.locator('#route-selection .route-selected-model').getAttribute('title'),bindings.economy+' / medium');
  assert.match(await page.locator('#route-detail-title').innerText(),/L1 · 确定性机械任务/);
  await page.locator('#route-permissions > summary').click();
  await page.locator('#explain-role').selectOption('task_scan');
@@ -166,8 +167,8 @@ try {
  assert.equal(await page.locator('#explanation').textContent(),'','mode changes clear the old explanation');
  assert.match(await page.locator('#rules-view-note').innerText(),/只读预览.*尚未生效/);
  assert.match(await page.locator('#rules-maximum').innerText(),/查看不构成授权/);
- assert.match(await page.locator('#routes-L1 [data-task="mechanical"]').innerText(),/Luna \/ max/);
- assert.match(await page.locator('#routes-L3 [data-task="uncertain"]').innerText(),/Astra \/ ultra/);
+ assert.equal(await page.locator('#routes-L1 [data-task="mechanical"] .route-model').getAttribute('title'),bindings.economy+' / max');
+ assert.equal(await page.locator('#routes-L3 [data-task="uncertain"] .route-model').getAttribute('title'),bindings.frontier+' / ultra');
  await page.locator('#rules-mode').selectOption('fire');
  assert.match(await page.locator('#rules-maximum').innerText(),/每个会话首次使用前实际验证/);
  await page.locator('#routes-L1 .route-baseline').click();
@@ -199,7 +200,7 @@ try {
  await page.unroute('**/api/actions',failedExplainRoute);
  await page.locator('#route-retry').click();
  await page.waitForFunction(()=>document.querySelector('#explanation').textContent.includes('命中此等级')&&!document.querySelector('#refresh').disabled);
- assert.match(await page.locator('#route-selection').innerText(),/Luna \/ xhigh/);
+ assert.equal(await page.locator('#route-selection .route-selected-model').getAttribute('title'),bindings.economy+' / xhigh');
  assert.equal(await page.locator('#error').isVisible(),false);
  const staleExplainRoute=async route=>{
    if(route.request().postDataJSON().action!=='explain')return route.fallback();
@@ -291,7 +292,7 @@ try {
  await page.locator('a[href="#rules"]').click();
  await page.locator('#rules-mode').selectOption('');
  assert.match(await page.locator('#rules-context').innerText(),/生效档位：实验\/方案/);
- assert.match(await page.locator('#routes-L1 [data-task="mechanical"]').innerText(),/Luna \/ low/,'overview reads the saved custom task candidate');
+ assert.equal(await page.locator('#routes-L1 [data-task="mechanical"] .route-model').getAttribute('title'),bindings.economy+' / low','overview reads the saved custom task candidate');
  await page.locator('a[href="#modes"]').click();
  await page.locator('#L4-model').fill('my-updated');
  assert.equal(await page.locator('#check-primary').isDisabled(),true,'unsaved primary changes must be applied before checking');

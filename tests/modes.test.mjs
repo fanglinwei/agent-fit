@@ -1,28 +1,23 @@
 import './isolate-home.mjs';
+import bindings from '../adapters/codex/model-bindings.json' with { type: 'json' };
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { readFile, readdir } from 'node:fs/promises';
 import { safeToml, BUILTINS, ROLES, renderPayload, explainSelection, validateDefinition, resolveDefinition } from '../lib/codex.mjs';
 
-test('packaged role files and explicit registrations exactly cover the role registry with both model axes', async () => {
+test('packaged role files and explicit registrations exactly cover the role registry without duplicating model bindings', async () => {
   const assets = new URL('../adapters/codex/skills/agent-fit/assets/codex/', import.meta.url);
   const registrations = safeToml(await readFile(new URL('config.toml', assets))).agents;
   const filenames = (await readdir(new URL('agents/', assets), { recursive: true })).filter(name => name.endsWith('.toml')).sort();
   assert.deepEqual(Object.keys(registrations).sort(), Object.keys(ROLES).sort());
   assert.deepEqual(filenames, Object.keys(ROLES).map(name => `${name.replaceAll('_', '-')}.toml`).sort());
-  const baseline = resolveDefinition('official');
-  for (const [name, level] of Object.entries(ROLES)) {
+  for (const name of Object.keys(ROLES)) {
     const relative = `agents/${name.replaceAll('_', '-')}.toml`;
     assert.equal(registrations[name].config_file, relative);
     const role = safeToml(await readFile(new URL(relative, assets)));
     assert.equal(role.name, name);
-    if (level) {
-      assert.equal(role.model, baseline.levels[level].model);
-      assert.equal(role.model_reasoning_effort, baseline.levels[level].effort);
-    } else {
-      assert.equal(Object.hasOwn(role, 'model'), false);
-      assert.equal(Object.hasOwn(role, 'model_reasoning_effort'), false);
-    }
+    assert.equal(Object.hasOwn(role, 'model'), false);
+    assert.equal(Object.hasOwn(role, 'model_reasoning_effort'), false);
   }
 });
 
@@ -39,15 +34,15 @@ test('builtin ids are cut/official/high/fire and other names are not aliases', (
 
 test('all builtin primary/fallback tables render roles and current data consistently', async () => {
   const expected = [
-    ['gpt-6-luna/high', 'gpt-6-luna/high', 'gpt-6.1-sol/medium', 'gpt-6.1-sol/high'],
-    ['gpt-6-luna/high', 'gpt-6.1-sol/medium', 'gpt-6.1-sol/high', 'gpt-6.1-sol/xhigh'],
-    ['gpt-6-luna/max', 'gpt-6.1-sol/ultra', 'gpt-6-astra/ultra', 'gpt-6-astra/ultra'],
-    ['gpt-6-astra/ultra', 'gpt-6-astra/ultra', 'gpt-6-astra/ultra', 'gpt-6-astra/ultra'],
+    [`${bindings.economy}/high`, `${bindings.economy}/high`, `${bindings.general}/medium`, `${bindings.general}/high`],
+    [`${bindings.economy}/high`, `${bindings.general}/medium`, `${bindings.general}/high`, `${bindings.general}/xhigh`],
+    [`${bindings.economy}/max`, `${bindings.general}/ultra`, `${bindings.frontier}/ultra`, `${bindings.frontier}/ultra`],
+    [`${bindings.frontier}/ultra`, `${bindings.frontier}/ultra`, `${bindings.frontier}/ultra`, `${bindings.frontier}/ultra`],
   ];
   const backups = [
-    ['gpt-6.1-sol/medium', 'gpt-6.1-sol/medium', 'gpt-6-sol/medium', 'gpt-6-sol/high'],
-    ['gpt-6.1-sol/medium', 'gpt-6-sol/medium', 'gpt-6-sol/high', 'gpt-6-sol/xhigh'],
-    ['gpt-6.1-sol/high', 'gpt-6-sol/ultra', 'gpt-6.1-sol/ultra', 'gpt-6.1-sol/ultra'],
+    [`${bindings.general}/medium`, `${bindings.general}/medium`, `${bindings.general_backup}/medium`, `${bindings.general_backup}/high`],
+    [`${bindings.general}/medium`, `${bindings.general_backup}/medium`, `${bindings.general_backup}/high`, `${bindings.general_backup}/xhigh`],
+    [`${bindings.general}/high`, `${bindings.general_backup}/ultra`, `${bindings.general}/ultra`, `${bindings.general}/ultra`],
     [null, null, null, null],
   ];
   for (const [index, mode] of BUILTINS.entries()) {
@@ -85,7 +80,7 @@ test('role selection cannot expand original permission contract', () => {
   const low = resolveDefinition('cut');
   const hard = explainSelection({ definition: low, level: 'L3', role: 'task_execute', active: true });
   assert.equal(hard.dispatch_role, 'task_delegate'); assert.equal(hard.permission_contract, 'scoped_output');
-  assert.equal(hard.primary.model, 'gpt-6.1-sol');
+  assert.equal(hard.primary.model, bindings.general);
   const read = explainSelection({ definition: low, level: 'L1', role: 'task_scan', active: true });
   assert.equal(read.dispatch_role, 'task_scan'); assert.equal(read.access, 'unknown');
   assert.equal(explainSelection({ definition: low, level: 'L1', role: 'task_scan' }).dispatch_role, 'task_delegate');

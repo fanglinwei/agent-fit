@@ -21,6 +21,7 @@ mode configure MODE --definition-stdin [--dry-run]
 status [--details] [--project PATH]
 explain --level L1|L2|L3|L4 [--task mechanical|bounded|scan|deep|complex|uncertain|reasoning|visual|computer|writing|latency] [--mode MODE] [--role ROLE]
 models check [--verify] [--discover] [--expect-catalog HASH] [--model MODEL --effort EFFORT]
+models bind SLOT MODEL (--dry-run | --apply PREVIEW_TOKEN)
 restore [--dry-run]
 serve [--port PORT] [--open]
 
@@ -29,7 +30,7 @@ CLI 默认 global；聊天 Skill 切换默认 session。项目和会话选择可
 会话 > 项目 > 全局；查询显示有效档位及来源。局部选择只影响后续新任务。
 
 内置档位：cut（经济）、official（官方，首次配置默认）、high（高级）、fire（全开）。
-cut/official 支持同级任务候选；明确选择 high/fire 即授权所示最高强度，包括 Astra/ultra，预算与 fire 验证仍适用。
+cut/official 支持同级任务候选；明确选择 high/fire 即授权所示高强度组合，预算与 fire 验证仍适用。
 省略 --agent 时默认使用 codex；也可显式指定 --agent codex。
 目标目录支持 --codex-home PATH；默认 CODEX_HOME 或 ~/.codex。
 查询及写命令支持 --json；写命令支持 --expect-revision REV。
@@ -39,7 +40,7 @@ cut/official 支持同级任务候选；明确选择 high/fire 即授权所示�
 首次安装、更新基础规则或恢复后请重启 Codex；日常切档无需重启，后续新任务读取新配置。
 完整说明：https://github.com/fanglinwei/agent-fit/blob/main/docs/usage.md`;
 
-const strings = ['agent', 'codex-home', 'mode', 'from', 'level', 'task', 'model', 'effort', 'fallback-model', 'fallback-effort', 'expect-revision', 'role', 'project', 'scope', 'thread', 'port', 'expect-catalog'];
+const strings = ['agent', 'codex-home', 'mode', 'from', 'level', 'task', 'model', 'effort', 'fallback-model', 'fallback-effort', 'expect-revision', 'role', 'project', 'scope', 'thread', 'port', 'expect-catalog', 'apply'];
 const booleans = ['dry-run', 'json', 'details', 'clear-fallback', 'definition-stdin', 'verify', 'discover', 'open', 'help', 'version'];
 const optionTypes = Object.fromEntries([...strings.map(k => [k, { type: 'string' }]), ...booleans.map(k => [k, { type: 'boolean' }])]);
 const common = ['agent', 'codex-home', 'json'];
@@ -50,7 +51,8 @@ const commands = {
   setup: [...write, 'mode'], set: [...write, ...scoped], clear: [...write, ...scoped], delete: [...write, ...scoped], list: [...common, ...scoped], show: [...common, ...scoped],
   create: [...write, ...scoped, 'from'], configure: [...write, ...scoped, 'level', 'model', 'effort', 'fallback-model', 'fallback-effort', 'clear-fallback', 'definition-stdin'],
   status: [...common, ...scoped, 'details'], explain: [...common, ...scoped, 'level', 'task', 'mode', 'role'],
-  models: [...common, ...scoped, 'discover', 'expect-catalog', 'verify', 'model', 'effort', 'expect-revision'], restore: write,
+  models: [...common, ...scoped, 'discover', 'expect-catalog', 'verify', 'model', 'effort', 'expect-revision'],
+  'model-bind': [...write, 'apply'], restore: write,
   serve: ['agent', 'codex-home', 'project', 'thread', 'port', 'open'],
 };
 
@@ -78,8 +80,9 @@ export function parseCommand(argv) {
     if (!['path', 'update'].includes(positionals[1])) throw argumentError('skill 仅支持 path 或 update。');
     action = `skill-${positionals[1]}`; count = 2;
   } else if (action === 'models') {
-    if (positionals[1] !== 'check') throw argumentError('models 仅支持 check。');
-    count = 2;
+    if (positionals[1] === 'bind') { action = 'model-bind'; count = 4; }
+    else if (positionals[1] === 'check') count = 2;
+    else throw argumentError('models 仅支持 check 或 bind。');
   }
   if (!commands[action] || positionals.length !== count || ((count === 3) && !selector)) throw argumentError('命令或位置参数无效；使用 --help。');
   if (Object.keys(values).some(k => !commands[action].includes(k))) throw argumentError('该命令不支持给定参数。');
@@ -92,6 +95,7 @@ export function parseCommand(argv) {
   if (action === 'models' && Boolean(values.model) !== Boolean(values.effort)) throw argumentError('--model 与 --effort 必须成对。');
   if (action === 'models' && (values.discover && (!values.verify || values.model) || values['expect-catalog'] && (!values.discover || !/^[a-f0-9]{64}$/.test(values['expect-catalog'])))) throw argumentError('--discover 需要 --verify，且不能同时指定模型；目录版本须为 SHA-256。');
   if (action === 'models' && values.model) validatePair({ model: values.model, effort: values.effort });
+  if (action === 'model-bind' && (values['dry-run'] ? values.apply !== undefined : !/^[a-f0-9]{64}$/.test(values.apply ?? ''))) throw argumentError('models bind 需要 --dry-run 或 --apply PREVIEW_TOKEN。');
   if (action === 'configure') {
     const fields = ['level', 'model', 'effort', 'fallback-model', 'fallback-effort', 'clear-fallback'];
     if (values['definition-stdin']) {
@@ -107,6 +111,7 @@ export function parseCommand(argv) {
   const options = Object.fromEntries(Object.entries(values).map(([key, value]) => [key.replace(/-([a-z])/g, (_, c) => c.toUpperCase()), value]));
   if (action === 'create') options.name = selector;
   else if (selector) options.mode = selector;
+  if (action === 'model-bind') [options.slot, options.model] = positionals.slice(2);
   return { action, values, options };
 }
 
@@ -168,6 +173,12 @@ function renderHuman(data) {
     lines.push(`操作：${data.action} · ${data.result} · ${data.configuration_status}`, `Codex home：${data.home}`, `档位：${data.mode?.name || '无'} · 变化文件：${data.changed_files?.length || 0}`);
     if (data.created_mode) lines.push(`已创建：${data.created_mode.name} (${data.created_mode.id})，${data.mode?.id === data.created_mode.id ? '已在当前作用域选择。' : '尚未设为当前档位。'}`);
     if (data.result === 'preview') lines.push(...(data.changes || []).map(change => `${change.action}  ${change.path}`));
+    if (data.model_binding) {
+      const { slot, model, routes, preview_token } = data.model_binding;
+      lines.push(`模型用途：${slot} → ${model} · 变化组合：${routes.length}`);
+      for (const route of routes) lines.push(`  ${route.mode}/${route.level}${route.task ? '/' + route.task : ''} ${route.position === 'primary' ? '主选' : '备用'}：${pair(route.before)} → ${pair(route.after)}`);
+      if (data.result === 'preview') lines.push(`应用令牌：${preview_token}`);
+    }
     if (data.custom_modes_removed?.length) lines.push(`清理自定义档位：${data.custom_modes_removed.join('、')}`);
     if (data.restart?.message) lines.push(data.restart.message);
     if (data.shared_skill) lines.push(`共享 Skill：${data.shared_skill.path} · ${data.shared_skill.result}`);

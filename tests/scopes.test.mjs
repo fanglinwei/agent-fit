@@ -1,4 +1,5 @@
 import './isolate-home.mjs';
+import bindings from '../adapters/codex/model-bindings.json' with { type: 'json' };
 import test, { afterEach } from 'node:test';
 import assert from 'node:assert/strict';
 import fs from 'node:fs/promises';
@@ -111,7 +112,7 @@ test('CLI resolves session profiles with explicit generic dispatch and a complet
   assert.equal(before.code, 0); assert.deepEqual(before.errors, []);
   assert.equal(before.data.mode_id, 'high'); assert.equal(before.data.effective_scope, 'session');
   assert.equal(before.data.dispatch_role, 'task_delegate');
-  assert.equal(before.data.task_profile.levels.L4.model, 'gpt-6-astra');
+  assert.equal(before.data.task_profile.levels.L4.model, bindings.frontier);
   await mutate(home, 'set', { scope: 'session', project, thread: 'chat-a', mode: 'cut' });
   assert.equal(before.data.task_profile.id, 'high'); assert.equal(cli(home, query).data.mode_id, 'cut');
   const restored = cli(home, ['mode', 'show', '--scope=session', `--project=${project}`, '--thread=chat-a']);

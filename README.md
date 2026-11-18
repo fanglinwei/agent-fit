@@ -23,8 +23,8 @@ npm 安装只提供工具，`setup` 才配置 Codex。默认目标为 `CODEX_HOM
 | --- | --- |
 | `cut` · 经济 | 较轻组合处理容易核验的任务，复杂部分提高等级 |
 | `official` · 官方 | 首次配置默认；依据官方建议制定的本地映射 |
-| `high` · 高级 | 预设模型的最高受支持推理强度 |
-| `fire` · 全开 | Astra / ultra，委派前须通过当前会话的实际验证 |
+| `high` · 高级 | 按预设使用高强度组合 |
+| `fire` · 全开 | 旗舰用途 / ultra，委派前须通过当前会话的实际验证 |
 
 ```sh
 agent-fit mode list
@@ -33,7 +33,7 @@ agent-fit status --details
 agent-fit explain --level L2 --task bounded --role task_execute --json
 ```
 
-L1–L4 表示任务推理需求，`--task` 查询同级候选；cut/official 包含 Terra 6.1 的视觉、电脑操作和写作路线。`explain` 只查配置，不调用模型或创建子代理。完整组合、职责和选择边界见[使用说明](docs/usage.md#任务等级与委派职责)与 [Skill](adapters/codex/skills/agent-fit/SKILL.md)。
+L1–L4 表示任务推理需求，`--task` 查询同级候选；cut/official 包含视觉、电脑操作和写作专长路线。`explain` 只查配置，不调用模型或创建子代理。内置档位按用途绑定模型，可[显式预览和应用换代](docs/usage.md#模型绑定与换代)。完整组合、职责和选择边界见[使用说明](docs/usage.md#任务等级与委派职责)与 [Skill](adapters/codex/skills/agent-fit/SKILL.md)。
 
 有效档位按 **会话 > 项目 > 全局** 整份选择。CLI 默认全局，聊天中用 `$agent-fit` 切档默认仅当前会话；项目和会话操作见[作用域说明](docs/usage.md#全局项目与会话)。自定义、账号与手动模型检查也见使用说明；配置操作不自动发送模型请求。
 
