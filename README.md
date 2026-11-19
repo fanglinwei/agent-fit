@@ -4,7 +4,7 @@
 
 ## 快速开始
 
-需要 Node.js 22+。npm 包名为 [`@fanglinwei/agent-fit`](https://www.npmjs.com/package/@fanglinwei/agent-fit)，命令与 Skill 名为 `agent-fit`。
+需要 Node.js 22+。npm 包名为 `@fanglinwei/agent-fit`，命令与 Skill 名为 `agent-fit`。也可安装[已发布到 GitHub Packages 的版本](docs/usage.md#从-github-packages-安装)。
 
 从 [GitHub Releases](https://github.com/fanglinwei/agent-fit/releases/latest) 下载本版安装包：
 

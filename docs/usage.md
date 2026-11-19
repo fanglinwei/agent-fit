@@ -22,6 +22,19 @@ Skill 调用为 `$agent-fit`，默认目录为 `~/.agents/skills/agent-fit/`。
 
 **首次安装、基础规则更新或恢复原配置后需要重启 Codex；日常档位切换与模型/effort 调整无需重启。** 全局角色配置在下一轮加载，项目与会话选择由后续新任务重新查询；已开始的任务继续使用原快照。工具不会自动重启或停止任务。
 
+### 从 GitHub Packages 安装
+
+版本发布到 GitHub Packages 后，可以使用以下命令安装。登录时用 GitHub 用户名，并将拥有 `read:packages` 权限且可读取该包的个人访问令牌（classic）填在密码提示中。
+
+```sh
+npm login --scope=@fanglinwei --auth-type=legacy --registry=https://npm.pkg.github.com
+npm install -g @fanglinwei/agent-fit
+```
+
+安装后按上文执行 `agent-fit setup`。没有 GitHub Packages 访问权限时，仍可从 GitHub Releases 下载 `.tgz` 安装。
+
+维护者发布正式 GitHub Release 时，[发布工作流](../.github/workflows/publish-npm.yml)会核对标签为 `v<version>`、与 `package.json` 和 `VERSION` 一致，并在测试通过后用 Actions 的 `GITHUB_TOKEN` 发布。工作流须存在于发布标签所指的提交；已有 Release 不会补发。首次创建的软件包默认是私有的，可在 GitHub 软件包设置中调整[可见性与权限](https://docs.github.com/zh/packages/learn-github-packages/configuring-a-packages-access-control-and-visibility)。
+
 ## Skill 目录与旧安装迁移
 
 共享 Skill 保存通用规则和说明；每个 Codex home 的当前档位保存在 `.agent-fit/current-mode.json`，作用域、自定义档位、角色和恢复记录仍属于该 home。CCSwitch 同步规则时不再携带当前运行配置。旧共享目录中遗留的 `references/current-mode.json` 会保留，但迁移后不参与查询、切档或恢复。
