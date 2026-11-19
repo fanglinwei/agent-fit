@@ -152,8 +152,8 @@ agent-fit explain --level L4 --role task_review
 无需全局安装，可通过 npm 查询或切换档位。将路径换为当前源码打出的包：
 
 ```sh
-npm exec --package="/path/to/fanglinwei-agent-fit-0.9.0.tgz" -- agent-fit mode show heigh
-npm exec --package="/path/to/fanglinwei-agent-fit-0.9.0.tgz" -- agent-fit mode set low
+npm exec --package="/path/to/fanglinwei-agent-fit-0.10.0.tgz" -- agent-fit mode show heigh
+npm exec --package="/path/to/fanglinwei-agent-fit-0.10.0.tgz" -- agent-fit mode set low
 ```
 
 ## 委派收益检查

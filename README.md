@@ -12,7 +12,7 @@
 
 ```sh
 npm pack
-npm install -g ./fanglinwei-agent-fit-0.9.0.tgz
+npm install -g ./fanglinwei-agent-fit-0.10.0.tgz
 agent-fit setup --mode mid --dry-run
 agent-fit setup --mode mid
 agent-fit serve --open
