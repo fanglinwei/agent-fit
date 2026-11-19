@@ -80,7 +80,7 @@ test('provider model-not-found is shown as unavailable and does not expose the r
  const {result}=await invoke(null,{fetch:async()=>new Response(JSON.stringify({error:{code:'model_not_found',param:'model',message:key}}),{status:400})});
  assert.equal(result.reason_code,'PROBE_MODEL_NOT_FOUND');assert.equal(result.request_status,'failed');assert.equal(result.access,'unavailable');assert.equal(JSON.stringify(result).includes(key),false);
 });
-test('ChatGPT file credentials only go to the official endpoint and credential-store overrides are respected', async t => {
+test('ChatGPT file credentials only go to the mid endpoint and credential-store overrides are respected', async t => {
  const home=await mkdtemp(path.join(await realpath(os.tmpdir()),'delegation-oauth-probe-'));t.after(()=>rm(home,{recursive:true,force:true}));
  await writeFile(path.join(home,'auth.json'),JSON.stringify({auth_mode:'chatgpt',OPENAI_API_KEY:'STALE_KEY',tokens:{access_token:key,account_id:'PRIVATE_ACCOUNT'}}),{mode:0o600});
  let calls=0;

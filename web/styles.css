@@ -184,7 +184,6 @@ main { max-width: 1360px; margin: auto; padding: 38px 36px 0; }
 .changes { position: sticky; top: 24px; padding: 22px; }
 .changes-heading { display: flex; align-items: center; justify-content: space-between; gap: 10px; }
 .changes-heading h2 { font-size: 15px; }
-.draft-label { font-size: 10px; color: var(--muted); padding: 2px 6px; border: 1px solid var(--line); border-radius: 4px; }
 #changes-count { margin-top: 7px; margin-bottom: 16px; font-size: 12px; }
 .change-item { border-top: 1px solid var(--line); padding: 12px 0; }
 .change-item h4 { font-size: 11px; font-weight: 550; margin-bottom: 6px; }
@@ -193,9 +192,7 @@ main { max-width: 1360px; margin: auto; padding: 38px 36px 0; }
 .change-before { color: var(--muted); }
 .change-after { color: var(--blue); }
 .empty-changes { text-align: center; border: 1px dashed var(--line); border-radius: 8px; padding: 23px 15px; color: var(--muted); }
-.empty-changes > span { width: 26px; height: 26px; margin: 0 auto 12px; display: grid; place-items: center; background: #f0f3fa; border-radius: 50%; color: #6b7893; }
 .empty-changes p { font-size: 12px; }
-.empty-changes p + p { font-size: 11px; }
 .save-note { color: var(--muted); font-size: 11px; padding-top: 16px; border-top: 1px solid var(--line); margin-top: 10px !important; }
 .actions { display: flex; flex-direction: column; gap: 8px; margin-top: 18px; }
 .actions .primary { min-height: 42px; }
@@ -253,7 +250,6 @@ main { max-width: 1360px; margin: auto; padding: 38px 36px 0; }
 .route-row { width: 100%; border: 0; border-top: 1px solid var(--line); border-radius: 0; padding: 13px 12px; min-height: 52px; font-weight: 400; }
 .route-level > .route-row { margin-top: 0; }
 .route-baseline { background: #fafbfe; }
-.route-row small { display: block; color: var(--muted); font-size: 11px; margin-top: 3px; }
 .route-task { font-size: 13px; }
 .route-model { font-size: 14px; font-weight: 600; overflow-wrap: anywhere; }
 div.route-row { color: var(--muted); }

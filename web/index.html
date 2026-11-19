@@ -4,7 +4,7 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <meta name="color-scheme" content="light">
-  <title>Agent Fit · 子代理委派配置</title>
+  <title>Agent Fit · 子代理设置</title>
   <link rel="stylesheet" href="/styles.css">
   <script src="/app.js" defer></script>
 </head>
@@ -14,7 +14,7 @@
     <header class="header">
       <div class="brand">
         <svg class="brand-mark" viewBox="0 0 32 32" fill="none" aria-hidden="true"><path d="M9 8v16m0-8h9m0 0V8m0 8v8" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"/><circle cx="9" cy="8" r="3" fill="currentColor"/><circle cx="18" cy="8" r="3" fill="currentColor"/><circle cx="18" cy="24" r="3" fill="currentColor"/><circle cx="9" cy="24" r="3" fill="currentColor"/></svg>
-        <strong>Agent Fit</strong><span class="brand-description">子代理委派配置</span>
+        <strong>Agent Fit</strong><span class="brand-description">子代理设置</span>
       </div>
       <div class="header-actions"><span class="host-label">Codex</span><button id="refresh" type="button" class="secondary refresh-button"><svg viewBox="0 0 20 20" fill="none" aria-hidden="true"><path d="M16.2 8a6.5 6.5 0 1 0-.5 5.3M16.2 8V3.5M16.2 8h-4.5" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/></svg>刷新状态</button></div>
     </header>
@@ -27,7 +27,7 @@
           <a href="#restore"><svg viewBox="0 0 20 20" fill="none" aria-hidden="true"><path d="M3.5 8a6.5 6.5 0 1 1 .7 6M3.5 8V3.5M3.5 8H8M10 6.5V10l2.5 1.5" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg><span>恢复配置</span></a>
         </nav>
         <div class="environment">
-          <details class="home-details"><summary>配置目录</summary><p id="home" class="path">加载中</p><p class="muted">由启动服务时的终端指定。</p></details>
+          <details class="home-details"><summary>Codex 配置目录</summary><p id="home" class="path">加载中</p></details>
           <p id="versions">正在连接本地服务…</p>
         </div>
         <div class="sidebar-note"><span class="local-mark" aria-hidden="true"></span><p>本地配置工具<span>更改经确认后写入</span></p></div>
@@ -36,70 +36,77 @@
         <main id="main" tabindex="-1">
           <p id="progress" class="progress" role="status" hidden></p>
           <div id="error" class="notice error" tabindex="-1" hidden><h2>操作未完成</h2><div id="error-content"></div><button id="compare" type="button" class="secondary" hidden>刷新后比较</button></div>
+          <form id="access-form" class="surface" aria-labelledby="access-title" hidden>
+            <h2 id="access-title">解锁设置</h2>
+            <p id="access-hint" class="muted">访问码在启动 Agent Fit 的终端里。</p>
+            <label for="access-code">访问码</label>
+            <input id="access-code" type="password" autocomplete="off" aria-describedby="access-hint" required>
+            <button id="unlock" type="submit" class="primary">解锁</button>
+          </form>
           <div id="result" class="notice result" role="status" hidden></div>
           <section id="modes" class="panel" aria-labelledby="modes-title">
             <div class="section-heading">
-              <div><h1 id="modes-title">委派档位</h1><p class="muted">为不同难度的任务，选择合适的子代理模型。</p></div>
+              <div><h1 id="modes-title">档位配置</h1><p class="muted">选择 Codex 给子代理用的模型和推理强度。</p></div>
               <div class="heading-controls"><p id="configured" class="configured-state">正在读取配置…</p><button id="new-mode" type="button" class="secondary" disabled>新建档位</button></div>
             </div>
             <p id="runtime" class="runtime" hidden></p>
-            <div class="surface scope-controls"><label for="scope">配置作用域</label><select id="scope"><option value="global">全局</option><option value="project">当前项目</option><option value="session">当前会话</option></select><p id="scope-context" class="muted path"></p><p id="scope-source" class="muted" role="status"></p><button id="clear-scope" type="button" class="secondary" disabled>清除本层选择，恢复继承</button></div>
+            <div class="surface scope-controls"><label for="scope">应用范围</label><select id="scope"><option value="global">全局</option><option value="project">当前项目</option><option value="session">当前会话</option></select><p id="scope-context" class="muted path"></p><p id="scope-source" class="muted" role="status"></p><button id="clear-scope" type="button" class="secondary" disabled>沿用上层档位</button></div>
             <div id="diagnostics" class="notice warning" hidden></div>
             <fieldset id="mode-options" class="mode-options">
               <legend>选择档位</legend>
               <div id="mode-radios" class="segmented"></div>
-              <div id="custom-picker" class="custom-picker" hidden><label for="custom-mode">自定义名称</label><select id="custom-mode"></select></div>
+              <div id="custom-picker" class="custom-picker" hidden><label for="custom-mode">自定义档位</label><select id="custom-mode"></select></div>
             </fieldset>
             <div class="workspace">
               <div class="editor surface">
-                <div class="editor-heading"><div><h2 id="editing-title">四级模型预设</h2><p id="editing-note" class="muted">选择档位后查看完整定义。</p></div><div><button id="copy-mode" type="button" class="secondary" disabled>复制为自定义</button><button id="delete-mode" type="button" class="secondary" disabled>删除自定义档位</button></div></div>
+                <div class="editor-heading"><div><h2 id="editing-title">模型配置</h2><p id="editing-note" class="muted"></p></div><div><button id="copy-mode" type="button" class="secondary" disabled>复制为自定义</button><button id="delete-mode" type="button" class="secondary" disabled>删除档位</button></div></div>
                 <div class="allocation-heading" aria-hidden="true"><span>任务等级</span><div class="field-grid"><span>主模型</span><span>推理强度</span></div></div>
                 <div id="levels" class="levels"></div>
                 <datalist id="effort-suggestions"><option value="low"></option><option value="medium"></option><option value="high"></option><option value="xhigh"></option></datalist>
-                <details class="technical allocation-notes"><summary>备用模型什么时候使用？</summary><p>备用候选只有在原授权与预算允许、宿主支持参数、工具与任务要求满足且原职责与验收不变时使用。写入任务改用备用前，先确认上一产出者已经停止。</p><p>目录信息与静态配置不能证明模型调用权限。页面不会自动派发备用模型。</p></details>
+                <details class="technical allocation-notes"><summary>何时使用备用模型？</summary><p>主模型无法使用时，Codex 才会考虑备用模型。备用必须符合原任务、授权和预算；涉及写入时，须先确认原子代理已停止。网页只保存设置。</p></details>
               </div>
               <aside class="changes surface" aria-labelledby="changes-title">
-                <div class="changes-heading"><h2 id="changes-title">本次变更</h2><span id="draft-label" class="draft-label" hidden>待确认</span></div>
+                <div class="changes-heading"><h2 id="changes-title">本次变更</h2></div>
                 <p id="changes-count" class="muted">尚未修改</p><div id="change-list"></div>
                 <p id="save-note" class="save-note"></p>
                 <div class="actions"><button id="apply" type="button" class="primary" disabled>无修改</button><button id="cancel-draft" type="button" class="secondary" hidden>取消修改</button><button id="cancel-selection" type="button" class="secondary" hidden>取消选择</button><button id="preview" type="button" class="secondary" disabled>预览文件变更</button></div>
-                <details id="command-details" class="technical"><summary>查看终端命令</summary><p id="command-label" class="muted">将执行的命令（尚未执行）</p><pre id="command"></pre><button id="copy-definition" type="button" class="secondary" hidden>复制完整四级 JSON</button><p id="copy-status" class="muted" role="status"></p></details>
+                <details id="command-details" class="technical"><summary>终端命令</summary><p id="command-label" class="muted">命令预览</p><pre id="command"></pre><button id="copy-definition" type="button" class="secondary" hidden>复制档位 JSON</button><p id="copy-status" class="muted" role="status"></p></details>
               </aside>
             </div>
-            <section class="surface preview" aria-labelledby="primary-check-title"><h2 id="primary-check-title">当前档位主模型检测</h2><p id="primary-check-note" class="muted"></p><button id="check-primary" type="button" class="secondary" disabled>检测当前档位主模型</button><div id="primary-check-result" role="status"></div></section>
+            <section class="surface preview" aria-labelledby="primary-check-title"><h2 id="primary-check-title">模型检测</h2><p id="primary-check-note" class="muted"></p><button id="check-primary" type="button" class="secondary" disabled>检测主模型</button><div id="primary-check-result" role="status"></div></section>
             <section id="preview-area" class="surface preview" hidden aria-labelledby="preview-title"><div class="section-heading"><h2 id="preview-title">文件变更预览</h2><button id="close-preview" type="button" class="secondary">关闭预览</button></div><p id="preview-note" class="muted"></p><div id="preview-files"></div></section>
           </section>
           <section id="rules" class="panel" hidden aria-labelledby="rules-title">
-            <div class="section-heading"><div><h1 id="rules-title">委派规则</h1><p class="muted">什么任务，交给哪个模型？先看等级，再看具体任务。</p></div><button id="edit-routes" type="button" class="secondary">前往档位配置</button></div>
+            <div class="section-heading"><div><h1 id="rules-title">委派规则</h1><p class="muted">查看不同任务会用哪个模型。</p></div><button id="edit-routes" type="button" class="secondary">前往档位配置</button></div>
             <div class="surface routing-context">
               <div><p id="rules-context">正在读取生效配置…</p><p id="rules-bound-context" class="muted path"></p></div>
               <div class="routing-picker"><label for="rules-mode">查看档位（只读）</label><select id="rules-mode" aria-describedby="rules-view-note"></select></div>
               <p id="rules-view-note" class="routing-view-note" role="status"></p>
             </div>
             <div id="rules-maximum" class="notice warning" hidden></div>
-            <nav id="route-overview" class="route-overview" aria-label="四级默认路由"></nav>
-            <div class="routing-intro"><h2>按任务找到模型</h2><p class="muted">每级先列默认组合，再列适用的任务候选。点击任一路由查看依据与备用；任务数量不决定等级。</p></div>
+            <nav id="route-overview" class="route-overview" aria-label="各等级的默认模型"></nav>
+            <div class="routing-intro"><h2>按任务查看模型</h2><p class="muted">先按任务难度找等级，再查看默认设置或任务专用设置。</p></div>
             <div id="routing-workspace" class="routing-workspace">
               <div id="route-levels"></div>
               <aside id="route-detail" class="surface route-detail" aria-labelledby="route-detail-title">
-                <h2 id="route-detail-title" tabindex="-1">查看一条路由</h2>
-                <div id="route-selection"><p class="muted">点击左侧等级或任务，查看模型、选择依据与备用条件。</p></div>
+                <h2 id="route-detail-title" tabindex="-1">模型详情</h2>
+                <div id="route-selection"><p class="muted">选择等级或任务，查看模型和备用条件。</p></div>
                 <div id="explanation" class="explanation" aria-live="polite"></div>
-                <details id="route-permissions" class="technical" hidden><summary>职责与执行权限</summary><p class="muted">职责限定允许做什么，不直接决定等级和模型。</p><label for="explain-role">本次职责</label><select id="explain-role"><option value="task_delegate">明确委派</option><option value="task_scan">扫描取证（只读）</option><option value="task_execute">范围内产出</option><option value="task_review">独立复核（只读）</option></select><div id="route-contract"></div></details>
+                <details id="route-permissions" class="technical" hidden><summary>子代理可以做什么？</summary><label for="explain-role">查看职责</label><select id="explain-role"><option value="task_delegate">明确委派</option><option value="task_scan">扫描取证（只读）</option><option value="task_execute">范围内产出</option><option value="task_review">独立复核（只读）</option></select><div id="route-contract"></div></details>
               </aside>
             </div>
-            <div class="surface routing-reference"><details><summary>子代理职责说明</summary><p class="muted">模型与强度由任务路由决定；固定角色的组合不匹配时，用明确委派保留原职责。</p><div id="role-list"></div></details><details class="technical"><summary>共同边界与完整规则</summary><div id="rule-summary"></div></details><details class="technical"><summary>配置来源与未检查范围</summary><div id="sources"></div></details></div>
+            <div class="surface routing-reference"><details><summary>子代理职责</summary><p class="muted">职责决定可以做什么。模型和强度按任务选择。</p><div id="role-list"></div></details><details class="technical"><summary>通用限制</summary><div id="rule-summary"></div></details><details class="technical"><summary>配置来源与诊断</summary><div id="sources"></div></details></div>
           </section>
           <section id="accounts" class="panel" hidden aria-labelledby="accounts-title">
-            <div class="section-heading"><div><h1 id="accounts-title">账号配置</h1><p class="muted">查看已有授权，管理当前 Codex 配置目录的登录。</p></div></div>
-            <section class="surface account-surface" aria-labelledby="account-title"><div class="account-heading"><h2 id="account-title">账号与授权</h2><button id="account-refresh" type="button" class="secondary">检查已有授权</button></div><p id="account-status" role="status" class="muted">优先复用当前 Codex 配置目录中的登录与供应商凭据。</p><p id="account-context" class="muted path"></p><div class="account-actions"><button id="login-browser" type="button" class="secondary">ChatGPT 浏览器授权</button><button id="login-device" type="button" class="secondary">设备码登录</button><button id="login-key" type="button" class="secondary">API Key 登录</button><button id="account-logout" type="button" class="secondary" hidden>退出当前登录</button></div><div id="account-login" role="status"></div></section>
+            <div class="section-heading"><div><h1 id="accounts-title">账号配置</h1><p class="muted">查看或更换 Codex 登录。</p></div></div>
+            <section class="surface account-surface" aria-labelledby="account-title"><div class="account-heading"><h2 id="account-title">登录状态</h2><button id="account-refresh" type="button" class="secondary">刷新登录状态</button></div><p id="account-status" role="status" class="muted">正在读取登录状态…</p><p id="account-context" class="muted path"></p><div class="account-actions"><button id="login-browser" type="button" class="secondary">用 ChatGPT 登录</button><button id="login-device" type="button" class="secondary">设备码登录</button><button id="login-key" type="button" class="secondary">API Key 登录</button><button id="account-logout" type="button" class="secondary" hidden>退出登录</button></div><div id="account-login" role="status"></div></section>
           </section>
           <section id="restore" class="panel" hidden aria-labelledby="restore-title">
-            <div class="section-heading"><div><h1 id="restore-title">恢复原配置</h1><p class="muted">撤销本工具的修改，回到首次配置之前。</p></div></div>
-            <div class="surface restore-surface"><h2>恢复前先确认</h2><p id="restore-capability">正在读取恢复状态…</p><p id="restore-target" class="path"></p><p class="muted">将移除本工具的委派规则和四个角色，清理全局、所有项目和所有会话的选择及自定义档位。原有配置与无关文件会保留。</p><div id="restore-customs"></div><button id="restore-preview" type="button" class="secondary" disabled>预览恢复</button><section id="restore-plan" class="restore-plan" hidden><h2>本次恢复计划</h2><div id="restore-files"></div><p id="restore-plan-note" class="muted"></p><button id="restore-confirm" type="button" class="danger">恢复原配置</button></section></div>
+            <div class="section-heading"><div><h1 id="restore-title">恢复原配置</h1><p class="muted">撤销 Agent Fit 的设置，保留原有配置和无关文件。</p></div></div>
+            <div class="surface restore-surface"><h2>恢复范围</h2><p id="restore-capability">正在读取恢复状态…</p><p id="restore-target" class="path"></p><p class="muted">将移除 Agent Fit 的规则、角色和档位设置，影响全局、所有项目和所有会话。</p><div id="restore-customs"></div><button id="restore-preview" type="button" class="secondary" disabled>预览恢复</button><section id="restore-plan" class="restore-plan" hidden><h2>将修改的文件</h2><div id="restore-files"></div><p id="restore-plan-note" class="muted"></p><button id="restore-confirm" type="button" class="danger">恢复原配置</button></section></div>
           </section>
         </main>
-        <footer><p>配置保存在本机。日常切档无需重启；首次安装、基础规则更新或恢复后需重启。新任务读取新配置，运行模型身份需另行核实。</p><p id="last-read"></p></footer>
+        <footer><p>配置保存在本机。</p><p id="last-read"></p></footer>
       </div>
     </div>
   </div>

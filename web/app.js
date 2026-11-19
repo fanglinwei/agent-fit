@@ -1,10 +1,10 @@
 'use strict';
 
 const LEVELS = ['L1', 'L2', 'L3', 'L4'];
-const LEVEL_LABELS = ['明确执行', '有边界的推理', '复杂推理', '高不确定性推理'];
-const LEVEL_EXAMPLES = ['方法与验收已知，含大型确定性处理', '局部分析、有限方案选择', '多约束、竞争假设与矛盾证据', '检验关键假设、处理强耦合开放问题'];
-const ROUTE_EXAMPLES = ['按明确格式取证、按已批准规则批量替换', '实现边界清楚的功能、修复可复现的局部问题', '跨模块根因分析、状态与生命周期问题', '多机制交互的疑难问题、约束冲突的架构取舍'];
-const TASK_LABELS = { mechanical: '确定性机械任务', bounded: '普通有界任务', scan: '大型有界扫描或审查', deep: '大型确定性深度任务', complex: '有界复杂任务', uncertain: '高歧义、高耦合或高后果', reasoning: '复杂推理或质量验证失败', visual: '视觉理解与图像推理', computer: '有界电脑操作', writing: '自然写作与修订', latency: '明确追求低延迟' };
+const LEVEL_LABELS = ['按步骤执行', '局部分析', '复杂推理', '疑难推理'];
+const LEVEL_EXAMPLES = ['步骤和完成标准已知', '范围明确，需要做少量判断', '要权衡多项要求或相互矛盾的证据', '关键假设未确定，要逐一验证'];
+const ROUTE_EXAMPLES = ['按格式整理证据、按规则批量替换', '实现范围明确的功能、修复局部问题', '找出涉及多个模块的问题根因', '排查多个因素交织的故障'];
+const TASK_LABELS = { mechanical: '按规则执行', bounded: '常规分析', scan: '大范围扫描或审查', deep: '大量工作，规则明确', complex: '复杂但范围明确', uncertain: '目标不清、依赖多或风险高', reasoning: '复杂推理或验收未通过', visual: '图像理解', computer: '电脑操作', writing: '写作与修改', latency: '低延迟' };
 const TASK_LEVELS = { mechanical: ['L1'], bounded: ['L2'], scan: ['L1', 'L2'], deep: ['L1', 'L2'], complex: ['L2', 'L3'], uncertain: ['L3', 'L4'], reasoning: ['L3', 'L4'], visual: ['L1', 'L2', 'L3'], computer: ['L1', 'L2', 'L3'], writing: ['L1', 'L2', 'L3'], latency: LEVELS };
 const ROLE_LABELS = { task_scan: '扫描取证', task_execute: '范围内产出', task_review: '独立复核', task_delegate: '明确委派' };
 const CONTRACT_LABELS = { readonly_evidence: '只读取证，保留证据与局部阻断', scoped_output: '只在明确范围内产出，独占写入', readonly_review: '只读独立复核，保留原验收要求', bounded_delegate: '遵守本次明确职责与授权范围' };
@@ -45,6 +45,15 @@ function primaryPairs(definition) {
 function validText(value, maximum) { return typeof value === 'string' && value.length > 0 && value.trim() === value && [...value].length <= maximum && !/[\p{Cc}\p{Cf}\p{Cs}]/u.test(value); }
 function displayValue(value) { return value === null || value === undefined ? '未确认' : typeof value === 'object' ? JSON.stringify(value, null, 2) : String(value); }
 
+const ACCESS_STORAGE = 'agent-fit-access';
+let accessCode = '';
+try { accessCode = sessionStorage.getItem(ACCESS_STORAGE) ?? ''; } catch { /* Unlock still works in memory. */ }
+function lockPanel() {
+  accessCode = '';
+  state.connected = false;
+  try { sessionStorage.removeItem(ACCESS_STORAGE); } catch { /* Storage may be disabled. */ }
+  $('access-form').hidden = false;
+}
 class ActionError extends Error {
   constructor(code, message, response = null) { super(message); this.code = code; this.response = response; }
 }
@@ -52,9 +61,9 @@ async function request(action, params = {}, allowPartial = false) {
   if (!['account', 'setup', 'restore'].includes(action)) params = { ...params, scope: state.scope };
   let response, payload;
   try {
-    response = await fetch('/api/actions', { method: 'POST', credentials: 'same-origin', headers: { 'Content-Type': 'application/json', 'X-Delegation-Token': state.bootstrap.csrf_token }, body: JSON.stringify({ action, params }) });
+    response = await fetch('/api/actions', { method: 'POST', credentials: 'omit', headers: { 'Content-Type': 'application/json', 'X-Delegation-Token': accessCode }, body: JSON.stringify({ action, params }) });
     payload = await response.json();
-  } catch { state.connected = false; throw new ActionError('RESULT_UNKNOWN', '结果暂无法确认。请检查终端中的本地服务并刷新状态；已提交的操作不会自动重发。'); }
+  } catch { state.connected = false; throw new ActionError('RESULT_UNKNOWN', '结果未确认。请检查启动终端并刷新页面；操作不会自动重试。'); }
   if (!payload || !Number.isInteger(payload.exit_code) || payload.report?.report_schema_version !== 1 || !Array.isArray(payload.report.errors) || payload.report.data !== null && (typeof payload.report.data !== 'object' || Array.isArray(payload.report.data))) {
     const errors = payload?.errors ?? payload?.report?.errors;
     if (Array.isArray(errors) && errors[0]?.code) throw new ActionError(errors[0].code, errors[0].message || '本地服务拒绝了此次操作。');
@@ -64,6 +73,7 @@ async function request(action, params = {}, allowPartial = false) {
   if (!response.ok || payload.exit_code !== 0 || payload.report.errors.length) {
     if (allowPartial && (typeof payload.report.data?.configuration_revision === 'string' || ['applied', 'unchanged'].includes(payload.report.data?.result))) return payload;
     const error = payload.report.errors[0] ?? { code: 'COMMAND_FAILED', message: '操作未完整完成，请查看本次结果。' };
+    if (error.code === 'ACCESS_REQUIRED') lockPanel();
     if (['CSRF_REJECTED', 'SERVICE_CLOSING'].includes(error.code)) state.connected = false;
     throw new ActionError(error.code, error.message, payload);
   }
@@ -96,7 +106,7 @@ async function readBatch(preferred) {
     const listing = (await request('list', {}, true)).report.data;
     if (!status || !Array.isArray(listing?.modes)) throw new ActionError('COMMAND_RESULT_INVALID', '配置查询缺少状态或档位列表。');
     const active = status.mode?.id;
-    const selected = listing.modes.some(mode => mode.id === preferred) ? preferred : active ?? listing.modes.find(mode => mode.id === 'official')?.id ?? listing.modes[0]?.id;
+    const selected = listing.modes.some(mode => mode.id === preferred) ? preferred : active ?? listing.modes.find(mode => mode.id === 'mid')?.id ?? listing.modes[0]?.id;
     const shown = selected ? (await request('show', { mode: selected }, true)).report.data : null;
     const revision = status.configuration_revision;
     if (revision && revision === listing.configuration_revision && (!shown || revision === shown.configuration_revision)) {
@@ -114,14 +124,14 @@ async function refresh({ selected = state.selected, compare = false, preserve = 
   const focused = document.activeElement;
   const focusedId = focused?.id;
   const selection = focused instanceof HTMLInputElement || focused instanceof HTMLTextAreaElement ? [focused.selectionStart, focused.selectionEnd] : null;
-  busy(true, '正在按序读取状态、档位列表与完整定义…');
+  busy(true, '正在读取配置…');
   try {
     const batch = await readBatch(selected);
     state.status = batch.status; state.modes = batch.modes;
     state.readTime = now();
     if (hasDraft && batch.revision !== oldRevision && !compare) {
       state.stale = true;
-      showError(new ActionError('CONFIG_CHANGED', '配置已被其他操作更新。草稿已保留；点击“刷新后比较”重新查看差异，再决定是否保存。'));
+      showError(new ActionError('CONFIG_CHANGED', '配置已在别处更新。草稿已保留，请先点“刷新后比较”。'));
     } else if (hasDraft && batch.selected !== state.selected) {
       state.stale = true;
       showError(new ActionError('CONFIG_CHANGED', '正在编辑的自定义档位已不存在。草稿仍保留，但无法保存；取消修改后重新选择档位。'));
@@ -228,7 +238,7 @@ function renderResult() {
 }
 async function performWrite(action, params, { preview = false } = {}) {
   if (state.busy || (action === 'restore' ? !state.connected || !state.revision || state.stale : writeBlocked())) return false;
-  busy(true, preview ? '正在执行 CLI 预检与文件变更预览…' : action === 'restore' ? '正在恢复原配置，请等待安全完成…' : '正在保存配置，请等待…');
+  busy(true, preview ? '正在生成文件预览…' : action === 'restore' ? '正在恢复原配置…' : '正在保存配置，请等待…');
   clearError();
   try {
     const response = await request(action, { ...params, ...(preview ? { dryRun: true } : {}) }, !preview);
@@ -277,7 +287,7 @@ function dialog({ title, description, content = [], choices }) {
 }
 async function leaveDraft(callback) {
   if (!dirty()) { await callback(); return; }
-  const answer = await dialog({ title: '保留还是放弃本次修改？', description: '草稿尚未保存。放弃只清除本页输入，不会删除已创建的档位。', choices: [{ label: '继续编辑', value: null }, { label: '放弃修改并离开', value: 'discard' }, { label: current() ? '保存并应用后离开' : '保存档位后离开', value: 'save', class: 'primary' }] });
+  const answer = await dialog({ title: '修改尚未保存', description: '放弃只会清除草稿，已创建的档位会保留。', choices: [{ label: '继续编辑', value: null }, { label: '放弃修改并离开', value: 'discard' }, { label: current() ? '保存并应用后离开' : '保存档位后离开', value: 'save', class: 'primary' }] });
   if (answer === 'discard') { state.draft = clone(state.saved); state.preview = null; if (state.stale) await refresh({ preserve: false }); else render(); await callback(); }
   if (answer === 'save' && await apply()) await callback();
 }
@@ -298,8 +308,8 @@ function showTab(tab) {
 function renderModePicker() {
   const focusedMode = $('mode-radios').contains(document.activeElement) ? document.activeElement.id : null;
   const isCustom = state.modes.find(mode => mode.id === state.selected)?.kind === 'custom';
-  const descriptions = { cut: '节省优先，按任务选同级候选', official: '四级基线与任务候选', high: '选档即授权所示高强度组合', fire: '选档即授权所示高强度组合，仍须先验证', custom: '自行设置模型、候选与备用' };
-  const radios = state.modes.filter(mode => mode.kind !== 'custom').map(mode => ({ value: mode.id, label: `${mode.name} · ${mode.id}` }));
+  const descriptions = { low: '经济：优先节省用量', mid: '官方：首次配置默认', heigh: '高级：应用即允许使用所示高强度', custom: '自行设置模型和强度' };
+  const radios = state.modes.filter(mode => mode.kind !== 'custom').map(mode => ({ value: mode.id, label: mode.name }));
   radios.push({ value: 'custom', label: '自定义' });
   replace('mode-radios', radios.map(option => node('label', {}, node('input', { id: `mode-${option.value}`, type: 'radio', name: 'mode', value: option.value, 'aria-label': option.label, 'aria-describedby': `mode-${option.value}-note`, checked: option.value === 'custom' ? isCustom : state.selected === option.value, disabled: state.busy || !state.connected, on: { change: () => { if (option.value !== 'custom') selectMode(option.value); else { const target = state.modes.find(mode => mode.kind === 'custom'); if (target) selectMode(target.id); else { renderModePicker(); createMode(); } } } } }), node('span', { class: 'mode-name' }, option.label), node('span', { id: `mode-${option.value}-note`, class: 'mode-description' }, descriptions[option.value] ?? '查看模型分配'))));
   $('custom-picker').hidden = !isCustom;
@@ -322,7 +332,7 @@ function renderLevels() {
   if (!state.draft) return;
   LEVELS.forEach((level, index) => {
     const pair = state.draft.levels[level];
-    const fallbackText = !custom() && state.saved.id === 'fire' ? '用户指定，否则继承父代理' : pairText(pair.fallback);
+    const fallbackText = pairText(pair.fallback);
     const summary = node('summary', { on: { click: event => { if (desktop.matches) event.preventDefault(); } } }, node('span', { class: 'level-code' }, level), node('span', { class: 'level-name' }, LEVEL_LABELS[index]), node('span', { id: `${level}-changed`, class: 'tag', hidden: true }, '已修改'), node('span', { class: 'level-example' }, LEVEL_EXAMPLES[index]), node('span', { id: `${level}-summary`, class: 'level-summary' }, pairText(pair)));
     const fields = node('div', { class: 'level-fields' });
     if (custom()) fields.append(node('div', { class: 'field-grid' }, field(level, 'model', pair.model), field(level, 'effort', pair.effort)));
@@ -338,15 +348,15 @@ function renderLevels() {
         fallbackFields.replaceChildren();
         if (event.target.checked) fallbackFields.append(field(level, 'model', '', true), field(level, 'effort', '', true));
         state.preview = null; updateLevelSummary(level); renderChanges(); renderControls(); renderPreview();
-      } } }), '启用一个备用组合'), fallbackFields);
+      } } }), '使用备用模型'), fallbackFields);
     } else fallbackDetails.append(node('p', { class: 'muted' }, fallbackText));
     fields.append(node('div', { class: 'level-meta' }, fallbackDetails));
     const tasks = pair.tasks;
     if (custom() || tasks && typeof tasks === 'object' && Object.keys(tasks).length) {
-      const candidates = node('details', { class: 'technical task-candidates' }, node('summary', {}, '同级任务候选'), node('p', {}, '先选复杂度与保障下限，再按任务特征选择；未指定任务类型时使用上方基线。'));
+      const candidates = node('details', { class: 'technical task-candidates' }, node('summary', {}, '按任务类型设置模型'), node('p', {}, '有专用设置时可选用，其他任务使用上方默认设置。'));
       if (custom()) {
         const id = `${level}-tasks`;
-        candidates.append(node('label', { htmlFor: id }, '任务候选 JSON'), node('p', { class: 'muted' }, `本等级支持：${Object.entries(TASK_LEVELS).filter(([, levels]) => levels.includes(level)).map(([task]) => task).join('、')}。每项包含 model、effort、fallback；{} 清空候选。明确保存并选择的组合即为授权。`), node('textarea', { id, value: typeof tasks === 'string' ? tasks : JSON.stringify(tasks ?? {}, null, 2), rows: 8, maxLength: 65536, spellcheck: false, 'data-level': level, 'aria-describedby': `${level}-error`, on: { input: event => {
+        candidates.append(node('label', { htmlFor: id }, '任务候选 JSON'), node('p', { class: 'muted' }, `可设置的任务：${Object.entries(TASK_LEVELS).filter(([, levels]) => levels.includes(level)).map(([task]) => task).join('、')}。每项填写 model、effort 和 fallback；无备用填 null。填入 {} 可清空。保存并应用即允许使用这些组合。`), node('textarea', { id, value: typeof tasks === 'string' ? tasks : JSON.stringify(tasks ?? {}, null, 2), rows: 8, maxLength: 65536, spellcheck: false, 'data-level': level, 'aria-describedby': `${level}-error`, on: { input: event => {
           try { const parsed = JSON.parse(event.target.value); state.draft.levels[level].tasks = parsed && typeof parsed === 'object' && !Array.isArray(parsed) ? parsed : event.target.value; } catch { state.draft.levels[level].tasks = event.target.value; }
           state.preview = null; updateLevelSummary(level); renderChanges(); renderControls(); renderPreview();
           $(`${level}-error`).hidden = true; event.target.removeAttribute('aria-invalid');
@@ -365,20 +375,20 @@ function updateLevelSummary(level) {
   $(`level-${level}`).classList.toggle('changed', changed);
   $(`${level}-changed`).hidden = !changed;
   $(`${level}-summary`).textContent = pairText(pair);
-  $(`${level}-fallback-summary`).textContent = `备用：${!custom() && state.saved.id === 'fire' ? '用户指定，否则继承父代理' : pairText(pair.fallback)}`;
+  $(`${level}-fallback-summary`).textContent = `备用：${pairText(pair.fallback)}`;
 }
 function renderChanges() {
-  if (!state.draft) { $('changes-count').textContent = '暂无可编辑的定义'; replace('change-list'); return; }
+  if (!state.draft) { $('changes-count').textContent = '请选择档位'; replace('change-list'); return; }
   const setup = installed() === 'not_installed';
   const old = dirty() || current() ? state.saved : activeMode();
   const changes = LEVELS.filter(level => setup || !same(old?.levels?.[level], state.draft.levels[level]));
-  $('changes-count').textContent = changes.length ? `${setup ? '将配置' : '变化涉及'} ${changes.length} 个任务等级` : current() ? '尚未修改' : '模型组合不变，将切换档位';
+  $('changes-count').textContent = changes.length ? `${setup ? '将配置' : '将更新'} ${changes.length} 个任务等级` : current() ? '尚未修改' : '模型组合相同';
   replace('change-list', changes.map(level => {
     const before = old?.levels?.[level]; const after = state.draft.levels[level];
     return node('div', { class: 'change-item' }, node('h4', {}, `${level} · ${LEVEL_LABELS[LEVELS.indexOf(level)]}`), before ? node('p', { class: 'change-before' }, `已保存：${pairText(before)}`) : null, node('p', { class: 'change-after' }, `将使用：${pairText(after)}`), !same(before?.fallback, after.fallback) || setup ? node('p', {}, before ? `备用：${pairText(before.fallback)} → ${pairText(after.fallback)}` : `备用：${pairText(after.fallback)}`) : null, !same(before?.tasks, after.tasks) ? node('details', {}, node('summary', {}, '任务候选变化'), node('pre', {}, `原候选：${JSON.stringify(before?.tasks ?? {}, null, 2)}\n新候选：${JSON.stringify(after.tasks ?? {}, null, 2)}`)) : null);
   }));
-  if (!changes.length) replace('change-list', node('div', { class: 'empty-changes' }, node('span', { 'aria-hidden': true }, '✓'), node('p', {}, current() ? '没有待应用的变更' : `将切换至「${state.saved.name}」`), node('p', {}, current() ? '可重新设置当前档位，也可选择其他档位。' : '模型组合与当前档位相同。')));
-  $('save-note').textContent = state.stale ? '草稿来自旧版本，请刷新后比较。' : dirty() && !current() && !setup ? `保存到${SCOPE_LABELS[state.scope]}，随后可单独设为当前档位。` : dirty() && current() ? `完整四级保存到${SCOPE_LABELS[state.scope]}；编辑上层定义时先生成局部副本。` : setup ? '点击配置后才写入绑定的 Codex home。' : `仅设置${SCOPE_LABELS[state.scope]}的档位选择。`;
+  if (!changes.length && !current()) replace('change-list', node('div', { class: 'empty-changes' }, node('p', {}, `将切换至「${state.saved.name}」`)));
+  $('save-note').textContent = state.stale ? '草稿来自旧版本，请刷新后比较。' : dirty() && !current() && !setup ? `保存到「${SCOPE_LABELS[state.scope]}」，当前档位不会变。` : dirty() && current() ? `保存并应用到「${SCOPE_LABELS[state.scope]}」。` : setup ? '点击「配置 Codex」后才会保存。' : `只修改「${SCOPE_LABELS[state.scope]}」的档位选择。`;
   const operation = nextWrite();
   $('command').textContent = operation ? commandText(commandArguments(operation.action, operation.params)) : '尚未选择配置动作。';
   $('copy-definition').hidden = !custom();
@@ -388,7 +398,6 @@ function renderControls() {
   const pendingLogin = state.account?.login?.status === 'pending';
   const blocked = state.busy || writeBlocked() || pendingLogin;
   const operation = nextWrite();
-  $('draft-label').hidden = !operation;
   $('apply').textContent = state.busy ? '请等待操作完成…' : installed() === 'not_installed' ? '配置 Codex' : dirty() ? current() ? '保存并应用' : '保存档位' : !current() && state.saved ? '设为当前档位' : '重新设置当前档位';
   $('apply').disabled = blocked || !operation;
   $('preview').disabled = blocked || !operation;
@@ -402,6 +411,7 @@ function renderControls() {
   $('cancel-draft').hidden = !dirty(); $('cancel-draft').disabled = state.busy;
   $('cancel-selection').hidden = !activeMode() || current() || dirty(); $('cancel-selection').disabled = state.busy;
   $('refresh').disabled = state.busy;
+  $('unlock').disabled = state.busy;
   for (const id of ['custom-mode', 'rules-mode', 'edit-routes', 'close-preview', 'compare']) $(id).disabled = state.busy || !state.connected;
   $('explain-role').disabled = state.busy || !state.connected || !state.rulesRoute;
   for (const button of document.querySelectorAll('[data-route], #route-retry')) button.disabled = state.busy || !state.connected || state.stale;
@@ -417,21 +427,21 @@ function renderControls() {
 function renderAccount() {
   const data = state.account;
   if (!data) return;
-  const labels = { authenticated: '已登录', authentication_required: '需要登录', unknown: '授权状态未确认' };
+  const labels = { authenticated: '已登录', authentication_required: '需要登录', unknown: '登录状态未确认' };
   const types = { chatgpt: 'ChatGPT', apiKey: 'API Key', amazonBedrock: 'Amazon Bedrock' };
-  $('account-status').textContent = `${labels[data.account?.status] ?? '授权状态未确认'}${types[data.account?.type] ? ` · ${types[data.account.type]}` : ''}`;
-  const source = { codex_login: '复用 Codex 已保存的登录', provider_environment: '已发现供应商环境变量凭据', provider_config: '已发现供应商配置凭据', not_confirmed: '尚未确认凭据来源' };
-  $('account-context').textContent = `配置目录：${state.bootstrap.home}；供应商：${data.provider ?? '未确认'}。${source[data.credential_source] ?? '尚未确认凭据来源'}。`;
+  $('account-status').textContent = `${labels[data.account?.status] ?? '登录状态未确认'}${types[data.account?.type] ? ` · ${types[data.account.type]}` : ''}`;
+  const source = { codex_login: '使用 Codex 已保存的登录', provider_environment: '凭据来自环境变量', provider_config: '凭据来自供应商配置', not_confirmed: '凭据来源未知' };
+  $('account-context').textContent = `配置目录：${state.bootstrap.home}；供应商：${data.provider ?? '未确认'}。${source[data.credential_source] ?? '凭据来源未知'}。`;
   $('account-logout').hidden = data.account?.status !== 'authenticated';
   const login = data.login;
   const contents = [];
   if (login?.status === 'pending') {
-    contents.push(node('p', {}, '等待官方授权完成。完成后本页会自动更新；也可点击“检查已有授权”。'));
+    contents.push(node('p', {}, '请在官方页面完成登录，本页会自动更新。'));
     if (login.user_code) contents.push(node('p', {}, '在官方页面输入设备码：', node('code', { class: 'device-code' }, login.user_code)));
     if (/^https:\/\/(?:auth\.openai\.com|auth0\.openai\.com|chatgpt\.com)\//.test(login.url ?? '')) contents.push(node('a', { href: login.url, target: '_blank', rel: 'noopener noreferrer', class: 'auth-link' }, '打开官方授权页面'));
-    contents.push(node('button', { id: 'cancel-login', type: 'button', class: 'secondary', on: { click: () => accountAction({ operation: 'cancel' }) } }, '取消本次授权'), node('p', { class: 'muted' }, `本页等待至 ${new Date(login.expires_at).toLocaleTimeString('zh-CN')}。设备码不可用时，请先在 ChatGPT 安全设置中启用设备码登录。`));
+    contents.push(node('button', { id: 'cancel-login', type: 'button', class: 'secondary', on: { click: () => accountAction({ operation: 'cancel' }) } }, '取消本次授权'), node('p', { class: 'muted' }, `等待至 ${new Date(login.expires_at).toLocaleTimeString('zh-CN')}。如无法使用设备码，请检查 ChatGPT 安全设置。`));
   } else if (login) {
-    contents.push(node('p', {}, { succeeded: '登录已完成。', cancelled: '本次授权已取消。', expired: '授权等待已超时，请重新发起登录。', failed: '登录未完成，请重试；设备码登录需在 ChatGPT 安全设置中启用。' }[login.status] ?? '登录状态未确认。'));
+    contents.push(node('p', {}, { succeeded: '登录已完成。', cancelled: '本次授权已取消。', expired: '登录超时，请重试。', failed: '登录未完成，请重试；设备码登录需在 ChatGPT 安全设置中启用。' }[login.status] ?? '登录状态未确认。'));
   }
   replace('account-login', contents);
   clearTimeout(loginTimer);
@@ -442,7 +452,7 @@ function renderAccount() {
 }
 async function accountAction(params, polling = false) {
   if (state.busy) return;
-  busy(true, polling ? '正在确认授权是否完成…' : '正在处理当前配置目录的账号授权…');
+  busy(true, polling ? '正在确认授权是否完成…' : '正在处理登录状态…');
   if (!polling) clearError();
   try {
     const previous = state.account;
@@ -461,7 +471,7 @@ async function login(method) {
   if (state.busy) return;
   const key = method === 'apiKey' ? node('input', { id: 'login-api-key', type: 'password', autocomplete: 'off', maxLength: 4096 }) : null;
   const error = node('p', { class: 'dialog-error', hidden: true });
-  const answer = await dialog({ title: method === 'apiKey' ? '使用 API Key 登录' : '授权当前 Codex 配置目录', description: `凭据由 Codex 官方客户端保存到 ${state.bootstrap.home} 对应的认证存储。此操作可能替换该目录的既有登录，其他使用此目录的 Codex 客户端也会受影响。`, content: key ? [node('label', { htmlFor: 'login-api-key' }, 'OpenAI API Key'), key, error, node('p', { class: 'muted' }, '密钥只传给本地 Codex，不写入页面存储或检查记录。')] : node('p', {}, '发起后在官方页面完成授权，本页会等待并更新登录状态。'), choices: [{ label: '取消', value: null }, { label: key ? '登录' : '发起授权', value: true, class: 'primary', validate: () => {
+  const answer = await dialog({ title: method === 'apiKey' ? '使用 API Key 登录' : '登录 Codex', description: `Codex 会保存登录到 ${state.bootstrap.home}。这可能替换现有登录，并影响使用同一目录的其他 Codex 客户端。`, content: key ? [node('label', { htmlFor: 'login-api-key' }, 'OpenAI API Key'), key, error, node('p', { class: 'muted' }, '密钥只传给本地 Codex，不写入页面存储或检查记录。')] : node('p', {}, '请在打开的官方页面完成登录。'), choices: [{ label: '取消', value: null }, { label: key ? '登录' : '发起授权', value: true, class: 'primary', validate: () => {
     if (key && !validText(key.value, 4096)) { error.textContent = '请输入有效 API Key，不含首尾空白或控制字符。'; error.hidden = false; key.focus(); return false; } return true;
   } }] });
   if (answer) {
@@ -475,7 +485,7 @@ function renderPreview() {
   $('preview-area').hidden = !state.preview;
   if (!state.preview) return;
   const data = state.preview.response.report.data;
-  $('preview-note').textContent = data?.restart?.message ?? '预览未写入；正式应用仍重新预检和核对配置版本。';
+  $('preview-note').textContent = data?.restart?.message ?? '预览不会写入文件。保存时会再次检查。';
   renderFiles('preview-files', data);
   $('preview-files').append(node('details', { class: 'technical' }, node('summary', {}, '本次预览的终端命令'), node('pre', {}, commandText(state.preview.response.command?.argv ?? []))));
 }
@@ -485,8 +495,8 @@ function renderFiles(id, data) {
   const verbs = { create: '新增', update: '更新', delete: '清除', remove: '清除', restore: '恢复', replace: data?.action === 'restore' ? '恢复' : '更新', write: '写入' };
   replace(id, node('ul', { class: 'file-list' }, files.map(file => typeof file === 'string' ? node('li', {}, file) : node('li', {}, node('strong', {}, verbs[file.action ?? file.operation] ?? file.action ?? file.operation ?? '变更'), file.path ?? file.relative ?? displayValue(file)))));
 }
-function rulesDefinition() { return state.modes.find(mode => mode.id === state.rulesMode) ?? activeMode() ?? state.modes.find(mode => mode.id === 'official'); }
-function maximumMode(definition) { return definition?.kind === 'builtin' && ['high', 'fire'].includes(definition.id); }
+function rulesDefinition() { return state.modes.find(mode => mode.id === state.rulesMode) ?? activeMode() ?? state.modes.find(mode => mode.id === 'mid'); }
+function maximumMode(definition) { return definition?.kind === 'builtin' && definition.id === 'heigh'; }
 function taskPair(definition, level, task) {
   return task && !(maximumMode(definition) && task !== 'latency') ? definition.levels[level].tasks?.[task] : definition.levels[level];
 }
@@ -499,22 +509,23 @@ function renderRules() {
   state.rulesRoute = null;
   if (!state.modes.some(mode => mode.id === state.rulesMode) || state.rulesMode === activeMode()?.id) state.rulesMode = '';
   placeRouteDetail();
-  $('route-detail-title').textContent = '查看一条路由';
-  replace('route-selection', node('p', { class: 'muted' }, '点击等级或任务，查看模型、选择依据与备用条件。'));
+  $('route-detail-title').textContent = '模型详情';
+  replace('route-selection', node('p', { class: 'muted' }, '选择等级或任务，查看模型和备用条件。'));
   replace('explanation'); replace('route-contract');
   $('route-permissions').hidden = true;
   $('explain-role').value = 'task_delegate';
   const active = activeMode(), definition = rulesDefinition();
-  $('rules-context').textContent = `当前作用域：${SCOPE_LABELS[state.scope]}；生效档位：${active?.name ?? '尚未配置'}；来源：${SCOPE_LABELS[state.status?.effective_scope] ?? '未配置'}${state.status?.inherited ? '（继承）' : ''}`;
+  $('rules-context').textContent = `应用范围：${SCOPE_LABELS[state.scope]}；生效档位：${active?.name ?? '尚未配置'}；来源：${SCOPE_LABELS[state.status?.effective_scope] ?? '未配置'}${state.status?.inherited ? '（继承）' : ''}`;
   $('rules-bound-context').textContent = $('scope-context').textContent;
-  replace('rules-mode', node('option', { value: '' }, active ? `当前生效：${active.name} · ${active.id}` : '尚未配置 · 预览官方档位'), state.modes.filter(mode => mode.id !== active?.id).map(mode => node('option', { value: mode.id }, `预览：${mode.name} · ${mode.id}`)));
+  const label = mode => mode.name === mode.id ? mode.name : `${mode.name} · ${mode.id}`;
+  replace('rules-mode', node('option', { value: '' }, active ? `当前生效：${label(active)}` : '尚未配置 · 预览 mid'), state.modes.filter(mode => mode.id !== active?.id).map(mode => node('option', { value: mode.id }, `预览：${label(mode)}`)));
   $('rules-mode').value = state.rulesMode;
   const preview = !active || definition?.id !== active.id;
-  $('rules-view-note').textContent = preview ? `只读预览「${definition?.name ?? '未知'}」，尚未生效。查看不会切换档位。` : `正在展示「${active.name}」的已保存生效配置；未保存草稿不参与路由。`;
+  $('rules-view-note').textContent = preview ? `只读预览「${definition?.name ?? '未知'}」，不会切换档位。` : '这里显示已保存的设置，不包含草稿。';
   $('rules-view-note').dataset.preview = String(preview);
   $('rules-maximum').hidden = !maximumMode(definition);
-  replace('rules-maximum', maximumMode(definition) ? [node('p', {}, preview ? '最高强度预览：查看不构成授权，明确选择此档位后才授权所示最高强度。' : '已选择最高强度档位：明确选档即授权所示高强度组合。'), node('p', {}, '普通任务沿用本级最高组合；低延迟仍须显式配置候选。'), definition.id === 'fire' ? node('p', {}, 'fire 每个会话首次使用前实际验证；模型、强度、供应商或账号变化后重新验证。失败时使用用户指定模型与强度，否则继承父代理。') : null] : []);
-  replace('route-overview', definition ? LEVELS.map((level, index) => node('button', { type: 'button', class: 'route-overview-item', 'data-route': '', 'data-level': level, 'data-task': '', 'aria-controls': 'route-detail', 'aria-pressed': 'false', on: { click: () => explain(level) } }, node('span', { class: 'route-overview-heading' }, node('strong', {}, level), LEVEL_LABELS[index]), node('strong', { class: 'route-overview-model', title: pairText(definition.levels[level]) }, routePair(definition.levels[level])), node('span', { class: 'muted' }, '等级默认'))) : []);
+  replace('rules-maximum', maximumMode(definition) ? [node('p', {}, preview ? '应用此档位后，才允许使用所示最高推理强度。' : '此档位允许使用所示最高推理强度。'), node('p', {}, '普通任务使用该级默认组合；低延迟需单独设置。')] : []);
+  replace('route-overview', definition ? LEVELS.map((level, index) => node('button', { type: 'button', class: 'route-overview-item', 'data-route': '', 'data-level': level, 'data-task': '', 'aria-controls': 'route-detail', 'aria-pressed': 'false', on: { click: () => explain(level) } }, node('span', { class: 'route-overview-heading' }, node('strong', {}, level), LEVEL_LABELS[index]), node('strong', { class: 'route-overview-model', title: pairText(definition.levels[level]) }, routePair(definition.levels[level])), node('span', { class: 'muted' }, '该级默认'))) : []);
   replace('route-levels', definition ? LEVELS.map((level, index) => {
     const tasks = ['', ...Object.keys(TASK_LEVELS).filter(task => TASK_LEVELS[task].includes(level))];
     return node('section', { id: `routes-${level}`, class: 'surface route-level', 'aria-labelledby': `routes-${level}-title` },
@@ -522,11 +533,11 @@ function renderRules() {
       node('p', { class: 'route-example muted' }, `例如：${ROUTE_EXAMPLES[index]}`),
       node('div', { class: 'route-columns muted', 'aria-hidden': 'true' }, node('span', {}, '任务'), node('span', {}, '模型 / 推理强度')),
       tasks.map(task => {
-        const pair = taskPair(definition, level, task), label = task ? TASK_LABELS[task] : '等级默认';
-        return node(pair ? 'button' : 'div', { class: `route-row${task ? '' : ' route-baseline'}`, ...(pair ? { type: 'button', 'data-route': '', 'data-level': level, 'data-task': task, 'aria-controls': 'route-detail', 'aria-pressed': 'false', on: { click: () => explain(level, task) } } : {}) }, node('span', { class: 'route-task' }, label, !pair ? node('small', {}, '需在档位配置中添加候选') : null), node('strong', { class: 'route-model', title: pair ? pairText(pair) : '此任务候选未配置，不猜测路由' }, routePair(pair)));
+        const pair = taskPair(definition, level, task), label = task ? TASK_LABELS[task] : '该级默认';
+        return node(pair ? 'button' : 'div', { class: `route-row${task ? '' : ' route-baseline'}`, ...(pair ? { type: 'button', 'data-route': '', 'data-level': level, 'data-task': task, 'aria-controls': 'route-detail', 'aria-pressed': 'false', on: { click: () => explain(level, task) } } : {}) }, node('span', { class: 'route-task' }, label), node('strong', { class: 'route-model', title: pair ? pairText(pair) : '未设置专用组合' }, routePair(pair)));
       }));
-  }) : [node('p', { class: 'surface muted' }, '暂无可展示的档位。请刷新状态或前往档位配置。')]);
-  replace('role-list', (state.status?.roles ?? []).map(role => node('div', { class: 'role' }, node('h4', {}, `${ROLE_LABELS[role.name] ?? role.name} · ${role.name}`), node('p', {}, role.name === 'task_scan' || role.name === 'task_review' ? '只读职责；不获得项目写入权限。' : role.name === 'task_execute' ? '仅在本次明确范围内产出，写入范围须独占。' : '按照本次明确授权与原职责执行。'), node('details', { class: 'technical' }, node('summary', {}, '全局固定角色配置'), node('p', {}, `${role.configured_model ?? role.model ?? '模型未固定'} / ${role.configured_effort ?? role.effort ?? '推理强度未固定'}`), role.source ? node('p', { class: 'path' }, `来源：${role.source}`) : null))));
+  }) : [node('p', { class: 'surface muted' }, '没有可查看的档位。请刷新状态。')]);
+  replace('role-list', (state.status?.roles ?? []).map(role => node('div', { class: 'role' }, node('h4', {}, `${ROLE_LABELS[role.name] ?? role.name} · ${role.name}`), node('p', {}, role.name === 'task_scan' || role.name === 'task_review' ? '可以读取，不能修改项目。' : role.name === 'task_execute' ? '只修改分配给自己的内容。' : '只在本次授权范围内工作。'), node('details', { class: 'technical' }, node('summary', {}, '全局固定角色配置'), node('p', {}, `${role.configured_model ?? role.model ?? '模型未固定'} / ${role.configured_effort ?? role.effort ?? '推理强度未固定'}`), role.source ? node('p', { class: 'path' }, `来源：${role.source}`) : null))));
   if (!state.status?.roles?.length) replace('role-list', node('p', { class: 'muted' }, '未安装本工具的角色。可在档位页先预览并配置。'));
   const summary = state.status?.rules?.summary ?? ['用户与宿主授权优先', '禁止递归委派', '明确独占写入', '外部写入交回主代理', '局部阻断与最小充分验证', '保留专业规则、预算和高影响裁决边界'];
   replace('rule-summary', node('ul', {}, summary.map(item => node('li', {}, typeof item === 'string' ? item : displayValue(item)))));
@@ -534,11 +545,11 @@ function renderRules() {
 }
 function renderRestore() {
   const restoration = state.status?.restoration?.status;
-  const messages = { available: '安装前恢复记录可用。仍需先预览并通过完整预检。', not_installed: '未安装本工具，无需恢复。', invalid: '恢复记录无效。自动恢复已阻止，请核对诊断与原备份。' };
-  $('restore-capability').textContent = messages[restoration] ?? '恢复能力未确认，请查看状态诊断。';
-  $('restore-target').textContent = `绑定 home：${state.bootstrap?.home ?? ''}`;
+  const messages = { available: '可以恢复，请先预览。', not_installed: '未安装本工具，无需恢复。', invalid: '恢复记录无效。请检查诊断和备份。' };
+  $('restore-capability').textContent = messages[restoration] ?? '暂时无法确认能否恢复，请查看诊断。';
+  $('restore-target').textContent = `配置目录：${state.bootstrap?.home ?? ''}`;
   const customs = state.restorePreview?.response.report.data?.custom_modes_removed;
-  replace('restore-customs', node('p', { class: 'muted' }, customs ? customs.length ? `将清理全部作用域的 ${customs.length} 个自定义档位：${customs.join('、')}` : '没有需清理的自定义档位。' : '恢复会清理此 home 全部作用域的自定义档位；请先预览完整清单。'));
+  replace('restore-customs', node('p', { class: 'muted' }, customs ? customs.length ? `将删除 ${customs.length} 个自定义档位：${customs.join('、')}` : '没有要删除的自定义档位。' : '预览可查看要删除的自定义档位。'));
   $('restore-plan').hidden = !state.restorePreview;
   if (state.restorePreview) {
     renderFiles('restore-files', state.restorePreview.response.report.data);
@@ -549,12 +560,12 @@ function renderRestore() {
 }
 function renderPrimaryCheck() {
   const active = activeMode();
-  $('primary-check-note').textContent = !active ? '先配置档位，再检测主模型。' : !current() ? '先将所查看档位设为当前，再检测其主模型。' : dirty() ? '先保存并应用修改，再检测主模型。' : `检测已配置的「${active.name}」L1–L4 基线及同级任务候选；相同组合只请求一次，不检测备用。仅手动触发，实际调用可能消耗额度或产生费用。`;
+  $('primary-check-note').textContent = !active ? '先配置档位，再检测主模型。' : !current() ? '先应用此档位，再检测。' : dirty() ? '先保存并应用修改，再检测主模型。' : `检测「${active.name}」已保存的默认和专用模型。检测会实际调用模型，可能消耗额度或产生费用。`;
   const check = state.modelCheck;
   if (!check) { replace('primary-check-result'); return; }
   const data = check.response.report.data;
   const stale = data.source_revision !== state.revision || data.configuration_changed !== false || state.stale;
-  const note = data.authorization_changed === true ? '授权已变化，本轮结果已失效，请重新检测。' : stale ? '配置已变化或来源版本未确认，请重新检测。' : '仅代表本次请求，不代替 fire 的会话验证。';
+  const note = data.authorization_changed === true ? '授权已变化，本轮结果已失效，请重新检测。' : stale ? '配置已变化或来源版本未确认，请重新检测。' : '仅代表本次请求。';
   const access = { available: '可调用', unavailable: '不可用', denied: '访问被拒绝', unknown: '未确认' };
   const identity = { matched: '模型与强度匹配', mismatch: '模型或强度不匹配', unverified: '身份未确认' };
   replace('primary-check-result',
@@ -568,9 +579,9 @@ async function checkPrimary() {
   const revision = state.revision;
   const active = activeMode();
   const pairs = primaryPairs(active);
-  const answer = await dialog({ title: '检测当前档位主模型？', description: `使用 ${state.bootstrap.home} 的当前账号与供应商配置，对已配置的「${active.name}」检测以下 ${pairs.length} 个主模型组合，最多 ${pairs.length} 次实际调用，可能消耗额度或产生费用。总期限 90 秒，不自动重试，不检测备用。`, content: node('ul', {}, pairs.map(pair => node('li', {}, pairText(pair)))), choices: [{ label: '取消', value: null }, { label: '确认并检测', value: true, class: 'primary' }] });
+  const answer = await dialog({ title: '检测主模型？', description: `将用当前 Codex 配置检测「${active.name}」的 ${pairs.length} 个主模型组合，每个最多调用一次，可能消耗额度或产生费用。最长 90 秒，不重试，也不检测备用模型。`, content: node('ul', {}, pairs.map(pair => node('li', {}, pairText(pair)))), choices: [{ label: '取消', value: null }, { label: '确认并检测', value: true, class: 'primary' }] });
   if (!answer || state.busy) return;
-  busy(true, '正在检测当前档位主模型，请等待本次请求完成…'); clearError();
+  busy(true, '正在检测主模型…'); clearError();
   state.modelCheck = null; renderPrimaryCheck();
   try {
     const response = await request('verify', { expectRevision: revision }, true);
@@ -584,19 +595,19 @@ function render() {
   const active = activeMode();
   $('configured').dataset.state = installed();
   $('versions').textContent = `工具 ${state.bootstrap?.cli_version ?? '未知'} · 已安装配置 ${state.status?.configuration_version ?? '未安装'}`;
-  $('configured').textContent = active ? `已配置：${active.name}` : '尚未配置本工具';
+  $('configured').textContent = active ? `当前档位：${active.name}` : '尚未配置本工具';
   $('scope').value = state.scope;
-  $('scope-context').textContent = state.scope === 'global' ? `绑定 home：${state.bootstrap?.home ?? ''}` : state.scope === 'project' ? `项目：${state.bootstrap?.project ?? ''}` : `聊天：${state.bootstrap?.thread ?? '未绑定'}；项目：${state.bootstrap?.project ?? ''}`;
-  $('scope-source').textContent = `编辑范围：${SCOPE_LABELS[state.scope]}；有效来源：${SCOPE_LABELS[state.status?.effective_scope] ?? '未配置'}${state.status?.inherited ? '（继承）' : ''}。${!state.bootstrap?.thread ? '此服务未绑定聊天，当前会话选项不可用。' : ''}`;
-  $('clear-scope').textContent = state.scope === 'global' ? '恢复全局默认档位' : '清除本层选择，恢复继承';
+  $('scope-context').textContent = state.scope === 'global' ? `配置目录：${state.bootstrap?.home ?? ''}` : state.scope === 'project' ? `项目：${state.bootstrap?.project ?? ''}` : `聊天：${state.bootstrap?.thread ?? '未绑定'}；项目：${state.bootstrap?.project ?? ''}`;
+  $('scope-source').textContent = `档位来源：${SCOPE_LABELS[state.status?.effective_scope] ?? '未配置'}${state.status?.inherited ? '（继承）' : ''}。${!state.bootstrap?.thread ? '启动时未指定聊天，无法设置当前会话。' : ''}`;
+  $('clear-scope').textContent = state.scope === 'global' ? '恢复全局默认档位' : '沿用上层档位';
   $('runtime').hidden = installed() !== 'installed';
-  $('runtime').textContent = '日常全局、项目和会话切档无需重启，后续新任务读取新配置，全局角色在下一轮加载；已开始任务沿用原配置。首次安装、基础规则更新或恢复后请重启 Codex。运行模型身份仍需核实。';
-  $('editing-title').textContent = state.saved ? `${custom() ? '正在编辑' : '正在查看'}：${state.saved.name}` : '四级模型预设';
-  $('editing-note').textContent = custom() ? state.saved.definition_scope !== state.scope ? '这是上层共享档位；保存时先复制到当前作用域，再修改完整四级。' : '编辑形成草稿，完整四级一次保存。' : '内置定义只读。复制为自定义后可调整四级与备用。';
+  $('runtime').textContent = '切换档位无需重启，只对新任务生效。首次配置、更新基础规则或恢复后，请重启 Codex。';
+  $('editing-title').textContent = state.saved ? `${custom() ? '正在编辑' : '正在查看'}：${state.saved.name}` : '模型配置';
+  $('editing-note').textContent = custom() ? state.saved.definition_scope !== state.scope ? '保存时会在当前范围创建副本，上层档位不受影响。' : '保存前，修改只留在本页。' : '要修改内置档位，请先复制为自定义档位。';
   const diagnostics = (state.status?.diagnostics ?? []).filter(item => item.status === 'fail' || item.status === 'warn');
   $('diagnostics').hidden = !diagnostics.length;
   replace('diagnostics', diagnostics.map(item => node('p', {}, `${item.code}：${item.message ?? item.status}`, item.source ? node('span', { class: 'path muted' }, `（${item.source}）`) : null)));
-  $('last-read').textContent = state.readTime ? `最近状态读取：${state.readTime}；配置与运行状态分别核对。` : '';
+  $('last-read').textContent = state.readTime ? `上次刷新：${state.readTime}` : '';
   renderModePicker(); renderLevels(); renderChanges(); renderRules(); renderRestore(); renderPreview(); renderControls();
 }
 
@@ -616,7 +627,7 @@ async function createMode() {
       }
       return true;
     };
-    const answer = await dialog({ title: '新建自定义档位', description: '复制完整四级配置。创建后尚未设为当前，取消后续修改不会删除这个档位。', content: [node('label', { htmlFor: 'new-name' }, '档位名称'), name, node('label', { htmlFor: 'new-from' }, '从哪个档位复制'), source, error, preview], choices: [{ label: '关闭', value: null }, { label: '预览创建', validate: valid, run: async () => {
+    const answer = await dialog({ title: '新建自定义档位', description: '从已有档位复制设置。创建后，可再设为当前档位。', content: [node('label', { htmlFor: 'new-name' }, '档位名称'), name, node('label', { htmlFor: 'new-from' }, '从哪个档位复制'), source, error, preview], choices: [{ label: '关闭', value: null }, { label: '预览创建', validate: valid, run: async () => {
       preview.hidden = false; preview.replaceChildren(node('p', { class: 'muted', role: 'status' }, '正在执行创建预览…'));
       if (await performWrite('create', { name: name.value.trim().normalize('NFC'), from: source.value, expectRevision: state.revision }, { preview: true })) {
         preview.hidden = false;
@@ -632,31 +643,30 @@ async function explain(level, task = '') {
   const definition = rulesDefinition(), pair = taskPair(definition, level, task);
   if (!pair) return;
   state.rulesRoute = { level, task };
-  const label = task ? TASK_LABELS[task] : '等级默认';
+  const label = task ? TASK_LABELS[task] : '该级默认';
   $('route-detail-title').textContent = `${level} · ${label}`;
   replace('route-selection', node('p', { class: 'route-selected-model', title: pairText(pair) }, routePair(pair)), node('p', { class: 'muted' }, `${definition.name} · ${definition.id === activeMode()?.id ? '当前生效' : '只读预览，尚未生效'}`));
-  replace('explanation', node('p', { class: 'muted' }, '正在读取本条路由的选择依据…'));
+  replace('explanation', node('p', { class: 'muted' }, '正在读取模型详情…'));
   replace('route-contract');
   $('route-permissions').hidden = true;
   $('explanation').setAttribute('aria-busy', 'true');
   for (const button of document.querySelectorAll('[data-route]')) button.setAttribute('aria-pressed', String(button.dataset.level === level && button.dataset.task === task));
   placeRouteDetail();
   if (!wideRoutes.matches && focused?.matches('[data-route]')) { $('route-detail-title').focus(); $('route-detail').scrollIntoView({ block: 'nearest' }); }
-  busy(true, '正在读取所选路由的解释…'); clearError();
+  busy(true, '正在读取模型详情…'); clearError();
   try {
     const response = await request('explain', { mode: definition.id, level, role: $('explain-role').value, ...(task ? { task } : {}) });
     const data = response.report.data;
-    if (data?.configuration_revision !== state.revision) { state.stale = true; throw new ActionError('CONFIG_CHANGED', '配置版本已变化，请刷新状态后重新选择路由。'); }
-    if (data.mode_id !== definition.id || data.level !== level || data.task !== (task || null) || data.scope !== state.scope || data.primary?.model !== pair.model || data.primary?.effort !== pair.effort) throw new ActionError('COMMAND_RESULT_INVALID', '解释结果与所选路由不一致，请刷新后重新选择。');
-    const reason = task ? maximumMode(definition) && task !== 'latency' ? '此最高强度档位对普通任务使用本级最高组合。' : '命中此等级已配置的任务候选，替代等级默认组合；备用也使用此候选自己的配置。' : '未指定任务候选时，使用此等级的默认组合。';
-    const fields = [['等级依据', LEVEL_EXAMPLES[LEVELS.indexOf(level)]], ['选择依据', reason], ['备用模型 / 强度', data.verification?.required ? '用户指定，否则继承父代理' : pairText(data.fallback)]];
-    if (data.fallback) fields.push(['备用触发条件', '模型不可用、强度不支持，或临时故障有限重试后仍失败时，才在剩余次数与预算内接续；认证、权限、额度或原因不明时停止。仍须满足宿主、工具与原验收要求，写入者须先停止。']);
-    if (data.verification?.required) fields.push(['使用前检查', '每个会话首次使用前实际验证；模型、强度、供应商或账号变化后重新验证。'], ['检查失败', '使用 task_delegate，采用用户指定模型与强度，否则继承父代理当前组合。']);
-    replace('explanation', node('dl', {}, fields.flatMap(([label, value]) => [node('dt', {}, label), node('dd', {}, displayValue(value))])), node('p', { class: 'muted' }, '这是配置路由，未验证账号可用性或实际运行模型。'), node('details', { class: 'technical' }, node('summary', {}, '完整模型 ID、来源与诊断'), node('pre', {}, JSON.stringify({ primary: data.primary, scope: data.scope, effective_scope: data.effective_scope, reason_codes: data.reason_codes, fallback_conditions: data.fallback_conditions, source: data.source, configuration_revision: data.configuration_revision }, null, 2)), node('p', { class: 'muted' }, '本次解释的终端命令'), node('pre', {}, commandText(response.command?.argv ?? []))));
-    replace('route-contract', node('dl', {}, node('dt', {}, '请求职责'), node('dd', {}, ROLE_LABELS[data.requested_role]), node('dt', {}, '应使用角色'), node('dd', {}, data.dispatch_role), node('dt', {}, '权限契约'), node('dd', {}, CONTRACT_LABELS[data.permission_contract] ?? displayValue(data.permission_contract))));
+    if (data?.configuration_revision !== state.revision) { state.stale = true; throw new ActionError('CONFIG_CHANGED', '配置已更新，请刷新后重新选择。'); }
+    if (data.mode_id !== definition.id || data.active !== (definition.id === activeMode()?.id) || data.level !== level || data.task !== (task || null) || data.scope !== state.scope || data.primary?.model !== pair.model || data.primary?.effort !== pair.effort) throw new ActionError('COMMAND_RESULT_INVALID', '结果与所选任务不一致，请刷新后重选。');
+    const reason = task ? maximumMode(definition) && task !== 'latency' ? '高级档位为这类任务使用该级默认组合。' : '这类任务有专用设置，也使用自己的备用设置。' : '未选任务类型，使用该级默认设置。';
+    const fields = [['等级依据', LEVEL_EXAMPLES[LEVELS.indexOf(level)]], ['选择依据', reason], ['备用模型 / 强度', pairText(data.fallback)]];
+    if (data.fallback) fields.push(['何时用备用', '主模型不可用、强度不支持，或重试后仍失败时，可在剩余次数和预算内使用备用。遇到登录、权限、额度问题或原因不明时停止。备用仍须满足原任务要求；涉及写入时，原子代理须先停止。']);
+    replace('explanation', node('dl', {}, fields.flatMap(([label, value]) => [node('dt', {}, label), node('dd', {}, displayValue(value))])), node('p', { class: 'muted' }, '这里显示配置，未验证模型能否实际调用。'), node('details', { class: 'technical' }, node('summary', {}, '完整模型 ID、来源与诊断'), node('pre', {}, JSON.stringify({ primary: data.primary, scope: data.scope, effective_scope: data.effective_scope, reason_codes: data.reason_codes, fallback_conditions: data.fallback_conditions, source: data.source, configuration_revision: data.configuration_revision }, null, 2)), node('p', { class: 'muted' }, '本次解释的终端命令'), node('pre', {}, commandText(response.command?.argv ?? []))));
+    replace('route-contract', node('dl', {}, node('dt', {}, '请求职责'), node('dd', {}, ROLE_LABELS[data.requested_role]), node('dt', {}, '应使用角色'), node('dd', {}, data.dispatch_role), node('dt', {}, '允许操作'), node('dd', {}, CONTRACT_LABELS[data.permission_contract] ?? displayValue(data.permission_contract))));
     $('route-permissions').hidden = false;
   } catch (error) {
-    replace('explanation', node('p', {}, `未能读取本条路由：${error.message}`), node('button', { id: 'route-retry', type: 'button', on: { click: () => explain(level, task) } }, '重试读取'));
+    replace('explanation', node('p', {}, `未能读取模型详情：${error.message}`), node('button', { id: 'route-retry', type: 'button', on: { click: () => explain(level, task) } }, '重试读取'));
     showError(error);
   }
   finally {
@@ -668,11 +678,17 @@ async function restore() {
   if (!state.restorePreview || state.busy) return;
   if (state.restorePreview.revision !== state.revision) { showError(new ActionError('CONFIG_CHANGED', '配置版本已改变，请重新预览恢复。')); return; }
   const customs = state.restorePreview.response.report.data.custom_modes_removed;
-  const answer = await dialog({ title: '恢复原配置？', description: '按本次预览恢复首次配置前的记录。将移除本工具规则与角色，清理全部自定义档位。恢复后请重启 Codex。', content: [node('p', { class: 'path' }, state.bootstrap.home), node('p', {}, customs.length ? `清理全部作用域的自定义档位：${customs.join('、')}` : '没有需清理的自定义档位。')], choices: [{ label: '保留配置', value: null }, { label: '恢复原配置', value: true, class: 'danger' }] });
+  const answer = await dialog({ title: '恢复原配置？', description: '将移除 Agent Fit 的规则、角色，以及全局、所有项目和会话的档位设置。恢复后请重启 Codex。', content: [node('p', { class: 'path' }, state.bootstrap.home), node('p', {}, customs.length ? `将删除这些自定义档位：${customs.join('、')}` : '没有要删除的自定义档位。')], choices: [{ label: '保留配置', value: null }, { label: '恢复原配置', value: true, class: 'danger' }] });
   if (answer) await performWrite('restore', { expectRevision: state.restorePreview.revision });
 }
 
 for (const form of document.querySelectorAll('form')) form.addEventListener('submit', event => event.preventDefault());
+$('access-form').addEventListener('submit', () => {
+  if (state.busy) return;
+  accessCode = $('access-code').value.trim();
+  $('access-code').value = '';
+  void start();
+});
 for (const link of document.querySelectorAll('.tabs a')) link.addEventListener('click', event => { event.preventDefault(); if (!state.busy) leaveDraft(() => showTab(link.hash.slice(1))); });
 $('refresh').addEventListener('click', () => state.connected ? refresh() : start());
 $('compare').addEventListener('click', () => refresh({ compare: true }));
@@ -693,7 +709,7 @@ $('scope').addEventListener('change', async event => {
 });
 for (const [id, action] of [['clear-scope', 'clear'], ['delete-mode', 'delete']]) $(id).addEventListener('click', async () => {
   const selected = state.selected, revision = state.revision;
-  const answer = await dialog({ title: action === 'clear' ? '清除当前层的选择？' : '删除自定义档位？', description: action === 'clear' ? `仅修改${SCOPE_LABELS[state.scope]}的选择，保留自定义定义和其他层；全局清除恢复 official。` : `删除${SCOPE_LABELS[state.scope]}中的「${state.saved.name}」。仍被任何作用域引用时会阻止删除。`, choices: [{ label: '取消', value: null }, { label: '确认', value: true, class: 'primary' }] });
+  const answer = await dialog({ title: action === 'clear' ? `${$(id).textContent}？` : '删除自定义档位？', description: action === 'clear' ? `只清除「${SCOPE_LABELS[state.scope]}」的档位选择，自定义档位会保留。` : `将删除「${SCOPE_LABELS[state.scope]}」里的「${state.saved.name}」。仍在使用的档位不能删除。`, choices: [{ label: '取消', value: null }, { label: '确认', value: true, class: 'primary' }] });
   if (answer) await performWrite(action, { expectRevision: revision, ...(action === 'delete' ? { mode: selected } : {}) });
 });
 $('preview').addEventListener('click', () => apply(true));
@@ -701,8 +717,8 @@ $('cancel-draft').addEventListener('click', async () => { state.draft = clone(st
 $('cancel-selection').addEventListener('click', () => selectMode(activeMode().id));
 $('close-preview').addEventListener('click', () => { state.preview = null; renderPreview(); $('preview').focus(); });
 $('copy-definition').addEventListener('click', async () => {
-  try { await navigator.clipboard.writeText(JSON.stringify({ levels: state.draft.levels }, null, 2)); $('copy-status').textContent = '完整四级 JSON 已复制。'; }
-  catch { $('copy-status').textContent = '浏览器未允许复制，请展开以下 JSON 手动复制。'; $('command').textContent += `\n\n${JSON.stringify({ levels: state.draft.levels }, null, 2)}`; }
+  try { await navigator.clipboard.writeText(JSON.stringify({ levels: state.draft.levels }, null, 2)); $('copy-status').textContent = '档位 JSON 已复制。'; }
+  catch { $('copy-status').textContent = '浏览器未允许复制，请手动复制下方 JSON。'; $('command').textContent += `\n\n${JSON.stringify({ levels: state.draft.levels }, null, 2)}`; }
 });
 $('rules-mode').addEventListener('change', () => { state.rulesMode = $('rules-mode').value; renderRules(); renderControls(); });
 $('explain-role').addEventListener('change', () => { if (state.rulesRoute) explain(state.rulesRoute.level, state.rulesRoute.task); });
@@ -716,7 +732,7 @@ $('login-browser').addEventListener('click', () => login('chatgpt'));
 $('login-device').addEventListener('click', () => login('chatgptDeviceCode'));
 $('login-key').addEventListener('click', () => login('apiKey'));
 $('account-logout').addEventListener('click', async () => {
-  const answer = await dialog({ title: '退出当前 Codex 登录？', description: `将退出 ${state.bootstrap.home} 对应的官方登录。其他使用此配置目录的客户端也会受影响。供应商环境变量和配置凭据会保留。`, choices: [{ label: '保留登录', value: null }, { label: '退出登录', value: true, class: 'danger' }] });
+  const answer = await dialog({ title: '退出当前 Codex 登录？', description: `将退出 ${state.bootstrap.home} 的登录，使用同一目录的其他 Codex 客户端也会受影响。供应商凭据会保留。`, choices: [{ label: '保留登录', value: null }, { label: '退出登录', value: true, class: 'danger' }] });
   if (answer) await accountAction({ operation: 'logout' });
 });
 $('restore-preview').addEventListener('click', () => performWrite('restore', { expectRevision: state.revision }, { preview: true }));
@@ -727,12 +743,20 @@ window.addEventListener('focus', () => { if (state.connected && !state.busy && !
 
 async function start() {
   showTab(location.hash.slice(1));
+  if (!accessCode) { lockPanel(); renderControls(); $('access-code').focus(); return; }
   busy(true, '正在连接本地配置服务…');
   try {
-    const response = await fetch('/api/bootstrap', { credentials: 'same-origin' });
+    const response = await fetch('/api/bootstrap', { credentials: 'omit', headers: { 'X-Delegation-Token': accessCode } });
+    if (response.status === 403) {
+      lockPanel();
+      throw new ActionError('ACCESS_REQUIRED', '访问码无效，请输入启动服务的终端中显示的访问码。');
+    }
     const bootstrap = await response.json();
-    if (!response.ok || typeof bootstrap.home !== 'string' || typeof bootstrap.csrf_token !== 'string' || typeof bootstrap.cli_version !== 'string') throw new ActionError('SERVICE_UNAVAILABLE', '本地服务无法连接，请在终端重新启动 serve 后刷新页面。');
+    if (!response.ok || typeof bootstrap.home !== 'string' || typeof bootstrap.cli_version !== 'string') throw new ActionError('SERVICE_UNAVAILABLE', '本地服务无法连接，请在终端重新启动 serve 后刷新页面。');
+    try { sessionStorage.setItem(ACCESS_STORAGE, accessCode); } catch { /* Unlock still works in memory. */ }
+    $('access-form').hidden = true;
     state.bootstrap = bootstrap; state.connected = true;
+    clearError();
     $('home').textContent = bootstrap.home;
     if (!state.result && bootstrap.recent_result?.report?.data?.result) { state.result = bootstrap.recent_result; renderResult(); }
     busy(false);

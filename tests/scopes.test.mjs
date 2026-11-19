@@ -24,6 +24,21 @@ const cli = (home, args) => {
   return { code: result.status, ...JSON.parse(result.stdout) };
 };
 
+test('Git environment inherited from another repository cannot redirect explicit project operations', async () => {
+  const { home, project, other } = await fixture();
+  const gitRoot = await fs.realpath(process.cwd());
+  const git = spawnSync('git', ['-C', gitRoot, 'rev-parse', '--absolute-git-dir'], { encoding: 'utf8' });
+  assert.equal(git.status, 0, git.stderr);
+  const result = spawnSync(process.execPath, ['bin/agent-fit.mjs', 'mode', 'set', 'low', '--scope', 'project', '--project', other, '--codex-home', home, '--json'], {
+    encoding: 'utf8',
+    env: { ...process.env, GIT_DIR: git.stdout.trim(), GIT_WORK_TREE: gitRoot },
+  });
+  assert.equal(result.status, 0, result.stdout);
+  assert.equal((await showReport(home, undefined, { scope: 'project', project: other })).definition.id, 'low');
+  assert.equal((await showReport(home, undefined, { scope: 'project', project })).definition.id, 'mid');
+  assert.deepEqual((await readSnapshot(home)).scopeStore.projects.map(entry => entry.project), [other]);
+});
+
 test('session > project > global, threads and projects isolate, clearing restores whole inherited profile', async () => {
   const { home, project, other } = await fixture();
   const a = { scope: 'project', project }, chat = { scope: 'session', project, thread: 'chat-a' };
@@ -31,27 +46,27 @@ test('session > project > global, threads and projects isolate, clearing restore
   assert.equal((await mutate(home, 'clear', chat)).result, 'unchanged');
   assert.equal((await readSnapshot(home)).configuration_revision, initialRevision);
   const role = await fs.readFile(path.join(home, 'agents/task-execute.toml'));
-  for (const options of [{ ...a, mode: 'cut' }, { ...chat, mode: 'high' }]) {
+  for (const options of [{ ...a, mode: 'low' }, { ...chat, mode: 'heigh' }]) {
     const report = await mutate(home, 'set', options);
     assert.equal(report.restart.required, false); assert.match(report.restart.message, /无需重启/);
   }
-  assert.equal((await showReport(home, undefined, chat)).definition.id, 'high');
+  assert.equal((await showReport(home, undefined, chat)).definition.id, 'heigh');
   const inherited = await showReport(home, undefined, { ...chat, thread: 'chat-b' });
-  assert.equal(inherited.definition.id, 'cut'); assert.equal(inherited.effective_scope, 'project'); assert.equal(inherited.inherited, true);
-  assert.equal((await showReport(home, undefined, { ...a, project: other })).definition.id, 'official');
+  assert.equal(inherited.definition.id, 'low'); assert.equal(inherited.effective_scope, 'project'); assert.equal(inherited.inherited, true);
+  assert.equal((await showReport(home, undefined, { ...a, project: other })).definition.id, 'mid');
   assert.deepEqual(await fs.readFile(path.join(home, 'agents/task-execute.toml')), role);
-  assert.equal((await readSnapshot(home)).mode.id, 'official');
+  assert.equal((await readSnapshot(home)).mode.id, 'mid');
   const report = await mutate(home, 'clear', chat);
   assert.equal(report.restart.required, false); assert.equal(report.scope, 'session');
-  assert.equal((await showReport(home, undefined, chat)).definition.id, 'cut');
+  assert.equal((await showReport(home, undefined, chat)).definition.id, 'low');
   await mutate(home, 'clear', a);
-  assert.equal((await showReport(home, undefined, chat)).definition.id, 'official');
+  assert.equal((await showReport(home, undefined, chat)).definition.id, 'mid');
   assert.equal((await statusReport(home, chat)).effective_scope, 'global');
 });
 
 test('scope definitions are visible downwards; editing an inherited custom copies and preserves the original', async () => {
   const { home, project, other } = await fixture();
-  await mutate(home, 'create', { name: 'shared', from: 'cut' });
+  await mutate(home, 'create', { name: 'shared', from: 'low' });
   await mutate(home, 'set', { mode: 'shared' });
   const before = (await showReport(home, 'shared')).definition;
   const context = { scope: 'project', project };
@@ -89,7 +104,7 @@ test('delete blocks references from every scope; clear does not delete definitio
 
 test('scope writes use preview, revision checks, permissions, lock and rollback without changing global roles', async () => {
   const { home, project } = await fixture();
-  const options = { scope: 'project', project, mode: 'high' };
+  const options = { scope: 'project', project, mode: 'heigh' };
   const revision = (await readSnapshot(home)).configuration_revision;
   const preview = await mutate(home, 'set', { ...options, dryRun: true, expectRevision: revision });
   assert.equal(preview.result, 'preview');
@@ -99,35 +114,39 @@ test('scope writes use preview, revision checks, permissions, lock and rollback 
   assert.equal((await readSnapshot(home)).configuration_revision, revision);
   setTestHooks(); await mutate(home, 'set', options);
   assert.equal((await fs.stat(path.join(home, SCOPE_FILE))).mode & 0o777, 0o600);
-  await assert.rejects(mutate(home, 'set', { ...options, mode: 'cut', expectRevision: revision }), { code: 'CONFIG_CHANGED' });
+  await assert.rejects(mutate(home, 'set', { ...options, mode: 'low', expectRevision: revision }), { code: 'CONFIG_CHANGED' });
   await fs.writeFile(path.join(home, '.agent-fit/install.lock'), '');
   await assert.rejects(mutate(home, 'clear', options), { code: 'BUSY' });
 });
 
 test('CLI resolves session profiles with explicit generic dispatch and a complete task snapshot', async () => {
   const { home, project } = await fixture();
-  assert.equal(cli(home, ['mode', 'set', 'high', '--scope=session', `--project=${project}`, '--thread=chat-a']).code, 0);
+  assert.equal(cli(home, ['mode', 'set', 'heigh', '--scope=session', `--project=${project}`, '--thread=chat-a']).code, 0);
   const query = ['explain', '--level=L2', '--role=task_execute', '--scope=session', `--project=${project}`, '--thread=chat-a'];
   const before = cli(home, query);
   assert.equal(before.code, 0); assert.deepEqual(before.errors, []);
-  assert.equal(before.data.mode_id, 'high'); assert.equal(before.data.effective_scope, 'session');
+  assert.equal(before.data.mode_id, 'heigh'); assert.equal(before.data.effective_scope, 'session');
   assert.equal(before.data.dispatch_role, 'task_delegate');
   assert.equal(before.data.task_profile.levels.L4.model, bindings.frontier);
-  await mutate(home, 'set', { scope: 'session', project, thread: 'chat-a', mode: 'cut' });
-  assert.equal(before.data.task_profile.id, 'high'); assert.equal(cli(home, query).data.mode_id, 'cut');
+  await mutate(home, 'set', { scope: 'session', project, thread: 'chat-a', mode: 'low' });
+  assert.equal(before.data.task_profile.id, 'heigh'); assert.equal(cli(home, query).data.mode_id, 'low');
   const restored = cli(home, ['mode', 'show', '--scope=session', `--project=${project}`, '--thread=chat-a']);
-  assert.equal(restored.data.definition.id, 'cut');
+  assert.equal(restored.data.definition.id, 'low');
   const fresh = cli(home, ['mode', 'show', '--scope=session', `--project=${project}`, '--thread=forked-chat']);
-  assert.equal(fresh.data.definition.id, 'official');
+  assert.equal(fresh.data.definition.id, 'mid');
 });
 
 test('invalid references and unsupported store versions fail explicitly; model checks do not probe', async () => {
   const { home, project } = await fixture();
-  await mutate(home, 'set', { scope: 'project', project, mode: 'cut' });
+  const custom = (await mutate(home, 'create', { name: 'fire' })).created_mode;
+  await mutate(home, 'set', { scope: 'project', project, mode: 'low' });
   const snapshot = await readSnapshot(home);
-  snapshot.scopeStore.projects[0].selection = 'deleted-profile';
+  snapshot.scopeStore.projects[0].selection = 'fire';
   assert.throws(() => scopedSelection(snapshot, { scope: 'project', project, thread: null }), { code: 'SCOPE_REFERENCE_INVALID' });
-  assert.equal(scopedSelection(snapshot, { scope: 'global', project, thread: null }).definition.id, 'official');
+  const session = { scope: 'session', project, thread: 'chat-a' };
+  assert.throws(() => scopedSelection(snapshot, session), { code: 'SCOPE_REFERENCE_INVALID' });
+  assert.equal(scopedSelection(snapshot, session, 'fire').definition.id, custom.id);
+  assert.equal(scopedSelection(snapshot, { scope: 'global', project, thread: null }).definition.id, 'mid');
   let started = 0;
   const check = await checkAccountModels({ home, scope: 'project', project, verify: true }, { readSnapshot: async () => snapshot, spawn() { started++; throw new Error(); } });
   assert.equal(check.exit_code, 1); assert.equal(started, 0); assert.deepEqual(check.checked_pairs, []);

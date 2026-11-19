@@ -2,16 +2,16 @@
 
 本工具在绑定 home 内管理四个 task_* 角色、`.agent-fit/current-mode.json` 全局档位、项目/会话配置及 AGENTS.md 中带 agent-fit 标记的区块。共享 Skill 默认位于 `~/.agents/skills/agent-fit/`，只保存通用规则；AGENTS 和角色通过 `agent-fit skill path --codex-home <绑定 home> --json` 查询入口。每次委派前必须按 Skill 检查。指令约束不等于宿主拦截器，原生 Skill 选择器发现与实际运行生效另行核验。
 
-- `setup --dry-run` 预览、`setup` 迁移旧安装。迁移核对原安装摘要、权限和档位归属，保留当前档位及各作用域选择；冲突时保留现场。旧目录已移走或仅保留指向共享目录的软链接均可识别。
+- 仅识别到 0.7.1 旧布局时，用 `setup --dry-run` 预览迁移，再用 `setup` 应用。迁移核对原安装摘要、权限和档位归属，保留当前档位及各作用域选择；冲突时保留现场。旧目录已移到共享位置，或旧位置保留指向共享目录的软链接时也可识别。
 - `status`、`explain`、`skill path` 只读；旧安装返回 `MIGRATION_REQUIRED`，不会在查询时迁移。
 - `setup` 仅在共享 Skill 尚不存在时安装；已有文件通过 `skill update --dry-run` 预览和 `skill update` 显式更新。日常切档与 home 的 `restore` 不改写或删除共享 Skill。恢复旧安装前先迁移；共享 Skill 删除不属于 home 恢复。
 
-- setup 首次默认 official；内置档位命令与 id 均为 cut、official、high、fire；mode set 切换，mode create/configure 保存自定义档位。
+- setup 首次默认 mid；内置档位命令与 id 均为 low、mid、heigh；mode set 切换，mode create/configure 保存自定义档位。
 - status --details 查看规则、磁盘角色及潜在覆盖；mode show 与 explain 只预览，不委派。
 - models check 只查询账号与目录，目录不证明调用权限；--verify 使用禁用工具的独立 Responses 请求，不启动 Codex 任务线程，可能产生费用。
 - restore 仅撤销可证明归属的改动，保留安装前内容和管理区块之外的用户修改；基线缺失或损坏时拒绝恢复。
 - 卸载前必须按 [Skill 的卸载前恢复规则](../SKILL.md#卸载前恢复) 恢复原绑定 home；预览不算恢复完成，多个 home 逐一恢复。实际恢复失败或结果未知时停止卸载，保留工具和恢复记录。
-- 仅支持当前配置格式与版本；不符合时拒绝读写，保持现有文件不变。
+- 除上述 0.7.1 迁移外，仅支持当前配置格式与版本；不符合时拒绝读写，保持现有文件不变。
 - 业务命令支持 --agent codex 与 --codex-home PATH；帮助/版本不接受目标目录。CLI 安装不自动改智能体配置。
 
 CLI 不带 --scope 保持全局兼容；聊天切换默认显式 --scope session。作用域优先级、隔离、存储与清除规则按下文 [作用域完整契约](#作用域完整契约) 执行。
@@ -25,7 +25,7 @@ CLI 不带 --scope 保持全局兼容；聊天切换默认显式 --scope session
 1. `agent-fit models bind <用途> <模型 ID> --dry-run --codex-home <绑定 home>` 查看受影响的主选、备用和应用令牌。
 2. 核对新模型的任务适配、预算和变化范围；明确授权后以相同参数使用 `--apply <预览令牌>`。配置变化、目录不完整或任何受影响组合缺少原 effort 时，停止写入。目录检查不发起推理，不证明运行权限或能力。
 
-用途有 `economy`（经济）、`general`（通用）、`general_backup`（通用备用）、`frontier`（旗舰）和 `visual_work`（视觉、电脑操作、写作）。调整对该 home 下所有作用域的内置档位生效，不改自定义固定组合或已开始任务快照。原 fire 门槛继续适用。
+用途有 `economy`（经济）、`general`（通用）、`general_backup`（通用备用）、`frontier`（旗舰）和 `visual_work`（视觉、电脑操作、写作）。调整对该 home 下所有作用域的内置档位生效，不改自定义固定组合或已开始任务快照。
 
 ## 配置查询与失败分流
 
@@ -39,7 +39,7 @@ CLI 不带 --scope 保持全局兼容；聊天切换默认显式 --scope session
 | 档位、等级或请求职责不符 | 核对绑定 home 与请求参数，再查询所需配置；不从其他模式补值 |
 | 获授权的非活动档位或未安装时预览成功 | `--mode` 不改变已部署角色；返回 task_delegate，评估时显式传入候选 model/effort 并保留原权限契约，不使用候选档位的固定角色 |
 | 活动档位查询成功且契约匹配 | 使用返回组合与派发角色，继续核对授权、能力与宿主覆盖；`runtime_verification: unverified` 仍不证明运行身份 |
-| 已有当前会话证据表明首选组合不受支持 | 按[派发前排除](failure-policy.md#派发前排除)查询该路线备用；组合不匹配时重新核对证据，无备用时停止，fire 按自己的会话规则处理 |
+| 已有当前会话证据表明首选组合不受支持 | 按[派发前排除](failure-policy.md#派发前排除)查询该路线备用；组合不匹配时重新核对证据，无备用时停止 |
 
 这些情况处理的是配置链路，不增加模型推理需求。实际任务结果未达原验收时，再按 [质量升级](failure-policy.md#质量升级) 判断是否重试或提高等级；查询修复不能重置原委派计数。
 
@@ -48,8 +48,6 @@ CLI 不带 --scope 保持全局兼容；聊天切换默认显式 --scope session
 首次安装、更新 Skill、AGENTS 或角色职责内容，以及恢复后须重启 Codex。普通全局、项目和会话切档与当前自定义模型/effort 调整无需重启；本机 Codex 0.162.1 已验证全局角色在同一会话下一轮加载新绑定。项目/会话选择或定义不重写宿主角色；后续新任务重新查询，已有任务沿用完整快照。若日常操作同时部署了基础规则更新，则仍需重启。runtime verification 保持 unverified，直到获得可信宿主证据。非空 AGENTS.override.md、同名角色、管理内容漂移或无法证明的恢复记录会阻止部署。
 
 完整用法、模式表、备用条件与故障处理见项目 docs/usage.md。
-
-fire 每个会话首次委派前须验证当前任务组合的实际调用与可信模型身份；模型、effort、供应商或账号变化后重验。检查失败或无法完成时使用用户指定组合，否则继承父代理实际组合，并使用 task_delegate 保留原职责。全局子代理默认可能覆盖继承，须核对有效组合；没有可信父代理组合时阻断该委派。验证结果不跨会话缓存。
 
 同级任务候选见 [任务路由](task-routing.md)。任务快照中的 levels 每级可含 tasks，各候选保存独立备用；explain 的 task 及 primary 必须对应所选候选。无候选的旧定义仍可查等级基线；显式候选缺失时不猜值。候选编辑与普通路由数据更新无需重启；基础 Skill/AGENTS 规则更新仍需重启。
 
@@ -73,7 +71,7 @@ fire 每个会话首次委派前须验证当前任务组合的实际调用与可
 - 会话绑定目标聊天的线程 ID。主会话工具中的 `CODEX_THREAD_ID` 可作为默认值，其他调用者必须显式传入 `--thread <目标聊天 ID>`；子代理的环境 ID 不是主聊天 ID。无法确认目标线程时阻断会话操作，不降为全局。
 - Git 项目以当前 worktree 根目录为准；子目录共用，不同 worktree 独立。非 Git 项目明确指定 `--project`，不要把随意的工具工作目录当项目。不同 home 的配置独立。
 - 项目/会话选择及其自定义档位保存在绑定 home 的 `.agent-fit/scopes.json`。恢复同一聊天保留选择，新聊天或 fork 不继承会话覆盖。项目移动路径后重新选择项目档位。
-- `mode clear --scope session|project` 仅清除该层选择，保留定义并恢复继承；全局 clear 恢复 official。删除自定义定义用 `mode delete`，存在选择引用时阻止删除。较小作用域修改上层自定义档位时先生成局部副本，不覆盖共享定义。
+- `mode clear --scope session|project` 仅清除该层选择，保留定义并恢复继承；全局 clear 恢复 mid。删除自定义定义用 `mode delete`，存在选择引用时阻止删除。较小作用域修改上层自定义档位时先生成局部副本，不覆盖共享定义。
 - 每个任务首次派发前记录查询的 `configuration_revision`、`effective_scope` 和完整 `task_profile`，作为该任务快照。后续重试、质量升级与备用接续从此快照按等级取值；途中切换或编辑档位只影响新任务，不重置原任务次数。新任务重新查询。
 
 作用域查询返回 `task_delegate`，显式传入 model + effort；当前宿主显式组合使用 `fork_turns="none"`，因此交接中必须包含完整目标、必要上下文、原职责与验收。不要为局部切换重写全局角色或主会话模型。重启与加载时机按上文 [生效与重启](#生效与重启) 执行；静态配置和请求参数不证明实际模型身份。

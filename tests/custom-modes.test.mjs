@@ -11,15 +11,15 @@ import { LEVELS, resolveDefinition } from '../lib/codex.mjs';
 const temporary = [];
 afterEach(async () => { setTestHooks(); await Promise.all(temporary.splice(0).map(directory => fs.rm(directory, { recursive: true, force: true }))); });
 async function fixture() { const directory = await fs.mkdtemp(path.join(os.tmpdir(), 'delegation-custom-')); temporary.push(directory); const home = path.join(directory, 'home'); await mutate(home, 'setup'); return home; }
-const canonicalDefinition = () => ({ levels: structuredClone(resolveDefinition('official').levels) });
+const canonicalDefinition = () => ({ levels: structuredClone(resolveDefinition('mid').levels) });
 async function managed(home) { const snapshot = await readSnapshot(home); return Object.fromEntries(await Promise.all([...Object.keys(snapshot.state.files), 'AGENTS.md', '.agent-fit/state.json', '.agent-fit/restore.json'].map(async relative => [relative, (await fs.readFile(path.join(home, relative))).toString('base64')]))); }
 
 test('create copies complete source by value without activating and extends first baseline only for custom metadata', async () => {
   const home = await fixture(); const initial = await readSnapshot(home), baseline = initial.baseline;
-  const report = await mutate(home, 'create', { name: '我的四级档位', from: 'fire' });
+  const report = await mutate(home, 'create', { name: '我的四级档位', from: 'heigh' });
   assert.equal(report.result, 'applied'); assert.equal(report.restart.required, false); assert.equal(report.restart.reason, 'definition_only');
-  assert.equal((await readSnapshot(home)).mode.id, 'official');
-  const custom = (await listReport(home)).modes.find(mode => mode.name === '我的四级档位'); assert.match(custom.id, /^custom-/); assert.deepEqual(custom.levels, resolveDefinition('fire').levels);
+  assert.equal((await readSnapshot(home)).mode.id, 'mid');
+  const custom = (await listReport(home)).modes.find(mode => mode.name === '我的四级档位'); assert.match(custom.id, /^custom-/); assert.deepEqual(custom.levels, resolveDefinition('heigh').levels);
   const after = await readSnapshot(home); assert.equal(after.baseline.entries['.agent-fit/custom-modes.json'], null);
   for (const [relative, before] of Object.entries(baseline.entries)) assert.deepEqual(after.baseline.entries[relative], before); assert.deepEqual(after.baseline.rules, baseline.rules);
   const showed = await showReport(home, custom.name); assert.equal(showed.active, false); assert.equal(showed.configuration_revision, (await listReport(home)).configuration_revision);
@@ -37,35 +37,35 @@ for (const scope of ['global', 'project', 'session']) test(`${scope} copies the 
   state.files[relative] = createHash('sha256').update(bytes).digest('hex');
   await fs.writeFile(statePath, JSON.stringify(state));
   const options = { scope, project: path.dirname(home), thread: 'snapshot-copy-chat' };
-  const source = await showReport(home, 'official', options);
+  const source = await showReport(home, 'mid', options);
   assert.deepEqual(source.diagnostics.filter(item => item.status === 'fail'), []);
   assert.equal(source.definition.levels.L1.tasks, undefined);
-  assert.ok(resolveDefinition('official').levels.L1.tasks.mechanical);
+  assert.ok(resolveDefinition('mid').levels.L1.tasks.mechanical);
   const before = await managed(home);
-  await mutate(home, 'create', { ...options, name: 'preview-copy', from: 'official', dryRun: true });
+  await mutate(home, 'create', { ...options, name: 'preview-copy', from: 'mid', dryRun: true });
   assert.deepEqual(await managed(home), before);
-  for (const from of [undefined, 'official']) {
+  for (const from of [undefined, 'mid']) {
     const created = await mutate(home, 'create', { ...options, name: from ? 'explicit-copy' : 'default-copy', ...(from ? { from } : {}) });
     const copied = await showReport(home, created.created_mode.id, options);
     assert.deepEqual(copied.definition.levels, source.definition.levels);
     assert.equal(copied.active, false);
     assert.deepEqual((await showReport(home, undefined, options)).definition.levels, source.definition.levels);
   }
-  const other = await mutate(home, 'create', { ...options, name: 'package-copy', from: 'cut' });
-  assert.deepEqual((await showReport(home, other.created_mode.id, options)).definition.levels, resolveDefinition('cut').levels);
+  const other = await mutate(home, 'create', { ...options, name: 'package-copy', from: 'low' });
+  assert.deepEqual((await showReport(home, other.created_mode.id, options)).definition.levels, resolveDefinition('low').levels);
 });
 
 test('NFC names are unique, aliases cannot collide, and names remain data even with path separators', async () => {
   const home = await fixture(); await mutate(home, 'create', { name: '  Cafe\u0301  ' });
   assert.equal((await readSnapshot(home)).customModes[0].name, 'Café');
-  for (const name of ['Café', '官方', 'cut', 'official', 'high', 'fire', '\u0000bad', '', 'x'.repeat(81)]) await assert.rejects(mutate(home, 'create', { name }), error => error.exitCode === 2);
+  for (const name of ['Café', 'low', 'mid', 'heigh', '\u0000bad', '', 'x'.repeat(81)]) await assert.rejects(mutate(home, 'create', { name }), error => error.exitCode === 2);
   const id = (await readSnapshot(home)).customModes[0].id; await assert.rejects(mutate(home, 'create', { name: id }), error => error.exitCode === 2);
   await mutate(home, 'create', { name: '../data-only/name' });
   assert.equal((await readSnapshot(home)).customModes.length, 2); assert.equal(await fs.stat(path.join(path.dirname(home), 'data-only')).catch(() => null), null);
 });
 
 test('inactive configure changes only definition and metadata; primary changes clear old fallback unless specified', async () => {
-  const home = await fixture(); await mutate(home, 'create', { name: 'custom', from: 'cut' });
+  const home = await fixture(); await mutate(home, 'create', { name: 'custom', from: 'low' });
   const role = await fs.readFile(path.join(home, 'agents/task-scan.toml'));
   const report = await mutate(home, 'configure', { mode: 'custom', level: 'L1', model: 'user-model', effort: 'custom-effort' });
   assert.equal(report.restart.required, false); assert.deepEqual(await fs.readFile(path.join(home, 'agents/task-scan.toml')), role);
@@ -95,7 +95,7 @@ test('full-definition schema and paired fields reject invalid input without writ
     { level: 'L1', model: 'only-half' }, { level: 'L1', fallbackModel: 'only-half' }, { level: 'L1', clearFallback: true, fallbackModel: 'backup', fallbackEffort: 'low' },
     { definition: canonicalDefinition(), level: 'L1' }, { level: 'L5', model: 'model', effort: 'low' },
   ]) await assert.rejects(mutate(home, 'configure', { mode: 'custom', ...options }), error => error.exitCode === 2);
-  await assert.rejects(mutate(home, 'configure', { mode: 'official', definition: canonicalDefinition() }), error => error.code === 'BUILTIN_READ_ONLY'); assert.deepEqual(await managed(home), before);
+  await assert.rejects(mutate(home, 'configure', { mode: 'mid', definition: canonicalDefinition() }), error => error.code === 'BUILTIN_READ_ONLY'); assert.deepEqual(await managed(home), before);
 });
 
 test('active configure failure rolls back definition and all deployment files together', async () => {
@@ -106,7 +106,7 @@ test('active configure failure rolls back definition and all deployment files to
 });
 
 test('setup preserves selected custom mode and all independent definitions', async () => {
-  const home = await fixture(); await mutate(home, 'create', { name: 'first', from: 'cut' }); await mutate(home, 'create', { name: 'second', from: 'first' });
+  const home = await fixture(); await mutate(home, 'create', { name: 'first', from: 'low' }); await mutate(home, 'create', { name: 'second', from: 'first' });
   await mutate(home, 'configure', { mode: 'first', level: 'L3', model: 'mine', effort: 'mine' });
   assert.notEqual((await showReport(home, 'second')).definition.levels.L3.model, 'mine'); await mutate(home, 'set', { mode: 'second' });
   const baseline = await fs.readFile(path.join(home, '.agent-fit/restore.json')); const report = await mutate(home, 'setup'); assert.equal(report.result, 'unchanged');
@@ -135,7 +135,7 @@ test('protected custom metadata rejects id-name namespace collisions in either e
     const state = structuredClone(snapshot.state); state.files[customPath] = createHash('sha256').update(content).digest('hex'); await fs.writeFile(path.join(home, statePath), JSON.stringify(state));
     const before = await bytes();
     await assert.rejects(readSnapshot(home), error => error.code === 'CUSTOM_MODES_INVALID');
-    await assert.rejects(mutate(home, 'set', { mode: 'cut' }), error => error.code === 'CUSTOM_MODES_INVALID');
+    await assert.rejects(mutate(home, 'set', { mode: 'low' }), error => error.code === 'CUSTOM_MODES_INVALID');
     assert.deepEqual(await bytes(), before);
   }
 });

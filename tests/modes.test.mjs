@@ -21,13 +21,13 @@ test('packaged role files and explicit registrations exactly cover the role regi
   }
 });
 
-test('builtin ids are cut/official/high/fire and other names are not aliases', () => {
-  assert.deepEqual(BUILTINS.map(mode => mode.id), ['cut', 'official', 'high', 'fire']);
-  for (const id of ['cut', 'official', 'high', 'fire']) assert.equal(resolveDefinition(id).id, id);
-  for (const name of ['low', 'mid', 'economy', 'balanced', 'performance', '经济', '官方', '高级', '全开']) {
+test('builtin ids and names are low/mid/heigh and other names are not aliases', () => {
+  assert.deepEqual(BUILTINS.map(mode => mode.id), ['low', 'mid', 'heigh']);
+  for (const { id } of BUILTINS) assert.equal(resolveDefinition(id).name, id);
+  for (const name of ['cut', 'official', 'high', 'fire', 'economy', 'balanced', 'performance', '经济', '官方', '高级', '全开']) {
     assert.throws(() => resolveDefinition(name), error => error.code === 'MODE_NOT_FOUND');
   }
-  const custom = { ...resolveDefinition('official'), id: 'custom-example', name: '我的档位', kind: 'custom' };
+  const custom = { ...resolveDefinition('mid'), id: 'custom-example', name: '我的档位', kind: 'custom' };
   assert.equal(resolveDefinition(custom.id, [custom]).id, custom.id);
   assert.equal(resolveDefinition(custom.name, [custom]).id, custom.id);
 });
@@ -37,13 +37,11 @@ test('all builtin primary/fallback tables render roles and current data consiste
     [`${bindings.economy}/high`, `${bindings.economy}/high`, `${bindings.general}/medium`, `${bindings.general}/high`],
     [`${bindings.economy}/high`, `${bindings.general}/medium`, `${bindings.general}/high`, `${bindings.general}/xhigh`],
     [`${bindings.economy}/max`, `${bindings.general}/ultra`, `${bindings.frontier}/ultra`, `${bindings.frontier}/ultra`],
-    [`${bindings.frontier}/ultra`, `${bindings.frontier}/ultra`, `${bindings.frontier}/ultra`, `${bindings.frontier}/ultra`],
   ];
   const backups = [
     [`${bindings.general}/medium`, `${bindings.general}/medium`, `${bindings.general_backup}/medium`, `${bindings.general_backup}/high`],
     [`${bindings.general}/medium`, `${bindings.general_backup}/medium`, `${bindings.general_backup}/high`, `${bindings.general_backup}/xhigh`],
     [`${bindings.general}/high`, `${bindings.general_backup}/ultra`, `${bindings.general}/ultra`, `${bindings.general}/ultra`],
-    [null, null, null, null],
   ];
   for (const [index, mode] of BUILTINS.entries()) {
     assert.deepEqual(Object.values(mode.levels).map(v => `${v.model}/${v.effort}`), expected[index]);
@@ -77,7 +75,7 @@ test('all builtin primary/fallback tables render roles and current data consiste
 });
 
 test('role selection cannot expand original permission contract', () => {
-  const low = resolveDefinition('cut');
+  const low = resolveDefinition('low');
   const hard = explainSelection({ definition: low, level: 'L3', role: 'task_execute', active: true });
   assert.equal(hard.dispatch_role, 'task_delegate'); assert.equal(hard.permission_contract, 'scoped_output');
   assert.equal(hard.primary.model, bindings.general);
@@ -89,7 +87,7 @@ test('role selection cannot expand original permission contract', () => {
 });
 
 test('simple review and complex evidence gathering use the chosen level without changing responsibility', () => {
-  const definition = resolveDefinition('official');
+  const definition = resolveDefinition('mid');
   for (const [level, role, contract] of [['L1', 'task_review', 'readonly_review'], ['L3', 'task_scan', 'readonly_evidence']]) {
     const selected = explainSelection({ definition, level, role, active: true });
     assert.equal(selected.level, level);
@@ -98,8 +96,8 @@ test('simple review and complex evidence gathering use the chosen level without 
     assert.equal(selected.dispatch_role, 'task_delegate');
     assert.equal(selected.permission_contract, contract);
   }
-  const high = resolveDefinition('high');
-  assert.deepEqual(explainSelection({ definition: high, level: 'L3' }).primary, explainSelection({ definition: high, level: 'L4' }).primary);
+  const heigh = resolveDefinition('heigh');
+  assert.deepEqual(explainSelection({ definition: heigh, level: 'L3' }).primary, explainSelection({ definition: heigh, level: 'L4' }).primary);
 });
 
 test('whole definition validation rejects incomplete, unknown and identical backup pairs', () => {
@@ -118,18 +116,4 @@ test('rendered paths are data escaped and distinct per home', async () => {
   assert.notEqual(a.block.toString(), b.block.toString());
   const data = JSON.parse(a.block.toString().split('```json\n')[1].split('\n```')[0]);
   assert.deepEqual(data.skill_command, ['agent-fit', 'skill', 'path', '--codex-home', '/test/`quote<>"', '--json']);
-});
-
-
-test('fire requires session verification and describes an unpinned user or parent fallback', () => {
-  const explained = explainSelection({ definition: resolveDefinition('fire'), level: 'L1', role: 'task_scan' });
-  assert.equal(explained.verification.required, true);
-  assert.equal(explained.verification.scope, 'session');
-  assert.equal(explained.verification.on_failure.selection, 'user_or_parent');
-  assert.equal(explained.verification.on_failure.dispatch_role, 'task_delegate');
-  assert.equal(explained.permission_contract, 'readonly_evidence');
-  assert.equal(explained.fallback, null);
-  assert.equal(explainSelection({ definition: resolveDefinition('high'), level: 'L3' }).verification, null);
-  const custom = { ...resolveDefinition('fire'), kind: 'custom', id: 'custom-test' };
-  assert.equal(explainSelection({ definition: custom, level: 'L1' }).verification, null);
 });

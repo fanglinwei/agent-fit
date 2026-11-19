@@ -18,9 +18,10 @@ const run = (home, args, input) => {
 
 test('help/version and strict argument errors never require a home', () => {
   assert.equal(run('/not-a-home', ['--version']).report.data.cli_version, VERSION);
-  assert.match(run('/not-a-home', ['--help']).report.data.help, /mode configure/);
-  assert.match(run('/not-a-home', ['--help']).report.data.help, /^agent-fit /);
-  for (const args of [['setup', '--agent', 'other'], ['setup', '--bogus'], ['mode', 'bad'], ['mode', 'configure', 'a', '--definition-stdin', '--level', 'L1'], ['models', 'check', '--model', 'x'], ['serve', '--port', '80'], ['setup', '--mode', 'official', '--mode', 'cut']]) {
+  const { help } = run('/not-a-home', ['--help']).report.data;
+  assert.match(help, /mode configure/);
+  assert.match(help, /^agent-fit /);
+  for (const args of [['setup', '--agent', 'other'], ['setup', '--bogus'], ['mode', 'bad'], ['mode', 'configure', 'a', '--definition-stdin', '--level', 'L1'], ['models', 'check', '--model', 'x'], ['serve', '--port', '80'], ['setup', '--mode', 'mid', '--mode', 'low']]) {
     assert.throws(() => parseCommand(args), e => e.exitCode === 2);
   }
   assert.equal(parseCommand(['mode', 'create', '--agent', 'codex', '--', '-named']).options.name, '-named');
@@ -35,9 +36,9 @@ test('real CLI supports setup/switch/custom whole stdin/status/explain/restore w
   assert.deepEqual(run(home, ['setup', '--agent', 'codex', '--dry-run']).report, dry.report);
   await assert.rejects(readFile(path.join(home, 'AGENTS.md')));
   assert.equal(run(home, ['explain', '--level', 'L1']).status, 1);
-  assert.equal(run(home, ['explain', '--mode', 'official', '--level', 'L1']).status, 0);
+  assert.equal(run(home, ['explain', '--mode', 'mid', '--level', 'L1']).status, 0);
   let result = run(home, ['setup']); assert.equal(result.status, 0, result.stdout); assert.equal(result.report.data.restart.required, true);
-  for (const id of ['cut', 'official', 'high', 'fire']) {
+  for (const id of ['low', 'mid', 'heigh']) {
     result = run(home, ['mode', 'set', id]); assert.equal(result.status, 0, result.stdout);
     assert.equal(result.report.data.mode.id, id); assert.equal(result.report.data.restart.required, false); assert.match(result.report.data.restart.message, /无需重启 Codex/);
     assert.equal(run(home, ['status']).report.data.mode.id, id);
@@ -46,8 +47,8 @@ test('real CLI supports setup/switch/custom whole stdin/status/explain/restore w
     assert.equal(JSON.parse(await readFile(path.join(home, '.agent-fit/state.json'), 'utf8')).mode, id);
     assert.equal(JSON.parse(await readFile(path.join(home, '.agent-fit/current-mode.json'), 'utf8')).id, id);
   }
-  assert.deepEqual(run(home, ['mode', 'list']).report.data.modes.map(mode => mode.id), ['cut', 'official', 'high', 'fire']);
-  result = run(home, ['mode', 'create', '我的任务', '--from', 'fire']); assert.equal(result.status, 0); assert.equal(result.report.data.restart.required, false);
+  assert.deepEqual(run(home, ['mode', 'list']).report.data.modes.map(mode => mode.id), ['low', 'mid', 'heigh']);
+  result = run(home, ['mode', 'create', '我的任务', '--from', 'heigh']); assert.equal(result.status, 0); assert.equal(result.report.data.restart.required, false);
   const definition = { levels: structuredClone(BUILTINS[1].levels) }; definition.levels.L4 = { model: 'my-model', effort: 'high', fallback: null };
   result = run(home, ['mode', 'configure', '我的任务', '--definition-stdin'], JSON.stringify(definition)); assert.equal(result.status, 0, result.stdout);
   result = run(home, ['mode', 'set', '我的任务']); assert.equal(result.status, 0);
@@ -66,11 +67,9 @@ test('explain keeps the explicit mode and level together across L4 review previe
   const dir = await mkdtemp(path.join(os.tmpdir(), 'delegation-routing-')); t.after(() => rm(dir, { recursive: true, force: true }));
   const home = path.join(dir, 'uninstalled');
   for (const [mode, model, effort] of [
-    ['high', bindings.frontier, 'ultra'],
-    ['official', bindings.general, 'xhigh'],
-    ['cut', bindings.general, 'high'],
-    ['fire', bindings.frontier, 'ultra'],
-    ['high', bindings.frontier, 'ultra'],
+    ['heigh', bindings.frontier, 'ultra'],
+    ['mid', bindings.general, 'xhigh'],
+    ['low', bindings.general, 'high'],
   ]) {
     const result = run(home, ['explain', '--mode', mode, '--level', 'L4', '--role', 'task_review']);
     assert.equal(result.status, 0, result.stdout);
@@ -110,7 +109,7 @@ test('explain can skip an unsupported primary before dispatch without changing t
 
   for (const [extra, code] of [
     [unsupported('medium'), 'UNSUPPORTED_PAIR_MISMATCH'],
-    [[...unsupported('ultra'), '--mode', 'high'], 'MODE_NOT_ACTIVE'],
+    [[...unsupported('ultra'), '--mode', 'heigh'], 'MODE_NOT_ACTIVE'],
     [['--unsupported-model', bindings.frontier], 'INVALID_ARGUMENT'],
   ]) {
     const rejected = run(home, [...query, ...extra]);
@@ -120,9 +119,8 @@ test('explain can skip an unsupported primary before dispatch without changing t
   }
   assert.deepEqual(run(home, query).report.data.dispatch_candidate, before.dispatch_candidate, 'the observation is not persisted');
   assert.equal(run(home, ['explain', '--level', 'L4', '--task', 'uncertain', ...unsupported('low')]).status, 2);
-  await mutate(home, 'set', { mode: 'fire' });
-  assert.equal(run(home, [...query, ...unsupported('ultra')]).report.errors[0].code, 'FIRE_VERIFICATION_REQUIRED');
-  await mutate(home, 'create', { name: '无备用', from: 'fire' });
+  await mutate(home, 'create', { name: '无备用', from: 'heigh' });
+  await mutate(home, 'configure', { mode: '无备用', level: 'L4', clearFallback: true });
   await mutate(home, 'set', { mode: '无备用' });
   const noFallback = query.slice(0, query.indexOf('--task'));
   assert.equal(run(home, [...noFallback, ...unsupported('ultra')]).report.errors[0].code, 'FALLBACK_NOT_CONFIGURED');
@@ -133,13 +131,13 @@ test('explain separates active, builtin preview and custom selections without ch
   const home = path.join(dir, 'home');
   const { mutate } = await import('../lib/install.mjs');
   await mutate(home, 'setup');
-  await mutate(home, 'create', { name: '查询预检', from: 'official' });
+  await mutate(home, 'create', { name: '查询预检', from: 'mid' });
   await mutate(home, 'configure', { mode: '查询预检', level: 'L1', model: bindings.general, effort: 'high' });
   const before = run(home, ['status']).report.data;
   const customId = run(home, ['mode', 'show', '查询预检']).report.data.definition.id;
   for (const [selector, level, mode, model, effort, dispatchRole] of [
-    [null, 'L4', 'official', bindings.general, 'xhigh', 'task_delegate'],
-    ['high', 'L4', 'high', bindings.frontier, 'ultra', 'task_delegate'],
+    [null, 'L4', 'mid', bindings.general, 'xhigh', 'task_delegate'],
+    ['heigh', 'L4', 'heigh', bindings.frontier, 'ultra', 'task_delegate'],
     ['查询预检', 'L1', customId, bindings.general, 'high', 'task_delegate'],
   ]) {
     const result = run(home, ['explain', '--level', level, '--role', 'task_review', ...(selector ? ['--mode', selector] : [])]);
@@ -156,26 +154,26 @@ test('explain separates active, builtin preview and custom selections without ch
     assert.equal(data.permission_contract, 'readonly_review');
   }
   const after = run(home, ['status']).report.data;
-  assert.equal(after.mode.id, 'official');
+  assert.equal(after.mode.id, 'mid');
   assert.equal(after.configuration_revision, before.configuration_revision);
 });
 
 test('inactive and uninstalled previews use an unpinned role while active selections retain fixed roles', async t => {
   const dir = await mkdtemp(path.join(os.tmpdir(), 'delegation-preview-role-')); t.after(() => rm(dir, { recursive: true, force: true }));
   const home = path.join(dir, 'home');
-  let result = run(home, ['explain', '--mode', 'official', '--level', 'L1', '--role', 'task_scan']);
+  let result = run(home, ['explain', '--mode', 'mid', '--level', 'L1', '--role', 'task_scan']);
   assert.equal(result.status, 0); assert.equal(result.report.data.dispatch_role, 'task_delegate');
   await assert.rejects(readFile(path.join(home, 'AGENTS.md')), { code: 'ENOENT' });
   const { mutate } = await import('../lib/install.mjs');
   await mutate(home, 'setup');
-  await mutate(home, 'create', { name: '候选', from: 'official' });
+  await mutate(home, 'create', { name: '候选', from: 'mid' });
   const before = run(home, ['status']).report.data.configuration_revision;
   const roleBefore = await readFile(path.join(home, 'agents/task-execute.toml'), 'utf8');
   for (const [mode, level, role, model, effort, dispatchRole, contract] of [
     [null, 'L2', 'task_execute', bindings.general, 'medium', 'task_execute', 'scoped_output'],
-    ['official', 'L2', 'task_execute', bindings.general, 'medium', 'task_execute', 'scoped_output'],
-    ['high', 'L2', 'task_execute', bindings.general, 'ultra', 'task_delegate', 'scoped_output'],
-    ['cut', 'L1', 'task_scan', bindings.economy, 'high', 'task_delegate', 'readonly_evidence'],
+    ['mid', 'L2', 'task_execute', bindings.general, 'medium', 'task_execute', 'scoped_output'],
+    ['heigh', 'L2', 'task_execute', bindings.general, 'ultra', 'task_delegate', 'scoped_output'],
+    ['low', 'L1', 'task_scan', bindings.economy, 'high', 'task_delegate', 'readonly_evidence'],
     ['候选', 'L2', 'task_execute', bindings.general, 'medium', 'task_delegate', 'scoped_output'],
   ]) {
     result = run(home, ['explain', '--level', level, '--role', role, ...(mode ? ['--mode', mode] : [])]);
@@ -193,22 +191,22 @@ test('inactive and uninstalled previews use an unpinned role while active select
   assert.equal(result.status, 0); assert.equal(result.report.data.dispatch_role, 'task_execute');
 });
 
-test('retired builtin names fail across CLI selectors without changing configuration', async t => {
-  const dir = await mkdtemp(path.join(os.tmpdir(), 'delegation-retired-')); t.after(() => rm(dir, { recursive: true, force: true }));
+test('CLI mode selectors reject former builtin ids without changing configuration', async t => {
+  const dir = await mkdtemp(path.join(os.tmpdir(), 'delegation-invalid-mode-')); t.after(() => rm(dir, { recursive: true, force: true }));
   const home = path.join(dir, 'home'); assert.equal(run(home, ['setup']).status, 0);
   const revision = run(home, ['status']).report.data.configuration_revision;
-  for (const name of ['low', 'mid', 'economy', 'balanced', 'performance']) {
+  for (const name of ['cut', 'official', 'high', 'fire']) {
     for (const args of [['setup', '--mode', name], ['mode', 'set', name], ['mode', 'show', name], ['mode', 'create', 'invalid-source', '--from', name], ['explain', '--mode', name, '--level', 'L1']]) {
       const result = run(home, args);
       assert.equal(result.status, 2, result.stdout); assert.equal(result.report.errors[0].code, 'MODE_NOT_FOUND');
     }
   }
   assert.equal(run(home, ['status']).report.data.configuration_revision, revision);
-  assert.equal(run(home, ['mode', 'list']).report.data.modes.length, 4);
+  assert.equal(run(home, ['mode', 'list']).report.data.modes.length, 3);
   assert.equal(run(home, ['explain', '--level', 'L1']).status, 0);
-  for (const args of [['mode', 'list'], ['mode', 'show', 'official'], ['status']]) {
+  for (const args of [['mode', 'list'], ['mode', 'show', 'mid'], ['status']]) {
     const output = spawnSync(process.execPath, [CLI, ...args, '--codex-home', home], { encoding: 'utf8', env: { ...process.env, PATH: '/nonexistent' } });
-    assert.equal(output.status, 0); assert.doesNotMatch(output.stdout, /^(?:\*? )?(?:economy|balanced|performance)(?:\s|$)/m);
+    assert.equal(output.status, 0); assert.doesNotMatch(output.stdout, /^(?:\*? )?(?:cut|official|high|economy|balanced|performance|fire)(?:\s|$)/m);
   }
 });
 
@@ -219,19 +217,19 @@ test('real CLI JSON errors redact malformed private config and reject stale revi
   let result = run(home, ['setup']); assert.equal(result.status, 1); assert.ok(!`${result.stdout}${result.stderr}`.includes('TEST_ONLY_NOT_REAL'));
   await writeFile(path.join(home, 'config.toml'), 'model = "user"\n');
   result = run(home, ['setup']); assert.equal(result.status, 0);
-  result = run(home, ['mode', 'set', 'cut', '--expect-revision', 'old']); assert.equal(result.status, 1); assert.equal(result.report.errors[0].code, 'CONFIG_CHANGED');
-  assert.equal(run(home, ['status']).report.data.mode.id, 'official');
-  assert.equal(run(home, ['mode', 'configure', 'official', '--definition-stdin'], '{broken').status, 2);
-  assert.equal(run(home, ['mode', 'configure', 'official', '--definition-stdin'], ' '.repeat(65537)).status, 2);
+  result = run(home, ['mode', 'set', 'low', '--expect-revision', 'old']); assert.equal(result.status, 1); assert.equal(result.report.errors[0].code, 'CONFIG_CHANGED');
+  assert.equal(run(home, ['status']).report.data.mode.id, 'mid');
+  assert.equal(run(home, ['mode', 'configure', 'mid', '--definition-stdin'], '{broken').status, 2);
+  assert.equal(run(home, ['mode', 'configure', 'mid', '--definition-stdin'], ' '.repeat(65537)).status, 2);
   const roleFile = path.join(home, 'agents/task-scan.toml');
   await writeFile(roleFile, await readFile(roleFile, 'utf8') + '\n# changed\n');
   result = run(home, ['status']); assert.equal(result.status, 1); assert.equal(result.report.data.integrity, 'drifted');
   result = run(home, ['explain', '--level', 'L1', '--role', 'task_scan']);
   assert.equal(result.status, 1); assert.equal(result.report.data.dispatch_role, 'task_scan');
   assert.ok(result.report.errors.some(error => error.code === 'MANAGED_FILE_DRIFT'));
-  result = run(home, ['explain', '--mode', 'high', '--level', 'L4', '--role', 'task_review']);
+  result = run(home, ['explain', '--mode', 'heigh', '--level', 'L4', '--role', 'task_review']);
   assert.equal(result.status, 1);
-  assert.equal(result.report.data.mode_id, 'high');
+  assert.equal(result.report.data.mode_id, 'heigh');
   assert.deepEqual(result.report.data.primary, { model: bindings.frontier, effort: 'ultra' });
   assert.ok(result.report.errors.some(error => error.code === 'MANAGED_FILE_DRIFT'));
 });

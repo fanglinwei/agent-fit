@@ -63,9 +63,9 @@ test('configuration operations never launch model checks, query providers or sav
   assert.equal(result.code, 0);
   await assert.rejects(readFile(path.join(f.home, 'AGENTS.md')), { code: 'ENOENT' });
   for (const args of [
-    ['setup', '--mode', 'high'], ['setup'], ['mode', 'set', 'high'],
-    ['mode', 'set', 'cut'], ['mode', 'set', 'official'], ['mode', 'set', 'fire'],
-    ['mode', 'create', 'copy', '--from', 'fire'],
+    ['setup', '--mode', 'heigh'], ['setup'], ['mode', 'set', 'heigh'],
+    ['mode', 'set', 'low'], ['mode', 'set', 'mid'],
+    ['mode', 'create', 'copy', '--from', 'heigh'],
     ['mode', 'configure', 'copy', '--level', 'L1', '--model', 'custom', '--effort', 'high'],
     ['mode', 'set', 'copy', '--dry-run'], ['mode', 'set', 'copy'],
     ['mode', 'configure', 'copy', '--level', 'L1', '--model', 'custom', '--effort', 'ultra'],
@@ -89,9 +89,9 @@ test('model binding reviews all affected routes and updates only new builtin sel
     return result.report;
   };
   await run(['setup']);
-  await run(['mode', 'create', 'pinned', '--from', 'official']);
+  await run(['mode', 'create', 'pinned', '--from', 'mid']);
   const scope = ['--scope', 'session', '--thread', 'fixture-chat', '--project', f.root];
-  await run(['mode', 'set', 'cut', ...scope]);
+  await run(['mode', 'set', 'low', ...scope]);
   const bindingPath = path.join(f.home, '.agent-fit/model-bindings.json');
   const original = (await run(['explain', '--level', 'L2'])).data;
   const routes = ['models', 'bind', 'general', 'future-general'];
@@ -108,8 +108,8 @@ test('model binding reviews all affected routes and updates only new builtin sel
   await setCatalog(allEfforts);
   let preview = (await run([...routes, '--dry-run'])).data;
   assert.equal(preview.configuration_status, 'not_written');
-  assert.ok(preview.model_binding.routes.some(route => route.mode === 'official' && route.level === 'L2' && route.position === 'primary' && route.after.model === 'future-general'));
-  assert.ok(preview.model_binding.routes.some(route => route.mode === 'cut' && route.task === 'visual' && route.position === 'fallback' && route.after.model === 'future-general'));
+  assert.ok(preview.model_binding.routes.some(route => route.mode === 'mid' && route.level === 'L2' && route.position === 'primary' && route.after.model === 'future-general'));
+  assert.ok(preview.model_binding.routes.some(route => route.mode === 'low' && route.task === 'visual' && route.position === 'fallback' && route.after.model === 'future-general'));
   await assert.rejects(readFile(bindingPath), { code: 'ENOENT' });
   assert.equal((await run(['explain', '--level', 'L2'])).data.primary.model, bindings.general);
 
@@ -133,14 +133,14 @@ test('model binding reviews all affected routes and updates only new builtin sel
   assert.deepEqual(original.primary, { model: bindings.general, effort: 'medium' });
   assert.equal((await run(['explain', '--level', 'L2', '--mode', 'pinned'])).data.primary.model, bindings.general);
   const scoped = (await run(['explain', '--level', 'L1', '--task', 'visual', ...scope])).data;
-  assert.equal(scoped.mode_id, 'cut');
+  assert.equal(scoped.mode_id, 'low');
   assert.equal(scoped.fallback.model, 'future-general');
-  assert.equal((await run(['mode', 'list', ...scope])).data.modes.find(mode => mode.id === 'high').levels.L2.model, 'future-general');
+  assert.equal((await run(['mode', 'list', ...scope])).data.modes.find(mode => mode.id === 'heigh').levels.L2.model, 'future-general');
   assert.equal((await run(['status'])).data.roles.find(role => role.name === 'task_execute').configured_model, 'future-general');
-  await run(['mode', 'set', 'high']);
+  await run(['mode', 'set', 'heigh']);
   assert.equal((await run(['explain', '--level', 'L2'])).data.primary.model, 'future-general');
   const otherHome = path.join(f.root, 'another-home');
-  assert.equal((await readSnapshot(otherHome)).builtins.find(mode => mode.id === 'official').levels.L2.model, bindings.general);
+  assert.equal((await readSnapshot(otherHome)).builtins.find(mode => mode.id === 'mid').levels.L2.model, bindings.general);
   assert.deepEqual(f.requests, []);
   assert.ok((await readFile(f.launches, 'utf8')).trim().split('\n').every(method => ['started', 'initialize', 'account/read', 'config/read', 'model/list'].includes(method)));
   await run(['restore']);
@@ -149,7 +149,7 @@ test('model binding reviews all affected routes and updates only new builtin sel
 
 test('manual verification still makes an isolated request and saves history independently of settings', async t => {
   const f = await fixture(t);
-  assert.equal((await f.run(['setup', '--mode', 'fire'])).code, 0);
+  assert.equal((await f.run(['setup', '--mode', 'mid'])).code, 0);
   assert.deepEqual(f.requests, []);
   const args = ['models', 'check', '--verify', '--model', bindings.frontier, '--effort', 'ultra'];
   let result = await f.run(args);
@@ -159,19 +159,19 @@ test('manual verification still makes an isolated request and saves history inde
   assert.deepEqual(f.requests, ['GET', 'POST']); assert.equal(f.posts.length, 1);
   assert.equal((await modelHistory(f.home)).records.length, 1);
   await chmod(path.join(f.home, '.agent-fit-checks'), 0o755);
-  result = await f.run(['mode', 'set', 'high']);
-  assert.equal(result.code, 0); assert.equal((await readSnapshot(f.home)).mode.id, 'high');
+  result = await f.run(['mode', 'set', 'heigh']);
+  assert.equal(result.code, 0); assert.equal((await readSnapshot(f.home)).mode.id, 'heigh');
   assert.equal(f.posts.length, 1);
   result = await f.run(args);
   assert.equal(result.code, 1); assert.equal(result.report.data.status, 'incomplete');
   assert.equal(result.report.data.check_status, 'passed');
   assert.equal(result.report.data.history.status, 'failed');
-  assert.equal((await readSnapshot(f.home)).mode.id, 'high');
+  assert.equal((await readSnapshot(f.home)).mode.id, 'heigh');
 });
 
 test('provider authentication failure only affects an explicitly requested model check', async t => {
   const f = await fixture(t); f.reject({ status: 401, error: { message: PRIVATE } });
-  let result = await f.run(['setup', '--mode', 'high']);
+  let result = await f.run(['setup', '--mode', 'heigh']);
   assert.equal(result.code, 0); assert.equal(result.report.data.configuration_status, 'written');
   assert.deepEqual(f.requests, []);
   result = await f.run(['models', 'bind', 'general', 'provider-model', '--dry-run']);
@@ -181,6 +181,6 @@ test('provider authentication failure only affects an explicitly requested model
   result = await f.run(['models', 'check', '--verify', '--model', bindings.frontier, '--effort', 'ultra']);
   assert.notEqual(result.code, 0); assert.equal(result.report.data.stop_reason, 'PROBE_AUTH_FAILED');
   assert.equal(result.report.data.history.status, 'saved');
-  assert.equal((await readSnapshot(f.home)).mode.id, 'high'); assert.equal(f.posts.length, 1);
+  assert.equal((await readSnapshot(f.home)).mode.id, 'heigh'); assert.equal(f.posts.length, 1);
   assert.equal(JSON.stringify(result).includes(PRIVATE), false);
 });

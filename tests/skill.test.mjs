@@ -17,7 +17,7 @@ const temporary = [];
 beforeEach(async () => { await fs.rm(path.dirname(sharedSkillPath()), { recursive: true, force: true }); });
 afterEach(async () => { setTestHooks(); setSkillTestHooks(); await Promise.all(temporary.splice(0).map(root => fs.rm(root, { recursive: true, force: true }))); });
 async function fixture() {
-  const root = await fs.realpath(await fs.mkdtemp(path.join(os.tmpdir(), 'agent-fit-migration-')));
+  const root = await fs.realpath(await fs.mkdtemp(path.join(os.tmpdir(), 'agent-fit-skill-')));
   temporary.push(root);
   return { root, home: path.join(root, '.codex') };
 }
@@ -41,7 +41,7 @@ const cli = (home, args) => {
 
 // Version 2 registered the full Skill tree and generated home-specific role copies inside it.
 async function legacyInstallation(home, placement = 'moved') {
-  const mode = resolveDefinition('high');
+  const mode = resolveDefinition('heigh');
   const payload = await renderPayload(home, mode), files = new Map();
   for (const [name, bytes] of await skillAssets()) files.set(`skills/agent-fit/${name}`, name === 'SKILL.md' ? Buffer.concat([bytes, Buffer.from('\nLegacy packaged instructions.\n')]) : bytes);
   for (const [relative, bytes] of payload.files) {
@@ -77,7 +77,7 @@ for (const placement of ['legacy', 'moved', 'link']) test(`migrate ${placement} 
   assert.equal(preview.result, 'preview'); assert.deepEqual(await tree(home), before);
   await mutate(home, 'setup');
   const snapshot = await readSnapshot(home);
-  assert.equal(snapshot.state.schema_version, 3); assert.equal(snapshot.mode.id, 'high');
+  assert.equal(snapshot.state.schema_version, 3); assert.equal(snapshot.mode.id, 'heigh');
   assert.ok(Object.keys(snapshot.state.files).every(name => !name.startsWith('skills/')));
   assert.deepEqual(snapshot.diagnostics.filter(value => value.status === 'fail'), []);
   const entry = cli(home, ['skill', 'path']); assert.equal(entry.code, 0); assert.equal(entry.data.path, path.join(await fs.realpath(sharedSkillPath()), 'SKILL.md'));
@@ -85,7 +85,7 @@ for (const placement of ['legacy', 'moved', 'link']) test(`migrate ${placement} 
   await fs.rm(path.join(home, 'skills/agent-fit'), { recursive: true, force: true });
   assert.equal(cli(home, ['explain', '--level', 'L2']).code, 0);
   const staticFiles = await tree(sharedSkillPath());
-  await mutate(home, 'set', { mode: 'cut' });
+  await mutate(home, 'set', { mode: 'low' });
   assert.deepEqual(await tree(sharedSkillPath()), staticFiles);
   await mutate(home, 'restore');
   assert.deepEqual(await tree(sharedSkillPath()), staticFiles);
@@ -106,7 +106,7 @@ test('migration preserves calibrated builtin levels and all local/custom selecti
   const roleBytes = Buffer.from(stringify(role)); await fs.writeFile(rolePath, roleBytes);
   await fs.writeFile(path.join(sharedSkillPath(), 'assets/codex/agents/task-scan.toml'), roleBytes);
   state.files['agents/task-scan.toml'] = digest(roleBytes); state.files['skills/agent-fit/assets/codex/agents/task-scan.toml'] = digest(roleBytes);
-  const scopeBytes = Buffer.from(JSON.stringify({ schema_version: 1, projects: [{ project: '/project', selection: 'cut', modes: [] }], sessions: [{ thread: 'chat', selection: 'official', modes: [] }] }));
+  const scopeBytes = Buffer.from(JSON.stringify({ schema_version: 1, projects: [{ project: '/project', selection: 'low', modes: [] }], sessions: [{ thread: 'chat', selection: 'mid', modes: [] }] }));
   const scopes = '.agent-fit/scopes.json'; await fs.writeFile(path.join(home, scopes), scopeBytes, { mode: 0o600 });
   state.files[scopes] = digest(scopeBytes); state.file_modes[scopes] = 0o600;
   const baselinePath = path.join(home, '.agent-fit/restore.json'); const baseline = JSON.parse(await fs.readFile(baselinePath)); baseline.entries[scopes] = null;
@@ -145,13 +145,13 @@ test('migration failure rolls home back and leaves shared files intact', async (
 
 test('two homes share rules while switches, custom definitions and restore remain isolated', async () => {
   const a = (await fixture()).home, b = (await fixture()).home;
-  await mutate(a, 'setup', { mode: 'high' }); await mutate(b, 'setup', { mode: 'cut' });
-  await mutate(a, 'create', { name: 'only-a', from: 'high' });
+  await mutate(a, 'setup', { mode: 'heigh' }); await mutate(b, 'setup', { mode: 'low' });
+  await mutate(a, 'create', { name: 'only-a', from: 'heigh' });
   const bBefore = await tree(b), shared = await tree(sharedSkillPath());
   await mutate(a, 'set', { mode: 'only-a' });
   assert.deepEqual(await tree(b), bBefore); assert.deepEqual(await tree(sharedSkillPath()), shared);
   await mutate(a, 'restore');
-  assert.equal((await readSnapshot(b)).mode.id, 'cut'); assert.deepEqual(await tree(b), bBefore); assert.deepEqual(await tree(sharedSkillPath()), shared);
+  assert.equal((await readSnapshot(b)).mode.id, 'low'); assert.deepEqual(await tree(b), bBefore); assert.deepEqual(await tree(sharedSkillPath()), shared);
   assert.equal(await fs.stat(path.join(sharedSkillPath(), 'references/current-mode.json')).catch(() => null), null);
 });
 
@@ -227,6 +227,27 @@ test('setup reports a committed home when shared install fails, and retry comple
   assert.ok((await inspectSkill(home)).path);
 });
 
+for (const missing of ['SKILL.md', 'references/task-routing.md']) test(`setup blocks an existing shared Skill missing ${missing}`, async () => {
+  const { home } = await fixture(), second = (await fixture()).home;
+  await mutate(home, 'setup');
+  await fs.unlink(path.join(sharedSkillPath(), missing));
+  if (missing === 'SKILL.md') assert.equal(cli(second, ['skill', 'path']).errors[0]?.code, 'SKILL_FILE_MISSING');
+  const shared = await tree(sharedSkillPath()), first = await tree(home);
+  for (const dryRun of [true, false]) {
+    const args = ['setup', ...(dryRun ? ['--dry-run'] : [])];
+    const result = cli(second, args);
+    assert.equal(result.code, 1);
+    assert.equal(result.errors[0]?.code, 'SKILL_NOT_READY');
+    assert.match(result.errors[0].message, /skill update --dry-run/);
+    assert.equal(result.data.configuration_status, 'not_written');
+    await assert.rejects(fs.lstat(second), { code: 'ENOENT' });
+  }
+  assert.deepEqual(await tree(home), first);
+  assert.deepEqual(await tree(sharedSkillPath()), shared);
+  await updateSkill(second);
+  assert.equal((await mutate(second, 'setup')).result, 'applied');
+});
+
 test('different old and shared snapshots block migration without choosing by timestamps', async () => {
   const { home } = await fixture(); await legacyInstallation(home, 'legacy');
   await fs.mkdir(path.dirname(sharedSkillPath()), { recursive: true }); await fs.cp(path.join(home, 'skills/agent-fit'), sharedSkillPath(), { recursive: true });
@@ -239,9 +260,47 @@ test('different old and shared snapshots block migration without choosing by tim
 test('unavailable shared rules do not block restoring a home or expose linked file contents', async () => {
   const { home } = await fixture(); await mutate(home, 'setup');
   const entry = path.join(sharedSkillPath(), 'SKILL.md'); await fs.unlink(entry); await fs.symlink('/etc/passwd', entry);
-  const report = await statusReport(home); assert.equal(report.mode.id, 'official'); assert.ok(report.diagnostics.some(value => value.code === 'SKILL_UNAVAILABLE'));
+  const report = await statusReport(home); assert.equal(report.mode.id, 'mid'); assert.ok(report.diagnostics.some(value => value.code === 'SKILL_UNAVAILABLE'));
   assert.equal(cli(home, ['skill', 'path']).code, 1);
   await mutate(home, 'restore', { expectRevision: report.configuration_revision });
   assert.equal((await fs.lstat(entry)).isSymbolicLink(), true);
   assert.equal(await fs.stat(path.join(home, '.agent-fit/state.json')).catch(() => null), null);
+});
+
+for (const scenario of ['missing', 'modified', 'manifest']) test(`shared Skill ${scenario} is observable without blocking home recovery`, async () => {
+  const { home } = await fixture();
+  await mutate(home, 'setup');
+  const before = await statusReport(home);
+  assert.equal(before.skill_integrity, 'clean');
+  const reference = path.join(sharedSkillPath(), 'references/failure-policy.md');
+  if (scenario === 'missing') await fs.unlink(reference);
+  if (scenario === 'modified') await fs.appendFile(path.join(sharedSkillPath(), 'SKILL.md'), '\nUser edit\n');
+  if (scenario === 'manifest') await fs.writeFile(path.join(sharedSkillPath(), '.agent-fit-manifest.json'), '{invalid');
+  const after = await statusReport(home);
+  assert.notEqual(after.skill_integrity, 'clean');
+  assert.equal(after.rules.integrity, after.skill_integrity);
+  assert.notEqual(after.skill_revision, before.skill_revision);
+  assert.equal(after.configuration_revision, before.configuration_revision);
+  const code = { missing: 'SKILL_FILE_MISSING', modified: 'SKILL_FILE_MODIFIED', manifest: 'SKILL_MANIFEST_INVALID' }[scenario];
+  assert.ok(after.diagnostics.some(item => item.code === code));
+  const report = cli(home, ['explain', '--level', 'L3']);
+  assert.equal(report.code, 0);
+  assert.equal(report.data.skill_integrity, after.skill_integrity);
+  assert.equal(report.data.skill_revision, after.skill_revision);
+  const contents = await fs.readFile(path.join(sharedSkillPath(), 'SKILL.md'));
+  await mutate(home, 'restore', { expectRevision: after.configuration_revision });
+  assert.deepEqual(await fs.readFile(path.join(sharedSkillPath(), 'SKILL.md')), contents);
+  assert.equal((await readSnapshot(home)).state, null);
+});
+
+test('untracked rules and incomplete manifests are not reported as clean', async () => {
+  const { home } = await fixture();
+  await mutate(home, 'setup');
+  const file = path.join(sharedSkillPath(), '.agent-fit-manifest.json');
+  const manifest = JSON.parse(await fs.readFile(file));
+  delete manifest.files['references/failure-policy.md'];
+  await fs.writeFile(file, JSON.stringify(manifest));
+  assert.equal((await inspectSkill(home)).integrity, 'invalid');
+  await fs.unlink(file);
+  assert.equal((await inspectSkill(home)).integrity, 'untracked');
 });

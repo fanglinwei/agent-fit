@@ -17,7 +17,7 @@ license: MIT
 3. **选择可用组合**：按“任务复杂度与组合选择”中的命令查询。核对退出码、封套、上下文、所选组合及规则完整性。已有适用于当前会话的证据表明首选不受支持时，在首次派发前按[失败处理](references/failure-policy.md#派发前排除)查询备用；无需先发一次注定失败的委派。
 4. **冻结证据**：保存 `configuration_revision`、`skill_revision`、`effective_scope` 和完整 `task_profile`（含全部候选与备用）。接续沿用原快照及次数；途中切档或编辑仅影响新任务。
 5. **派发完整契约**：使用 [派发契约模板](references/dispatch-contract.md)。固定角色仅在 model 和 effort 同时匹配时使用；L4、不匹配、用户指定或继承时用 task_delegate，保留原职责。作用域查询使用 task_delegate，显式 model + effort 和 `fork_turns="none"`，完整交接；核对宿主默认，省略参数不证明继承。
-6. **核验并返回**：完成下文权限与返回要求。首次失败后先读 [失败处理](references/failure-policy.md) 再决定接续；仅内置 fire 在首次使用前另读 [fire 门槛](references/failure-policy.md#fire-验证与继承备用)。评测或调优时才读 [校准指南](references/calibration.md)。
+6. **核验并返回**：完成下文权限与返回要求。首次失败后先读 [失败处理](references/failure-policy.md) 再决定接续。评测或调优时才读 [校准指南](references/calibration.md)。
 
 ## 安装与作用域
 
@@ -41,20 +41,19 @@ license: MIT
 
 用一句话说明执行方式、所解决的具体约束与主要理由，区分预计收益和实际执行；不逐次生成评分表或持久账本。收益估算工具不可用不阻断主会话能安全完成的工作；子代理启动失败与接续仍遵守下文失败处理，写入者停止状态未知时不得接管同范围写入。
 
-## 四个档位
+## 三个内置档位
 
-- cut（经济）：沿用经济配置及备用，复杂部分提高任务等级。
-- official（官方，首次配置默认）：L1 经济用途/high，L2 通用用途/medium，L3 通用用途/high，L4 通用用途/xhigh。这是依据官方建议制定的本地映射，官方没有固定 L1–L4 表。
-- high（高级）：L1 经济用途/max，L2 通用用途/ultra，L3、L4 旗舰用途/ultra。
-- fire（全开）：全部等级使用旗舰用途/ultra，委派前必须通过下面的实际验证；失败时使用用户指定组合，否则继承父代理组合。
+- low（经济）：沿用经济配置及备用，复杂部分提高任务等级。
+- mid（官方，首次配置默认）：L1 经济用途/high，L2 通用用途/medium，L3 通用用途/high，L4 通用用途/xhigh。这是依据官方建议制定的本地映射，官方没有固定 L1–L4 表。
+- heigh（高级）：L1 经济用途/max，L2 通用用途/ultra，L3、L4 旗舰用途/ultra。
 
-cut/official 保留四级基线，并增加同级任务候选。专长模型用于符合条件的 visual/computer/writing：L1 low、L2 medium、L3 high，故障备用为通用用途 medium/medium/high；不提供 L4 专长候选。先判复杂度再匹配专长，高不确定性、强耦合或高后果且难验收时优先原保障路线，电脑操作不扩大权限。用户明确选择 high/fire 即授权其展示的高强度组合；仅预览或保存不算选择，预算和 fire 验证继续适用。自定义按明确保存并选择的基线与候选执行。
+low/mid 保留四级基线，并增加同级任务候选。专长模型用于符合条件的 visual/computer/writing：L1 low、L2 medium、L3 high，故障备用为通用用途 medium/medium/high；不提供 L4 专长候选。先判复杂度再匹配专长，高不确定性、强耦合或高后果且难验收时优先原保障路线，电脑操作不扩大权限。用户明确选择 heigh 即授权其展示的高强度组合；仅预览或保存不算选择，仍须满足预算。自定义按明确保存并选择的基线与候选执行。
 
 内置档位引用模型用途，实际 model、effort 与备用以绑定 home 的 CLI 查询结果为准。模型换代按[模型绑定](references/configuration.md#模型绑定)显式预览和应用；已开始任务及自定义档位继续使用原具体组合。写入配置或在目录列出不证明实际可调用。
 
 ## 任务复杂度与组合选择
 
-L1–L4 表示任务需求，档位表示资源策略，model + effort 是最终执行组合。相邻等级可以共用组合：基线中 cut 的 L1/L2、high 的 L3/L4、fire 的全部等级相同，不代表有四档实际能力；同级任务候选可进一步区分。CLI 接收主代理选好的等级与任务类型，不自动识别复杂度。
+L1–L4 表示任务需求，档位表示资源策略，model + effort 是最终执行组合。相邻等级可以共用组合：low 的 L1 与 L2 共用同一基线，heigh 的 L3 与 L4 也一样；同级任务候选可进一步区分。CLI 接收主代理选好的等级与任务类型，不自动识别复杂度。
 
 | 等级 | 可观察的推理需求 | 例子与边界 |
 | --- | --- | --- |
@@ -67,21 +66,21 @@ L1–L4 表示任务需求，档位表示资源策略，model + effort 是最终
 
 范围用于限定职责、上下文与交互边界，不能按文件数计分；用户明确的时延要求只在满足原质量要求的候选间取舍。以上任务信号用于说明选择，不相加为固定总分，不额外调用模型分类。
 
-在最终等级内，先核对组合是否满足原工具、输入、上下文与验收能力，再按 [同级任务候选](references/task-routing.md) 判断使用基线还是 mechanical、bounded、scan、deep、complex、uncertain、reasoning，或视觉 visual、电脑操作 computer、写作 writing；说明候选适用依据，无法满足能力要求时停止受影响委派。明确低延迟路线用已配置的 latency。普通旗舰候选默认 low，复杂推理或有证据的质量升级最多 medium；不能自动提高到 high/xhigh/max/ultra。high/fire 的明确选档授权及用户明确保存并选择的自定义组合按上文执行。规模、审查职责和时延均不能绕过保障下限。同级候选及各自备用也属于任务完整快照。
+在最终等级内，先核对组合是否满足原工具、输入、上下文与验收能力，再按 [同级任务候选](references/task-routing.md) 判断使用基线还是 mechanical、bounded、scan、deep、complex、uncertain、reasoning，或视觉 visual、电脑操作 computer、写作 writing；说明候选适用依据，无法满足能力要求时停止受影响委派。明确低延迟路线用已配置的 latency。普通旗舰候选默认 low，复杂推理或有证据的质量升级最多 medium；不能自动提高到 high/xhigh/max/ultra。heigh 的明确选档授权及用户明确保存并选择的自定义组合按上文执行。规模、审查职责和时延均不能绕过保障下限。同级候选及各自备用也属于任务完整快照。
 
 按“档位 id + 最终等级”及同级任务类型（如有）核对同一条配置中的 model、effort；两者含义不同，但按配置成对选择，不临时拼出未配置组合。不假定不同模型的同名 effort 等效，也不假定更高 effort 总比换模型合适。用一句话说明档位 id、等级、任务类型、复杂度依据、保障调整（如有）与所选组合；用户明确组合与原预算优先，无法满足时报告受影响部分。
 
 复杂度、任务类型与职责由主代理判断；配置查表与 JSON 解析由主代理直接使用工具完成，不为读取映射额外派发子代理。使用 `agent-fit explain --codex-home <绑定 home> --scope session --project <项目根> --level <最终等级> --task <任务类型> --role <原职责> --json`；退出码为 0、顶层 `errors` 为空，且 `data.skill_integrity` 为 clean、`data.skill_revision` 非空，`data.scope`、`data.context`、`data.effective_scope`、`data.mode_id`、`data.level`、`data.task`、`data.requested_role` 均符合本次目标上下文与选择后，才使用 `data.dispatch_candidate`、`data.dispatch_role`、`data.permission_contract`。定义没有候选或明确使用基线时省略 --task；明确请求的候选缺失则阻断，不猜组合。获授权评估非活动档位时加 `--mode <候选 id>`，这不切换模式或授权最高强度。工具不可用、查询失败或结果不符时按 [配置查询说明](references/configuration.md#配置查询与失败分流) 处理，不凭记忆补值，也不据此提高任务等级。静态查询不证明运行身份或可用性。
 
-组合是待校准的预设。用户要求评估或调优时读取 [校准指南](references/calibration.md)，分别验证分级判断与实际任务结果，先冻结输入、候选及原验收，再独立比较。缺少校准数据限制能力与收益结论，不增加普通档位的派发门槛；仍须核对授权、规则完整性、能力与预算，fire 保留专有验证。单次自报成功或较强模型调用比例不证明质量；不自动采集账本、发起对照请求或修改默认映射。
+正常派发还须确认 `data.active` 为 true。非活动定义仅作预览或获授权的评估；已选档位也不等于运行已验证。
 
-## 接续与 fire
+组合是待校准的预设。用户要求评估或调优时读取 [校准指南](references/calibration.md)，分别验证分级判断与实际任务结果，先冻结输入、候选及原验收，再独立比较。缺少校准数据限制能力与收益结论，不增加派发门槛；仍须核对授权、规则完整性、能力与预算。单次自报成功或较强模型调用比例不证明质量；不自动采集账本、发起对照请求或修改默认映射。
 
-cut、official、high 及用户已选择的自定义档位，仅在本级非空 fallback、全部条件与原预算满足时允许备用；null 不借用其他档位或 fire 继承。接续前读取 [失败处理](references/failure-policy.md)，分别判断前提缺失、质量升级和可用性故障；认证、权限、额度、账单与原因 unknown 时停止受影响路径。
+## 失败后接续
+
+low、mid、heigh 及用户已选择的自定义档位，仅在本级非空 fallback、全部条件与原预算满足时允许备用；null 不借用其他档位。接续前读取 [失败处理](references/failure-policy.md)，分别判断前提缺失、质量升级和可用性故障；认证、权限、额度、账单与原因 unknown 时停止受影响路径。
 
 初次、重试、质量升级与备用共用每任务最多三次委派；同一组合最多额外一次，累计重试等待不超过30秒且遵守 Retry-After，宿主重试未知时不叠加。拆分不重置次数，相同组合不冒充升级；旧写入者停止未知时不重派。规则细节与有限接续均以失败处理为准，不缩减原输入、工具、范围或验收。
-
-仅内置 fire 需每会话的请求、可信运行身份与当前会话一致证据；独立 CLI 检查的 passed 不能代替会话匹配。`verification_summary` 分开报告请求成功、响应身份、会话匹配和 fire 放行；`fire_gate_satisfied` 为 null/false 时，不能仅凭检查通过放行。其他可信宿主证据仍按 [fire 门槛](references/failure-policy.md#fire-验证与继承备用) 核对。供应商、账号、model 或 effort 变化后重验，不跨会话缓存；未完成时只用用户指定或已确认的父代理实际组合，不猜测或切 high。
 
 ## 权限与返回
 

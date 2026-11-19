@@ -77,11 +77,30 @@ const codes = report => report.diagnostics.map(item => item.code);
 test('a changed configuration after user confirmation sends no account or inference RPC', async t => {
   const { home } = await fixture(t);
   const server = fakeServer();
-  const report = await checkAccountModels({ home, verify: true, target: single, expectRevision: 'previous' }, { spawn: server.spawn, readSnapshot: async () => ({ configuration_revision: 'current', mode: BUILTINS.find(mode => mode.id === 'fire') }) });
+  const report = await checkAccountModels({ home, verify: true, target: single, expectRevision: 'previous' }, { spawn: server.spawn, readSnapshot: async () => ({ configuration_revision: 'current', mode: BUILTINS.find(mode => mode.id === 'heigh') }) });
   assert.equal(report.exit_code, 1); assert.equal(report.configuration_changed, true);
   assert.equal(report.source_revision, 'previous'); assert.ok(codes(report).includes('CONFIG_CHANGED'));
   assert.equal(report.checked_pairs[0].request_status, 'not_checked');
   assert.equal(server.launches.length, 0);
+});
+
+test('implicit and explicit global verification reject managed drift before launching Codex', async t => {
+  const { home } = await fixture(t);
+  await mutate(home, 'setup');
+  const snapshot = await readSnapshot(home);
+  snapshot.mode.levels.L1.model = 'drifted-model';
+  snapshot.diagnostics.push({ code: 'MANAGED_FILE_DRIFT', status: 'fail' });
+  let started = 0;
+  for (const scope of [undefined, 'global']) {
+    const report = await checkAccountModels({ home, scope, verify: true }, {
+      readSnapshot: async () => snapshot,
+      spawn() { started++; throw new Error('unexpected child launch'); },
+    });
+    assert.equal(report.exit_code, 1);
+    assert.ok(report.diagnostics.some(item => item.code === 'CONFIG_SNAPSHOT_UNAVAILABLE'));
+    assert.deepEqual(report.checked_pairs, []);
+  }
+  assert.equal(started, 0);
 });
 
 test('catalog pagination includes hidden models, binds home, and emits only safe fields', async t => {
@@ -316,21 +335,6 @@ test('a supplied home with spaces and quote characters remains data', async t =>
 });
 
 
-test('fire verification failure preserves unknown access and reports the user or parent fallback', async t => {
-  const { home } = await fixture(t);
-  const server = fakeServer({ pages: [{ data: [model(bindings.frontier, ['ultra'])] }] });
-  const report = await checkAccountModels({ home, verify: true }, { spawn: server.spawn, readSnapshot: async () => ({ configuration_revision: 'initial', mode: BUILTINS[3] }) });
-  assert.equal(report.exit_code, 1);
-  assert.equal(report.checked_pairs.length, 1);
-  assert.equal(report.checked_pairs[0].parameter_support, 'supported');
-  assert.equal(report.checked_pairs[0].request_status, 'not_checked');
-  assert.equal(report.checked_pairs[0].actual_model, null);
-  assert.equal(report.verification.on_failure.selection, 'user_or_parent');
-  assert.equal(report.verification.on_failure.dispatch_role, 'task_delegate');
-  assert.ok(codes(report).includes('PROBE_AUTH_UNAVAILABLE'));
-  assert.ok(server.calls.every(call => ['initialize', 'initialized', 'account/read', 'config/read', 'model/list'].includes(call.method)));
-});
-
  test('verify reaches an isolated Responses request and checks identity without starting a Codex thread', async t => {
   const {home}=await fixture(t); const server=fakeServer({provider:'custom',providers:{custom:{base_url:'https://configured.example/v1',env_key:'PROBE_TEST_KEY'}}});
   let calls=0;
@@ -346,7 +350,6 @@ test('fire verification failure preserves unknown access and reports the user or
   assert.equal(report.verification_summary.request_succeeded, true);
   assert.equal(report.verification_summary.reported_identity_matched, true);
   assert.equal(report.verification_summary.session_context_matched, null);
-  assert.equal(report.verification_summary.fire_gate_satisfied, null);
   assert.ok(report.verification_summary.missing_evidence.includes('SESSION_CONTEXT_UNVERIFIED'));
   assert.equal(report.checked_pairs[0].source_revision, report.source_revision);
   assert.equal(report.checked_pairs[0].valid_for_current_configuration, true);
@@ -356,7 +359,7 @@ const externalProviders={custom:{base_url:'https://configured.example/v1',env_ke
 test('manual primary verification uses the selected session profile, deduplicates and excludes fallback', async t => {
   const { home, root } = await fixture(t);
   await mutate(home, 'setup');
-  await mutate(home, 'set', { scope: 'session', project: root, thread: 'model-chat', mode: 'high' });
+  await mutate(home, 'set', { scope: 'session', project: root, thread: 'model-chat', mode: 'heigh' });
   const server = fakeServer({ provider: 'custom', providers: externalProviders });
   const requests = [];
   const report = await checkAccountModels({ home, scope: 'session', project: root, thread: 'model-chat', verify: true }, {
@@ -366,11 +369,11 @@ test('manual primary verification uses the selected session profile, deduplicate
       return new Response(JSON.stringify({ status: 'completed', model: body.model, reasoning: body.reasoning, output: [{ type: 'message' }] }));
     },
   });
-  assert.equal(report.mode.id, 'high'); assert.equal(report.status, 'passed');
+  assert.equal(report.mode.id, 'heigh'); assert.equal(report.status, 'passed');
   assert.deepEqual(requests, [[bindings.economy, 'max'], [bindings.general, 'ultra'], [bindings.frontier, 'ultra']]);
   assert.equal(report.checked_pairs.length, 3);
 });
-function providerInternal(server,fetch) { return {spawn:server.spawn,env:{PROBE_TEST_KEY:PRIVATE},readSnapshot:async()=>({configuration_revision:'stable',mode:BUILTINS[3]}),fetch}; }
+function providerInternal(server,fetch) { return {spawn:server.spawn,env:{PROBE_TEST_KEY:PRIVATE},readSnapshot:async()=>({configuration_revision:'stable',mode:BUILTINS[2]}),fetch}; }
 test('third-party directory is a provider candidate list and never falls back to model/list',async t=>{
   const {home}=await fixture(t);const server=fakeServer({provider:'custom',providers:externalProviders});let calls=0;
   const report=await checkAccountModels({home,target:single},providerInternal(server,async(url,init)=>{
@@ -390,7 +393,7 @@ test('provider availability probes every candidate using Responses and records u
     return new Response(JSON.stringify({status:'completed',model:body.model==='redirected'?'other-model':body.model,output:[{type:'message'}]}));
   });
   const report=await checkAccountModels({home,verify:true,discover:true},internal);
-  assert.equal(report.status,'incomplete');assert.equal(report.check_kind,'availability');assert.equal(report.verification.required,false);
+  assert.equal(report.status,'incomplete');assert.equal(report.check_kind,'availability');
   assert.deepEqual(report.availability,{total:4,available:1,unavailable:1,unconfirmed:2});assert.equal(calls.length,4);
   assert.deepEqual(report.checked_pairs.map(pair=>pair.reason_code),['PROBE_AVAILABLE','PROBE_MODEL_NOT_FOUND','PROBE_RATE_LIMITED','CHECK_STOPPED']);
   assert.equal(report.checked_pairs.some(pair=>pair.identity_status==='matched'),false);assert.equal(JSON.stringify(report).includes(PRIVATE),false);
@@ -500,7 +503,7 @@ test('manual verification stops between probes on configuration change', async t
   assert.equal(report.checked_pairs[0].identity_status, 'matched'); assert.equal(report.checked_pairs[1].request_status, 'not_checked');
   assert.equal(report.checked_pairs[0].source_revision, 'stable');
   assert.equal(report.checked_pairs[0].valid_for_current_configuration, false);
-  assert.equal(report.verification_summary.fire_gate_satisfied, false);
+  assert.ok(report.verification_summary.missing_evidence.includes('CHECK_CONTEXT_CHANGED'));
 });
 
 test('verification stops and invalidates results when file authorization changes during a request', async t => {

@@ -20,13 +20,24 @@ test('web action whitelist always uses argv and one full stdin, rejecting arbitr
   assert.throws(() => actionCommand({ action: 'explain', params: { level: 'L1', task: '__proto__' } }, env));
 });
 
-test('loopback service performs real packaged CLI and protects host/origin/session/revision', async t => {
+test('loopback service requires its startup access code and protects host/origin/revision', async t => {
   const dir = await mkdtemp(path.join(os.tmpdir(), 'delegation-http-')); const home = path.join(await realpath(dir), 'home');
   const service = await serveLocal({ home, project: dir });
   t.after(async () => { await service.close(); await rm(dir, { recursive: true, force: true }); });
-  const bootstrap = await fetch(service.url + '/api/bootstrap'); const info = await bootstrap.json();
-  const cookie = bootstrap.headers.get('set-cookie').split(';')[0];
-  const headers = { 'Content-Type': 'application/json', Origin: service.url, Cookie: cookie, 'X-Delegation-Token': info.csrf_token };
+  const bootstrapURL = service.url + '/api/bootstrap';
+  const access = { 'X-Delegation-Token': service.accessCode };
+  for (const headers of [{}, { 'X-Delegation-Token': 'wrong' }]) {
+    const rejected = await fetch(bootstrapURL, { headers });
+    assert.equal(rejected.status, 403);
+    assert.equal((await rejected.json()).report.data, null);
+  }
+  const bootstrap = await fetch(bootstrapURL, { headers: access });
+  assert.equal(bootstrap.status, 200);
+  assert.equal(bootstrap.headers.has('set-cookie'), false);
+  const info = await bootstrap.text();
+  assert.equal(JSON.parse(info).home, home);
+  assert.ok(!info.includes(service.accessCode));
+  const headers = { 'Content-Type': 'application/json', Origin: service.url, ...access };
   const action = (body, custom = headers) => fetch(service.url + '/api/actions', { method: 'POST', headers: custom, body: JSON.stringify(body) });
   assert.equal((await action({ action: 'status' }, { ...headers, Origin: 'http://evil.example' })).status, 403);
   const badHostStatus = await new Promise((resolve, reject) => {
@@ -34,6 +45,7 @@ test('loopback service performs real packaged CLI and protects host/origin/sessi
     request.on('error', reject); request.end();
   });
   assert.equal(badHostStatus, 403);
+  assert.equal((await action({ action: 'account', params: { operation: 'logout' } }, { 'Content-Type': 'application/json', Origin: service.url })).status, 403);
   assert.equal((await action({ action: 'status' }, { ...headers, 'X-Delegation-Token': 'wrong' })).status, 403);
   assert.equal((await action({ action: 'account', params: { operation: 'login', method: 'apiKey', apiKey: 'test-private-key' } }, { ...headers, Origin: 'https://evil.example' })).status, 403);
   assert.equal((await action({ action: 'account', params: { operation: 'status', apiKey: 'test-private-key' } })).status, 400);
@@ -49,15 +61,15 @@ test('loopback service performs real packaged CLI and protects host/origin/sessi
   let result = await (await action({ action: 'status', params: { details: true } })).json();
   assert.equal(result.report.data.installation, 'not_installed');
   let revision = result.report.data.configuration_revision;
-  result = await (await action({ action: 'setup', params: { mode: 'official', dryRun: true, expectRevision: revision } })).json();
+  result = await (await action({ action: 'setup', params: { mode: 'mid', dryRun: true, expectRevision: revision } })).json();
   assert.equal(result.report.data.result, 'preview');
-  result = await (await action({ action: 'setup', params: { mode: 'official', expectRevision: revision } })).json();
+  result = await (await action({ action: 'setup', params: { mode: 'mid', expectRevision: revision } })).json();
   assert.equal(result.exit_code, 0, JSON.stringify(result)); assert.equal(result.report.data.restart.required, true); assert.equal(Object.hasOwn(result.report.data, 'post_check'), false);
   const staleCheck = await (await action({ action: 'verify', params: { expectRevision: revision } })).json();
   assert.equal(staleCheck.exit_code, 1);
   assert.equal(staleCheck.report.data.configuration_changed, true);
   assert.ok(staleCheck.report.data.diagnostics.some(item => item.code === 'CONFIG_CHANGED'));
-  result = await (await action({ action: 'set', params: { mode: 'cut', expectRevision: revision } })).json();
+  result = await (await action({ action: 'set', params: { mode: 'low', expectRevision: revision } })).json();
   assert.equal(result.exit_code, 1); assert.equal(result.report.errors[0].code, 'CONFIG_CHANGED');
   result = await (await action({ action: 'status' })).json(); revision = result.report.data.configuration_revision;
   result = await (await action({ action: 'restore', params: { expectRevision: revision } })).json();

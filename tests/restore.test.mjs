@@ -36,10 +36,10 @@ test('uninstalled restore and dry runs never create home or lock', async () => {
 });
 
 test('first baseline restores exact AGENTS bytes and original mode across multiple switches', async () => {
-  for (const original of [null, '', 'user', 'user\n', 'user\r\n', 'user\n\n']) {
+  for (const original of [null, '', 'user', 'user\n', 'user\r\n', 'user\n\n', '\uFEFF', '\uFEFFuser\r\n']) {
     const { home } = await fixture(); await fs.mkdir(home);
     if (original !== null) { await fs.writeFile(path.join(home, 'AGENTS.md'), original); await fs.chmod(path.join(home, 'AGENTS.md'), 0o640); }
-    const before = await tree(home); await mutate(home, 'setup'); await mutate(home, 'set', { mode: 'cut' }); await mutate(home, 'set', { mode: 'fire' });
+    const before = await tree(home); await mutate(home, 'setup'); await mutate(home, 'set', { mode: 'low' }); await mutate(home, 'set', { mode: 'heigh' });
     const preview = await mutate(home, 'restore', { dryRun: true }); assert.equal(preview.result, 'preview'); assert.ok(preview.changed_files.includes('.agent-fit/restore.json'));
     const report = await mutate(home, 'restore'); assert.equal(report.result, 'applied'); assert.equal(report.restart.required, true); assert.equal(Object.hasOwn(report, 'post_check'), false); assert.match(report.restart.message, /原配置已恢复/);
     assert.deepEqual(await tree(home), before); assert.equal((await statusReport(home)).installation, 'not_installed'); assert.equal(report.revision_after, (await readSnapshot(home)).configuration_revision);
@@ -49,10 +49,10 @@ test('first baseline restores exact AGENTS bytes and original mode across multip
 
 test('existing same public assets and rule block are restored with their original permissions', async () => {
   const { home } = await fixture(); await fs.mkdir(path.join(home, 'agents'), { recursive: true });
-  const payload = await renderPayload(resolveHome(home), resolveDefinition('official'));
+  const payload = await renderPayload(resolveHome(home), resolveDefinition('mid'));
   const role = 'agents/task-scan.toml'; await fs.writeFile(path.join(home, role), payload.files.get(role)); await fs.chmod(path.join(home, role), 0o644);
   await fs.writeFile(path.join(home, 'AGENTS.md'), Buffer.concat([Buffer.from('user\n\n'), payload.block, Buffer.from('\nOriginal suffix\n')])); await fs.chmod(path.join(home, 'AGENTS.md'), 0o640);
-  const before = await tree(home); await mutate(home, 'setup'); await mutate(home, 'set', { mode: 'fire' }); await mutate(home, 'restore'); assert.deepEqual(await tree(home), before);
+  const before = await tree(home); await mutate(home, 'setup'); await mutate(home, 'set', { mode: 'heigh' }); await mutate(home, 'restore'); assert.deepEqual(await tree(home), before);
 });
 
 test('restore clears all custom modes and tool metadata, while preserving new user files and unrelated config', async () => {
@@ -80,6 +80,22 @@ test('restore ignores unrelated invalid configurations, same-name user roles and
   await mutate(home, 'restore'); assert.equal(await fs.readFile(path.join(home, 'config.toml'), 'utf8'), 'not valid TOML "private token TEST_ONLY_NOT_REAL'); assert.equal(await fs.readFile(path.join(home, 'agents/user.toml'), 'utf8'), 'not valid TOML'); assert.equal(await fs.readFile(path.join(home, 'agents/conflict.toml'), 'utf8'), 'name = "task_scan"\n'); assert.equal(await fs.readFile(path.join(home, 'AGENTS.override.md'), 'utf8'), 'user override');
 });
 
+test('restore neither follows nor changes unrelated config links, even with an expected revision', async () => {
+  const { home, directory } = await fixture();
+  await mutate(home, 'setup');
+  const outside = path.join(directory, 'user-config.toml'), relative = 'config.toml';
+  const original = 'model = "test-only"\n';
+  await fs.writeFile(outside, original); await fs.symlink(outside, path.join(home, relative));
+  const status = await statusReport(home);
+  assert.ok(status.diagnostics.some(item => item.status === 'fail' && item.source.endsWith(relative)));
+  const expected = { expectRevision: status.configuration_revision };
+  assert.equal((await mutate(home, 'restore', { ...expected, dryRun: true })).result, 'preview');
+  assert.equal((await mutate(home, 'restore', expected)).result, 'applied');
+  assert.equal(await fs.readlink(path.join(home, relative)), outside);
+  assert.equal(await fs.readFile(outside, 'utf8'), original);
+  assert.equal((await statusReport(home)).installation, 'not_installed');
+});
+
 test('missing, corrupt or chmod-changed baseline blocks restore and every mutation before writes', async () => {
   for (const edit of [
     async home => fs.unlink(path.join(home, '.agent-fit/restore.json')),
@@ -87,7 +103,7 @@ test('missing, corrupt or chmod-changed baseline blocks restore and every mutati
     async home => fs.chmod(path.join(home, '.agent-fit/restore.json'), 0o644),
   ]) {
     const { home } = await fixture(); await mutate(home, 'setup'); await edit(home); const before = await tree(home);
-    for (const action of ['restore', 'setup', 'set', 'create', 'configure']) await assert.rejects(mutate(home, action, { mode: 'cut', name: 'test' }), error => error.code === 'RESTORE_METADATA_INVALID');
+    for (const action of ['restore', 'setup', 'set', 'create', 'configure']) await assert.rejects(mutate(home, action, { mode: 'low', name: 'test' }), error => error.code === 'RESTORE_METADATA_INVALID');
     assert.deepEqual(await tree(home), before);
   }
 });
@@ -151,7 +167,7 @@ test('restore deletes metadata after managed files, status sees BUSY during tran
 test('restore and reinstall changes instance id to defeat ABA stale revisions', async () => {
   const { home } = await fixture(); await mutate(home, 'setup'); const first = await readSnapshot(home); await mutate(home, 'restore'); await mutate(home, 'setup'); const second = await readSnapshot(home);
   assert.notEqual(first.state.instance_id, second.state.instance_id); assert.notEqual(first.configuration_revision, second.configuration_revision);
-  await assert.rejects(mutate(home, 'set', { mode: 'cut', expectRevision: first.configuration_revision }), error => error.code === 'CONFIG_CHANGED');
+  await assert.rejects(mutate(home, 'set', { mode: 'low', expectRevision: first.configuration_revision }), error => error.code === 'CONFIG_CHANGED');
 });
 
 test('new lock after committed restore preserves success and removes signal listeners even when final observation is BUSY', async () => {

@@ -93,10 +93,11 @@ test('a passed check with unavailable history keeps its check result but fails t
 
 test('history preserves verification layers and stale-pair provenance without extra private fields', async t => {
  const {home}=await fixture(t);
- const report={...data,check_status:'passed',verification_summary:{request_succeeded:true,reported_identity_matched:true,session_context_matched:null,fire_gate_satisfied:null,missing_evidence:['SESSION_CONTEXT_UNVERIFIED'],secret:PRIVATE},checked_pairs:[{...data.checked_pairs[0],source_revision:'old',valid_for_current_configuration:false}]};
+ const report={...data,check_status:'passed',verification_summary:{request_succeeded:true,reported_identity_matched:true,session_context_matched:null,missing_evidence:['SESSION_CONTEXT_UNVERIFIED'],secret:PRIVATE},checked_pairs:[{...data.checked_pairs[0],source_revision:'old',valid_for_current_configuration:false}]};
  const saved=await saveModelCheck(home,report,{verify:true});const record=(await modelHistory(home,{id:saved.id})).record;
  assert.equal(record.result.check_status,'passed');
- assert.equal(record.result.verification_summary.fire_gate_satisfied,null);
+ const {secret, ...evidence} = report.verification_summary;
+ assert.deepEqual(record.result.verification_summary,evidence);
  assert.equal(record.result.checked_pairs[0].valid_for_current_configuration,false);
  assert.equal(record.result.checked_pairs[0].source_revision,'old');
  assert.ok(!JSON.stringify(record).includes(PRIVATE));

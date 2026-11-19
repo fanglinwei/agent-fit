@@ -7,10 +7,189 @@
     "ORIGINAL_ROLE_AND_ACCEPTANCE_UNCHANGED",
     "PREVIOUS_WORKER_STOPPED_IF_WRITING"
   ],
+  "shared_tasks": {
+    "L1": {
+      "mechanical": {
+        "slot": "economy",
+        "effort": "medium",
+        "fallback": {
+          "slot": "general",
+          "effort": "medium"
+        }
+      },
+      "scan": {
+        "slot": "economy",
+        "effort": "xhigh",
+        "fallback": {
+          "slot": "general",
+          "effort": "medium"
+        }
+      },
+      "deep": {
+        "slot": "economy",
+        "effort": "max",
+        "fallback": {
+          "slot": "general",
+          "effort": "high"
+        }
+      },
+      "visual": {
+        "slot": "visual_work",
+        "effort": "low",
+        "fallback": {
+          "slot": "general",
+          "effort": "medium"
+        }
+      },
+      "computer": {
+        "slot": "visual_work",
+        "effort": "low",
+        "fallback": {
+          "slot": "general",
+          "effort": "medium"
+        }
+      },
+      "writing": {
+        "slot": "visual_work",
+        "effort": "low",
+        "fallback": {
+          "slot": "general",
+          "effort": "medium"
+        }
+      }
+    },
+    "L2": {
+      "bounded": {
+        "slot": "economy",
+        "effort": "high",
+        "fallback": {
+          "slot": "general",
+          "effort": "medium"
+        }
+      },
+      "complex": {
+        "slot": "general",
+        "effort": "medium",
+        "fallback": {
+          "slot": "general_backup",
+          "effort": "medium"
+        }
+      },
+      "scan": {
+        "slot": "economy",
+        "effort": "xhigh",
+        "fallback": {
+          "slot": "general",
+          "effort": "medium"
+        }
+      },
+      "deep": {
+        "slot": "economy",
+        "effort": "max",
+        "fallback": {
+          "slot": "general",
+          "effort": "high"
+        }
+      },
+      "visual": {
+        "slot": "visual_work",
+        "effort": "medium",
+        "fallback": {
+          "slot": "general",
+          "effort": "medium"
+        }
+      },
+      "computer": {
+        "slot": "visual_work",
+        "effort": "medium",
+        "fallback": {
+          "slot": "general",
+          "effort": "medium"
+        }
+      },
+      "writing": {
+        "slot": "visual_work",
+        "effort": "medium",
+        "fallback": {
+          "slot": "general",
+          "effort": "medium"
+        }
+      }
+    },
+    "L3": {
+      "complex": {
+        "slot": "general",
+        "effort": "medium",
+        "fallback": {
+          "slot": "general_backup",
+          "effort": "medium"
+        }
+      },
+      "uncertain": {
+        "slot": "frontier",
+        "effort": "low",
+        "fallback": {
+          "slot": "general",
+          "effort": "high"
+        }
+      },
+      "reasoning": {
+        "slot": "frontier",
+        "effort": "medium",
+        "fallback": {
+          "slot": "general",
+          "effort": "xhigh"
+        }
+      },
+      "visual": {
+        "slot": "visual_work",
+        "effort": "high",
+        "fallback": {
+          "slot": "general",
+          "effort": "high"
+        }
+      },
+      "computer": {
+        "slot": "visual_work",
+        "effort": "high",
+        "fallback": {
+          "slot": "general",
+          "effort": "high"
+        }
+      },
+      "writing": {
+        "slot": "visual_work",
+        "effort": "high",
+        "fallback": {
+          "slot": "general",
+          "effort": "high"
+        }
+      }
+    },
+    "L4": {
+      "uncertain": {
+        "slot": "frontier",
+        "effort": "low",
+        "fallback": {
+          "slot": "general",
+          "effort": "high"
+        }
+      },
+      "reasoning": {
+        "slot": "frontier",
+        "effort": "medium",
+        "fallback": {
+          "slot": "general",
+          "effort": "xhigh"
+        }
+      }
+    }
+  },
   "modes": [
     {
-      "id": "cut",
-      "name": "经济",
+      "id": "low",
+      "name": "low",
+      "uses_shared_tasks": true,
       "levels": {
         "L1": {
           "slot": "economy",
@@ -18,56 +197,6 @@
           "fallback": {
             "slot": "general",
             "effort": "medium"
-          },
-          "tasks": {
-            "mechanical": {
-              "slot": "economy",
-              "effort": "medium",
-              "fallback": {
-                "slot": "general",
-                "effort": "medium"
-              }
-            },
-            "scan": {
-              "slot": "economy",
-              "effort": "xhigh",
-              "fallback": {
-                "slot": "general",
-                "effort": "medium"
-              }
-            },
-            "deep": {
-              "slot": "economy",
-              "effort": "max",
-              "fallback": {
-                "slot": "general",
-                "effort": "high"
-              }
-            },
-            "visual": {
-              "slot": "visual_work",
-              "effort": "low",
-              "fallback": {
-                "slot": "general",
-                "effort": "medium"
-              }
-            },
-            "computer": {
-              "slot": "visual_work",
-              "effort": "low",
-              "fallback": {
-                "slot": "general",
-                "effort": "medium"
-              }
-            },
-            "writing": {
-              "slot": "visual_work",
-              "effort": "low",
-              "fallback": {
-                "slot": "general",
-                "effort": "medium"
-              }
-            }
           }
         },
         "L2": {
@@ -76,64 +205,6 @@
           "fallback": {
             "slot": "general",
             "effort": "medium"
-          },
-          "tasks": {
-            "bounded": {
-              "slot": "economy",
-              "effort": "high",
-              "fallback": {
-                "slot": "general",
-                "effort": "medium"
-              }
-            },
-            "complex": {
-              "slot": "general",
-              "effort": "medium",
-              "fallback": {
-                "slot": "general_backup",
-                "effort": "medium"
-              }
-            },
-            "scan": {
-              "slot": "economy",
-              "effort": "xhigh",
-              "fallback": {
-                "slot": "general",
-                "effort": "medium"
-              }
-            },
-            "deep": {
-              "slot": "economy",
-              "effort": "max",
-              "fallback": {
-                "slot": "general",
-                "effort": "high"
-              }
-            },
-            "visual": {
-              "slot": "visual_work",
-              "effort": "medium",
-              "fallback": {
-                "slot": "general",
-                "effort": "medium"
-              }
-            },
-            "computer": {
-              "slot": "visual_work",
-              "effort": "medium",
-              "fallback": {
-                "slot": "general",
-                "effort": "medium"
-              }
-            },
-            "writing": {
-              "slot": "visual_work",
-              "effort": "medium",
-              "fallback": {
-                "slot": "general",
-                "effort": "medium"
-              }
-            }
           }
         },
         "L3": {
@@ -142,56 +213,6 @@
           "fallback": {
             "slot": "general_backup",
             "effort": "medium"
-          },
-          "tasks": {
-            "complex": {
-              "slot": "general",
-              "effort": "medium",
-              "fallback": {
-                "slot": "general_backup",
-                "effort": "medium"
-              }
-            },
-            "uncertain": {
-              "slot": "frontier",
-              "effort": "low",
-              "fallback": {
-                "slot": "general",
-                "effort": "high"
-              }
-            },
-            "reasoning": {
-              "slot": "frontier",
-              "effort": "medium",
-              "fallback": {
-                "slot": "general",
-                "effort": "xhigh"
-              }
-            },
-            "visual": {
-              "slot": "visual_work",
-              "effort": "high",
-              "fallback": {
-                "slot": "general",
-                "effort": "high"
-              }
-            },
-            "computer": {
-              "slot": "visual_work",
-              "effort": "high",
-              "fallback": {
-                "slot": "general",
-                "effort": "high"
-              }
-            },
-            "writing": {
-              "slot": "visual_work",
-              "effort": "high",
-              "fallback": {
-                "slot": "general",
-                "effort": "high"
-              }
-            }
           }
         },
         "L4": {
@@ -200,31 +221,14 @@
           "fallback": {
             "slot": "general_backup",
             "effort": "high"
-          },
-          "tasks": {
-            "uncertain": {
-              "slot": "frontier",
-              "effort": "low",
-              "fallback": {
-                "slot": "general",
-                "effort": "high"
-              }
-            },
-            "reasoning": {
-              "slot": "frontier",
-              "effort": "medium",
-              "fallback": {
-                "slot": "general",
-                "effort": "xhigh"
-              }
-            }
           }
         }
       }
     },
     {
-      "id": "official",
-      "name": "官方",
+      "id": "mid",
+      "name": "mid",
+      "uses_shared_tasks": true,
       "levels": {
         "L1": {
           "slot": "economy",
@@ -232,56 +236,6 @@
           "fallback": {
             "slot": "general",
             "effort": "medium"
-          },
-          "tasks": {
-            "mechanical": {
-              "slot": "economy",
-              "effort": "medium",
-              "fallback": {
-                "slot": "general",
-                "effort": "medium"
-              }
-            },
-            "scan": {
-              "slot": "economy",
-              "effort": "xhigh",
-              "fallback": {
-                "slot": "general",
-                "effort": "medium"
-              }
-            },
-            "deep": {
-              "slot": "economy",
-              "effort": "max",
-              "fallback": {
-                "slot": "general",
-                "effort": "high"
-              }
-            },
-            "visual": {
-              "slot": "visual_work",
-              "effort": "low",
-              "fallback": {
-                "slot": "general",
-                "effort": "medium"
-              }
-            },
-            "computer": {
-              "slot": "visual_work",
-              "effort": "low",
-              "fallback": {
-                "slot": "general",
-                "effort": "medium"
-              }
-            },
-            "writing": {
-              "slot": "visual_work",
-              "effort": "low",
-              "fallback": {
-                "slot": "general",
-                "effort": "medium"
-              }
-            }
           }
         },
         "L2": {
@@ -290,64 +244,6 @@
           "fallback": {
             "slot": "general_backup",
             "effort": "medium"
-          },
-          "tasks": {
-            "bounded": {
-              "slot": "economy",
-              "effort": "high",
-              "fallback": {
-                "slot": "general",
-                "effort": "medium"
-              }
-            },
-            "complex": {
-              "slot": "general",
-              "effort": "medium",
-              "fallback": {
-                "slot": "general_backup",
-                "effort": "medium"
-              }
-            },
-            "scan": {
-              "slot": "economy",
-              "effort": "xhigh",
-              "fallback": {
-                "slot": "general",
-                "effort": "medium"
-              }
-            },
-            "deep": {
-              "slot": "economy",
-              "effort": "max",
-              "fallback": {
-                "slot": "general",
-                "effort": "high"
-              }
-            },
-            "visual": {
-              "slot": "visual_work",
-              "effort": "medium",
-              "fallback": {
-                "slot": "general",
-                "effort": "medium"
-              }
-            },
-            "computer": {
-              "slot": "visual_work",
-              "effort": "medium",
-              "fallback": {
-                "slot": "general",
-                "effort": "medium"
-              }
-            },
-            "writing": {
-              "slot": "visual_work",
-              "effort": "medium",
-              "fallback": {
-                "slot": "general",
-                "effort": "medium"
-              }
-            }
           }
         },
         "L3": {
@@ -356,56 +252,6 @@
           "fallback": {
             "slot": "general_backup",
             "effort": "high"
-          },
-          "tasks": {
-            "complex": {
-              "slot": "general",
-              "effort": "medium",
-              "fallback": {
-                "slot": "general_backup",
-                "effort": "medium"
-              }
-            },
-            "uncertain": {
-              "slot": "frontier",
-              "effort": "low",
-              "fallback": {
-                "slot": "general",
-                "effort": "high"
-              }
-            },
-            "reasoning": {
-              "slot": "frontier",
-              "effort": "medium",
-              "fallback": {
-                "slot": "general",
-                "effort": "xhigh"
-              }
-            },
-            "visual": {
-              "slot": "visual_work",
-              "effort": "high",
-              "fallback": {
-                "slot": "general",
-                "effort": "high"
-              }
-            },
-            "computer": {
-              "slot": "visual_work",
-              "effort": "high",
-              "fallback": {
-                "slot": "general",
-                "effort": "high"
-              }
-            },
-            "writing": {
-              "slot": "visual_work",
-              "effort": "high",
-              "fallback": {
-                "slot": "general",
-                "effort": "high"
-              }
-            }
           }
         },
         "L4": {
@@ -414,31 +260,13 @@
           "fallback": {
             "slot": "general_backup",
             "effort": "xhigh"
-          },
-          "tasks": {
-            "uncertain": {
-              "slot": "frontier",
-              "effort": "low",
-              "fallback": {
-                "slot": "general",
-                "effort": "high"
-              }
-            },
-            "reasoning": {
-              "slot": "frontier",
-              "effort": "medium",
-              "fallback": {
-                "slot": "general",
-                "effort": "xhigh"
-              }
-            }
           }
         }
       }
     },
     {
-      "id": "high",
-      "name": "高级",
+      "id": "heigh",
+      "name": "heigh",
       "levels": {
         "L1": {
           "slot": "economy",
@@ -471,32 +299,6 @@
             "slot": "general",
             "effort": "ultra"
           }
-        }
-      }
-    },
-    {
-      "id": "fire",
-      "name": "全开",
-      "levels": {
-        "L1": {
-          "slot": "frontier",
-          "effort": "ultra",
-          "fallback": null
-        },
-        "L2": {
-          "slot": "frontier",
-          "effort": "ultra",
-          "fallback": null
-        },
-        "L3": {
-          "slot": "frontier",
-          "effort": "ultra",
-          "fallback": null
-        },
-        "L4": {
-          "slot": "frontier",
-          "effort": "ultra",
-          "fallback": null
         }
       }
     }

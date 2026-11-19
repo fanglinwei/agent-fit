@@ -30,8 +30,8 @@ serve [--port PORT] [--open]
 CLI 默认 global；聊天 Skill 切换默认 session。项目和会话选择可用 mode clear 恢复继承。
 会话 > 项目 > 全局；查询显示有效档位及来源。局部选择只影响后续新任务。
 
-内置档位：cut（经济）、official（官方，首次配置默认）、high（高级）、fire（全开）。
-cut/official 支持同级任务候选；明确选择 high/fire 即授权所示高强度组合，预算与 fire 验证仍适用。
+内置档位：low（经济）、mid（官方，首次配置默认）、heigh（高级）。
+low/mid 支持同级任务候选；明确选择 heigh 即授权所示高强度组合，仍须满足预算。
 省略 --agent 时默认使用 codex；也可显式指定 --agent codex。
 目标目录支持 --codex-home PATH；默认 CODEX_HOME 或 ~/.codex。
 查询及写命令支持 --json；写命令支持 --expect-revision REV。
@@ -152,21 +152,21 @@ function emit(data, errors, json) {
 function renderHuman(data) {
   const lines = [];
   const pair = value => value ? `${value.model} / ${value.effort ?? '供应商默认参数'}` : '无';
+  const modeLabel = mode => mode.name === mode.id ? mode.id : `${mode.name} (${mode.id})`;
   const levels = definition => {
     for (const [level, value] of Object.entries(definition.levels || {})) {
-      lines.push(`${level}  ${pair(value)}  备用：${definition.kind === 'builtin' && definition.id === 'fire' ? '用户指定，否则继承父代理' : pair(value.fallback)}`);
+      lines.push(`${level}  ${pair(value)}  备用：${pair(value.fallback)}`);
       for (const [task, candidate] of Object.entries(value.tasks ?? {})) lines.push(`  ${task}  ${pair(candidate)}  备用：${pair(candidate.fallback)}`);
     }
   };
   if (data.installation) {
-    lines.push(`Codex home：${data.home}`, `工具 ${data.cli_version} · 配置 ${data.configuration_version || '未安装'}`, `状态：${data.installation} · 完整性：${data.integrity}`, `已配置档位：${data.mode?.name || '无'}${data.mode ? ` (${data.mode.id})` : ''}`, `恢复基线：${data.restoration.status}`);
+    lines.push(`Codex home：${data.home}`, `工具 ${data.cli_version} · 配置 ${data.configuration_version || '未安装'}`, `状态：${data.installation} · 完整性：${data.integrity}`, `已配置档位：${data.mode ? modeLabel(data.mode) : '无'}`, `恢复基线：${data.restoration.status}`);
     if (data.mode) levels(data.mode);
     if (data.rules.summary.length) {
       lines.push('', '职责与规则：');
       for (const role of data.roles) lines.push(`${role.name}  ${role.configured_model || '未固定'} / ${role.configured_effort || '未固定'}`);
       lines.push(...data.rules.summary.map(rule => `- ${rule}`), '', '相关配置与检查范围：', ...JSON.stringify({ related_config: data.related_config, inspection: data.inspection }, null, 2).split('\n'));
     }
-    if (data.verification?.required) lines.push('fire：每个会话首次委派前须实际验证；失败时使用用户指定组合，否则继承父代理模型与推理强度。');
     lines.push(...data.warnings);
   } else if (data.action === 'skill-update') {
     lines.push(`共享 Skill：${data.path}`, `规则版本：${data.version} · ${data.result} · 变化文件：${data.changed_files.length}`);
@@ -189,13 +189,12 @@ function renderHuman(data) {
     if (data.shared_skill) lines.push(`共享 Skill：${data.shared_skill.path} · ${data.shared_skill.result}`);
     lines.push(...(data.warnings || []));
   } else if (data.modes) {
-    lines.push(...data.modes.map(mode => `${mode.active ? '*' : ' '} ${mode.id}  ${mode.name}  ${mode.kind}`));
+    lines.push(...data.modes.map(mode => `${mode.active ? '*' : ' '} ${mode.id}  ${mode.name === mode.id ? '' : mode.name + '  '}${mode.kind}`));
   } else if (data.definition) {
-    lines.push(`${data.definition.name} (${data.definition.id}) · ${data.active ? '当前已配置' : '定义预览'}`, `来源：${data.source} · 定义版本：${data.definition_version || VERSION}`); levels(data.definition);
+    lines.push(`${modeLabel(data.definition)} · ${data.active ? '当前已配置' : '定义预览'}`, `来源：${data.source} · 定义版本：${data.definition_version || VERSION}`); levels(data.definition);
   } else if (data.dispatch_role) {
-    lines.push(`${data.mode_name} · ${data.level}${data.task ? ` · ${data.task}` : ''}`, `主组合：${pair(data.primary)} · 备用：${pair(data.fallback)}`, `职责：${data.requested_role} → 委派角色：${data.dispatch_role}`, `权限契约：${data.permission_contract}`, `原因：${data.reason_codes.join('、')}`);
+    lines.push(`${data.mode_name} · ${data.level}${data.task ? ` · ${data.task}` : ''} · ${data.active ? '当前已选' : '定义预览'}`, `主组合：${pair(data.primary)} · 备用：${pair(data.fallback)}`, `职责：${data.requested_role} → 委派角色：${data.dispatch_role}`, `权限契约：${data.permission_contract}`, `原因：${data.reason_codes.join('、')}`);
     if (data.reason_codes.includes('PRIMARY_UNSUPPORTED')) lines.push(`按传入的不可用信息排除首选；拟用备用：${pair(data.dispatch_candidate)}，仍须核对备用条件。`);
-    if (data.verification?.required) lines.push('先完成本会话实际验证；失败时使用 task_delegate，采用用户指定组合，否则继承父代理模型与推理强度。');
   } else if (data.catalog) {
     lines.push(`账号状态：${data.account.status} · 目录：${data.catalog.status} (${data.catalog.models.length} 个模型)`);
     if (data.catalog.source) lines.push(`目录来源：${data.catalog.source}`);
@@ -222,7 +221,7 @@ async function main() {
     if (action === 'serve') {
       const { serveLocal } = await import('../lib/server.mjs');
       const service = await serveLocal({ home, project: options.project ?? process.cwd(), thread: options.thread ?? process.env.CODEX_THREAD_ID ?? null, port: Number(options.port || 0), open: Boolean(options.open) });
-      process.stdout.write(`本地配置页面：${service.url}\n目标 Codex home：${terminalText(home)}\n按 Ctrl+C 停止。\n`);
+      process.stdout.write(`本地配置页面：${service.url}\n访问码：${service.accessCode}\n目标 Codex home：${terminalText(home)}\n按 Ctrl+C 停止。\n`);
       const stop = async () => { process.off('SIGINT', stop); process.off('SIGTERM', stop); await service.close(); };
       process.on('SIGINT', stop); process.on('SIGTERM', stop);
       return;
@@ -233,6 +232,7 @@ async function main() {
       if (action === 'skill-path') {
         const skill = await inspectSkill(home);
         if (!skill.path) throw Object.assign(new Error('未找到 agent-fit Skill；请执行 setup 安装。'), { code: 'SKILL_NOT_INSTALLED', exitCode: 1 });
+        if (skill.issues.some(issue => issue.code === 'SKILL_FILE_MISSING' && issue.file === 'SKILL.md')) throw Object.assign(new Error('共享 Skill 缺少入口；请先运行 agent-fit skill update --dry-run。'), { code: 'SKILL_FILE_MISSING', exitCode: 1 });
         data = { home, path: skill.path, skill_revision: skill.revision, skill_integrity: skill.integrity };
       } else data = await updateSkill(home, { dryRun: options.dryRun, legacyState: (await installer.readSnapshot(home)).state });
     } else if (action === 'status') {

@@ -4,52 +4,44 @@
 
 ## 快速开始
 
-需要 Node.js 22+。npm 包名为 `@fanglinwei/agent-fit`，命令与 Skill 名为 `agent-fit`。也可安装[已发布到 GitHub Packages 的版本](docs/usage.md#从-github-packages-安装)。
+需要 Node.js 22+。这份说明对应当前源码。安装正式版本请从 [GitHub Releases](https://github.com/fanglinwei/agent-fit/releases) 下载 `.tgz`，按对应标签的 README 使用；已发布到 GitHub Packages 的版本可按[包仓库安装说明](docs/usage.md#从-github-packages-安装)安装。
 
-从 [GitHub Releases](https://github.com/fanglinwei/agent-fit/releases/latest) 下载本版安装包：
+旧档位不兼容。已有配置时，先按[换版说明](docs/usage.md#安装与配置)用原版本恢复配置。
+
+要试用当前源码，在项目目录打包并用输出的文件名安装。包名带的是 `package.json` 中的版本号，即使同名也可能与正式发行包内容不同。
 
 ```sh
+npm pack
 npm install -g ./fanglinwei-agent-fit-0.9.0.tgz
-agent-fit setup --mode official --dry-run
-agent-fit setup --mode official
+agent-fit setup --mode mid --dry-run
+agent-fit setup --mode mid
 agent-fit serve --open
 ```
 
-npm 安装只提供工具，`setup` 才配置 Codex。默认目标为 `CODEX_HOME` 或 `~/.codex`；独立目录全程添加 `--codex-home "/path/to/codex-home"`。首次配置、基础规则更新或恢复后重启 Codex，日常切档无需重启。
-
-已有其他版本配置时，先保留所需自定义方案，用原版本 CLI 对原绑定 home 预览并实际恢复，再安装新版。版本与发行包见 [GitHub Releases](https://github.com/fanglinwei/agent-fit/releases)；本地安装和 Skill 更新见[使用说明](docs/usage.md#安装与配置)。
+npm 安装只提供工具，`setup` 才配置 Codex。默认目标为 `CODEX_HOME` 或 `~/.codex`；独立目录全程添加 `--codex-home "/path/to/codex-home"`。首次配置、基础规则更新或恢复后重启 Codex，日常切档无需重启。网页访问码见启动终端。
 
 ## 选择与查询
 
 | 档位 | 策略 |
 | --- | --- |
-| `cut` · 经济 | 较轻组合处理容易核验的任务，复杂部分提高等级 |
-| `official` · 官方 | 首次配置默认；依据官方建议制定的本地映射 |
-| `high` · 高级 | 按预设使用高强度组合 |
-| `fire` · 全开 | 旗舰用途 / ultra，委派前须通过当前会话的实际验证 |
+| `low` · 经济 | 较轻组合处理容易核验的任务，复杂部分提高等级 |
+| `mid` · 官方 | 首次配置默认；依据官方建议制定的本地映射 |
+| `heigh` · 高级 | 按预设使用高强度组合 |
 
 ```sh
 agent-fit mode list
-agent-fit mode set cut
+agent-fit mode set low
 agent-fit status --details
 agent-fit explain --level L2 --task bounded --role task_execute --json
 ```
 
-L1–L4 表示任务推理需求，`--task` 查询同级候选；cut/official 包含视觉、电脑操作和写作专长路线。`explain` 只查配置，不调用模型或创建子代理。内置档位按用途绑定模型，可[显式预览和应用换代](docs/usage.md#模型绑定与换代)。完整组合、职责和选择边界见[使用说明](docs/usage.md#任务等级与委派职责)与 [Skill](adapters/codex/skills/agent-fit/SKILL.md)。
+L1–L4 表示任务推理需求，`--task` 查询同级候选；low/mid 包含视觉、电脑操作和写作专长路线。`explain` 只查配置，不调用模型或创建子代理。内置档位按用途绑定模型，可[显式预览和应用换代](docs/usage.md#模型绑定与换代)。完整组合、职责和选择边界见[使用说明](docs/usage.md#任务等级与委派职责)与 [Skill](adapters/codex/skills/agent-fit/SKILL.md)。
 
 有效档位按 **会话 > 项目 > 全局** 整份选择。CLI 默认全局，聊天中用 `$agent-fit` 切档默认仅当前会话；项目和会话操作见[作用域说明](docs/usage.md#全局项目与会话)。自定义、账号与手动模型检查也见使用说明；配置操作不自动发送模型请求。
 
 ## 子代理如何分工
 
-主代理先用工具和按需加载的 Skills 完成能直接处理的工作。需要委派时，先说明要解决的具体约束，再按当前档位选择模型与推理强度；岗位名称和阶段数量不作为拆分依据。
-
-- **委派须有收益**：上下文隔离、并行、独立验证或能力与成本匹配的收益，需要覆盖启动、交接、等待、汇总、验证和返工开销。用户明确要求的委派与独立复核仍须执行。
-- **交接能够独立理解**：提供目标、可访问的权威材料及版本、已有修改、边界和验收。独立审查区分作者解释与已证实事实，不以作者结论为前提。
-- **隔离分别核实**：新上下文、独立文件与受限权限是三件事。新线程不自动创建工作树或沙箱，也不能保证消除同模型盲区；共享产出指定唯一负责人。
-- **结果精炼且可复核**：回传结论、产物、证据位置和验证状态，保留失败、反例与未知项。主代理负责最终设计、集成和关键验收。
-- **完成即返回，按需复用**：复用须有上下文收益且满足独立性要求。原任务接续沿用快照与累计次数，新任务重新查询配置；所有派发仍受授权和预算约束。
-
-完整规则以 [Skill](adapters/codex/skills/agent-fit/SKILL.md) 和[派发契约](adapters/codex/skills/agent-fit/references/dispatch-contract.md)为准。CLI 与规则辅助决策，不拦截宿主派发，也不强制提供文件或权限隔离。
+主代理先判断直接完成、并行调用工具或委派哪种更合适。委派前按 [Skill](adapters/codex/skills/agent-fit/SKILL.md) 核对授权、收益、档位和能力，再按[派发契约](adapters/codex/skills/agent-fit/references/dispatch-contract.md)交接并验收。CLI 只提供配置和诊断，不代替宿主派发或提供隔离。
 
 ## Marketplace 插件
 
@@ -70,16 +62,7 @@ agent-fit restore && npm uninstall -g @fanglinwei/agent-fit
 
 ## 文档与开发
 
-- [使用说明](docs/usage.md)：CLI、网页、作用域、自定义、模型检查与故障处理。
-- [文档导航](docs/README.md)：规则、验证边界及历史证据入口。
-- [验证范围](docs/implementation-review.md)：已有验收记录与未覆盖范围。
-
-```sh
-npm ci --ignore-scripts
-npm test
-npm pack
-```
-
-打包生成 `fanglinwei-agent-fit-0.9.0.tgz`。浏览器检查见[开发验证](docs/usage.md#开发验证)；唯一运行依赖为 [smol-toml](https://github.com/squirrelchat/smol-toml)。
+- [使用说明](docs/usage.md) · [开发验证与打包](docs/usage.md#开发验证)
+- [文档导航](docs/README.md)：派发规则、历史验收、校准证据与参考资料。
 
 [MIT](LICENSE) © 2026 fanglinwei.
