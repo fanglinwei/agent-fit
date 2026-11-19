@@ -86,6 +86,48 @@ test('explain keeps the explicit mode and level together across L4 review previe
   await assert.rejects(readFile(path.join(home, 'AGENTS.md')), { code: 'ENOENT' });
 });
 
+test('explain can skip an unsupported primary before dispatch without changing the task profile', async t => {
+  const project = await mkdtemp(path.join(os.tmpdir(), 'delegation-unsupported-'));
+  t.after(() => rm(project, { recursive: true, force: true }));
+  const home = path.join(project, 'home');
+  const { mutate } = await import('../lib/install.mjs');
+  await mutate(home, 'setup');
+  const query = ['explain', '--scope', 'session', '--project', project, '--thread', 'unsupported-chat', '--level', 'L4', '--task', 'uncertain', '--role', 'task_review'];
+  const unsupported = (effort) => ['--unsupported-model', bindings.frontier, '--unsupported-effort', effort];
+  const before = run(home, query).report.data;
+  assert.deepEqual(before.dispatch_candidate, { model: bindings.frontier, effort: 'low' });
+  const { status, report } = run(home, [...query, ...unsupported('low')]);
+  assert.equal(status, 0);
+  assert.deepEqual(report.errors, []);
+  assert.deepEqual(report.data.primary, before.primary);
+  assert.deepEqual(report.data.dispatch_candidate, { model: bindings.general, effort: 'high' }, 'uses the task fallback, not the L4 xhigh baseline');
+  assert.equal(report.data.dispatch_role, 'task_delegate');
+  assert.equal(report.data.permission_contract, 'readonly_review');
+  assert.ok(report.data.reason_codes.includes('PRIMARY_UNSUPPORTED'));
+  assert.equal(report.data.runtime_verification, 'unverified');
+  assert.deepEqual(report.data.task_profile, before.task_profile);
+  assert.equal(report.data.configuration_revision, before.configuration_revision);
+
+  for (const [extra, code] of [
+    [unsupported('medium'), 'UNSUPPORTED_PAIR_MISMATCH'],
+    [[...unsupported('ultra'), '--mode', 'high'], 'MODE_NOT_ACTIVE'],
+    [['--unsupported-model', bindings.frontier], 'INVALID_ARGUMENT'],
+  ]) {
+    const rejected = run(home, [...query, ...extra]);
+    assert.equal(rejected.status, 2);
+    assert.equal(rejected.report.errors[0].code, code);
+    assert.equal(rejected.report.data, null);
+  }
+  assert.deepEqual(run(home, query).report.data.dispatch_candidate, before.dispatch_candidate, 'the observation is not persisted');
+  assert.equal(run(home, ['explain', '--level', 'L4', '--task', 'uncertain', ...unsupported('low')]).status, 2);
+  await mutate(home, 'set', { mode: 'fire' });
+  assert.equal(run(home, [...query, ...unsupported('ultra')]).report.errors[0].code, 'FIRE_VERIFICATION_REQUIRED');
+  await mutate(home, 'create', { name: '无备用', from: 'fire' });
+  await mutate(home, 'set', { mode: '无备用' });
+  const noFallback = query.slice(0, query.indexOf('--task'));
+  assert.equal(run(home, [...noFallback, ...unsupported('ultra')]).report.errors[0].code, 'FALLBACK_NOT_CONFIGURED');
+});
+
 test('explain separates active, builtin preview and custom selections without changing the active mode', async t => {
   const dir = await mkdtemp(path.join(os.tmpdir(), 'delegation-preflight-')); t.after(() => rm(dir, { recursive: true, force: true }));
   const home = path.join(dir, 'home');

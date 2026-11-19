@@ -29,7 +29,7 @@ CLI 不带 --scope 保持全局兼容；聊天切换默认显式 --scope session
 
 ## 配置查询与失败分流
 
-主代理先确定复杂度等级与原职责，再执行 `agent-fit explain --codex-home <绑定 home> --scope session --project <项目根> --level <等级> --role <原职责> --json`。JSON 顶层为 `report_schema_version`、`data`、`errors`，先检查进程退出码与 `errors`，再读取 `data`。先核对 `data.scope`、`data.context`、`data.effective_scope` 与目标聊天及项目一致，`data.skill_integrity` 须为 clean，保存 `configuration_revision`、`skill_revision` 与完整 `task_profile` 作为该任务后续接续依据。其余所需字段为 `data.mode_id`、`data.level`、`data.requested_role`、`data.primary.model`、`data.primary.effort`、`data.dispatch_role`、`data.permission_contract`；全部按本次选择和职责核对，不能只判断 stdout 非空或 `data` 存在。
+主代理先确定复杂度等级与原职责，再执行 `agent-fit explain --codex-home <绑定 home> --scope session --project <项目根> --level <等级> --role <原职责> --json`。JSON 顶层为 `report_schema_version`、`data`、`errors`，先检查进程退出码与 `errors`，再读取 `data`。先核对 `data.scope`、`data.context`、`data.effective_scope` 与目标聊天及项目一致，`data.skill_integrity` 须为 clean，保存 `configuration_revision`、`skill_revision` 与完整 `task_profile` 作为该任务后续接续依据。其余所需字段为 `data.mode_id`、`data.level`、`data.requested_role`、`data.dispatch_candidate`（model 与 effort）、`data.dispatch_role`、`data.permission_contract`；全部按本次选择和职责核对，不能只判断 stdout 非空或 `data` 存在。
 
 | 观察结果 | 处理 |
 | --- | --- |
@@ -39,6 +39,7 @@ CLI 不带 --scope 保持全局兼容；聊天切换默认显式 --scope session
 | 档位、等级或请求职责不符 | 核对绑定 home 与请求参数，再查询所需配置；不从其他模式补值 |
 | 获授权的非活动档位或未安装时预览成功 | `--mode` 不改变已部署角色；返回 task_delegate，评估时显式传入候选 model/effort 并保留原权限契约，不使用候选档位的固定角色 |
 | 活动档位查询成功且契约匹配 | 使用返回组合与派发角色，继续核对授权、能力与宿主覆盖；`runtime_verification: unverified` 仍不证明运行身份 |
+| 已有当前会话证据表明首选组合不受支持 | 按[派发前排除](failure-policy.md#派发前排除)查询该路线备用；组合不匹配时重新核对证据，无备用时停止，fire 按自己的会话规则处理 |
 
 这些情况处理的是配置链路，不增加模型推理需求。实际任务结果未达原验收时，再按 [质量升级](failure-policy.md#质量升级) 判断是否重试或提高等级；查询修复不能重置原委派计数。
 

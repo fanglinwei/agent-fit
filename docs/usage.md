@@ -138,6 +138,8 @@ agent-fit explain --level L3 --task reasoning --role task_execute --json
 
 候选使用自己的备用。质量升级可以在原 L3/L4 中由 uncertain 的旗舰模型/low 转向 reasoning 的旗舰模型/medium；先证实推理不足，继续沿用原快照、职责与验收，计入同一任务最多三次委派。不能用故障备用代替质量升级，也不自动转到更高强度。
 
+如果已有可信证据表明首选组合不受当前会话的模型供应商或宿主支持，可以在首次派发前跳过它。给原 `explain --scope session` 查询加 `--unsupported-model MODEL --unsupported-effort EFFORT`；这两个值必须与首选完全匹配。报告的 `primary` 仍是配置里的首选，`dispatch_candidate` 改为该路线自己的备用。核对备用满足原授权、预算和验收后才派发。查询不发模型请求、不记委派次数、不保存排除状态；不能用于非活动档位，内置 fire 仍走自己的会话验证。见[派发前排除](../adapters/codex/skills/agent-fit/references/failure-policy.md#派发前排除)。
+
 当前档位的手动主模型检测同时覆盖基线和任务候选，按组合去重、排除备用，确认框列出数量。配置、切档、查询与账号页面仍不自动检测。
 
 ## 查询与切换

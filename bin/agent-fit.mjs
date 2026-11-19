@@ -20,6 +20,7 @@ mode configure MODE --level L1|L2|L3|L4 --model MODEL --effort EFFORT
 mode configure MODE --definition-stdin [--dry-run]
 status [--details] [--project PATH]
 explain --level L1|L2|L3|L4 [--task mechanical|bounded|scan|deep|complex|uncertain|reasoning|visual|computer|writing|latency] [--mode MODE] [--role ROLE]
+  [--scope session --unsupported-model MODEL --unsupported-effort EFFORT]
 models check [--verify] [--discover] [--expect-catalog HASH] [--model MODEL --effort EFFORT]
 models bind SLOT MODEL (--dry-run | --apply PREVIEW_TOKEN)
 restore [--dry-run]
@@ -40,7 +41,7 @@ cut/official 支持同级任务候选；明确选择 high/fire 即授权所示�
 首次安装、更新基础规则或恢复后请重启 Codex；日常切档无需重启，后续新任务读取新配置。
 完整说明：https://github.com/fanglinwei/agent-fit/blob/main/docs/usage.md`;
 
-const strings = ['agent', 'codex-home', 'mode', 'from', 'level', 'task', 'model', 'effort', 'fallback-model', 'fallback-effort', 'expect-revision', 'role', 'project', 'scope', 'thread', 'port', 'expect-catalog', 'apply'];
+const strings = ['agent', 'codex-home', 'mode', 'from', 'level', 'task', 'model', 'effort', 'fallback-model', 'fallback-effort', 'unsupported-model', 'unsupported-effort', 'expect-revision', 'role', 'project', 'scope', 'thread', 'port', 'expect-catalog', 'apply'];
 const booleans = ['dry-run', 'json', 'details', 'clear-fallback', 'definition-stdin', 'verify', 'discover', 'open', 'help', 'version'];
 const optionTypes = Object.fromEntries([...strings.map(k => [k, { type: 'string' }]), ...booleans.map(k => [k, { type: 'boolean' }])]);
 const common = ['agent', 'codex-home', 'json'];
@@ -50,7 +51,7 @@ const commands = {
   'skill-path': common, 'skill-update': [...common, 'dry-run'],
   setup: [...write, 'mode'], set: [...write, ...scoped], clear: [...write, ...scoped], delete: [...write, ...scoped], list: [...common, ...scoped], show: [...common, ...scoped],
   create: [...write, ...scoped, 'from'], configure: [...write, ...scoped, 'level', 'model', 'effort', 'fallback-model', 'fallback-effort', 'clear-fallback', 'definition-stdin'],
-  status: [...common, ...scoped, 'details'], explain: [...common, ...scoped, 'level', 'task', 'mode', 'role'],
+  status: [...common, ...scoped, 'details'], explain: [...common, ...scoped, 'level', 'task', 'mode', 'role', 'unsupported-model', 'unsupported-effort'],
   models: [...common, ...scoped, 'discover', 'expect-catalog', 'verify', 'model', 'effort', 'expect-revision'],
   'model-bind': [...write, 'apply'], restore: write,
   serve: ['agent', 'codex-home', 'project', 'thread', 'port', 'open'],
@@ -109,6 +110,10 @@ export function parseCommand(argv) {
   }
   if (action === 'serve' && values.port !== undefined && (!/^\d+$/.test(values.port) || (Number(values.port) !== 0 && (Number(values.port) < 1024 || Number(values.port) > 65535)))) throw argumentError('端口必须是 0 或 1024–65535。');
   const options = Object.fromEntries(Object.entries(values).map(([key, value]) => [key.replace(/-([a-z])/g, (_, c) => c.toUpperCase()), value]));
+  if (options.unsupportedModel !== undefined || options.unsupportedEffort !== undefined) {
+    if (options.scope !== 'session') throw argumentError('排除不可用首选仅支持 --scope session。');
+    options.unsupportedPrimary = validatePair({ model: options.unsupportedModel, effort: options.unsupportedEffort });
+  }
   if (action === 'create') options.name = selector;
   else if (selector) options.mode = selector;
   if (action === 'model-bind') [options.slot, options.model] = positionals.slice(2);
@@ -189,6 +194,7 @@ function renderHuman(data) {
     lines.push(`${data.definition.name} (${data.definition.id}) · ${data.active ? '当前已配置' : '定义预览'}`, `来源：${data.source} · 定义版本：${data.definition_version || VERSION}`); levels(data.definition);
   } else if (data.dispatch_role) {
     lines.push(`${data.mode_name} · ${data.level}${data.task ? ` · ${data.task}` : ''}`, `主组合：${pair(data.primary)} · 备用：${pair(data.fallback)}`, `职责：${data.requested_role} → 委派角色：${data.dispatch_role}`, `权限契约：${data.permission_contract}`, `原因：${data.reason_codes.join('、')}`);
+    if (data.reason_codes.includes('PRIMARY_UNSUPPORTED')) lines.push(`按传入的不可用信息排除首选；拟用备用：${pair(data.dispatch_candidate)}，仍须核对备用条件。`);
     if (data.verification?.required) lines.push('先完成本会话实际验证；失败时使用 task_delegate，采用用户指定组合，否则继承父代理模型与推理强度。');
   } else if (data.catalog) {
     lines.push(`账号状态：${data.account.status} · 目录：${data.catalog.status} (${data.catalog.models.length} 个模型)`);
@@ -255,7 +261,7 @@ async function main() {
         if (snapshot.configuration_revision === shown.configuration_revision) break;
         if (attempt) throw Object.assign(new Error('配置读取期间变化；请刷新。'), { code: 'BUSY', exitCode: 1 });
       }
-      data = { configuration_revision: shown.configuration_revision, skill_revision: shown.skill_revision, skill_integrity: shown.skill_integrity, diagnostics: shown.diagnostics, source: shown.source, definition_version: shown.definition_version, scope: shown.scope, effective_scope: shown.effective_scope, context: shown.context, inherited: shown.inherited, task_profile: shown.definition, ...explainSelection({ definition: shown.definition, level: options.level, task: options.task, role: options.role || 'task_delegate', selected: shown.active, active: options.scope === undefined && shown.active && shown.effective_scope === 'global' }) };
+      data = { configuration_revision: shown.configuration_revision, skill_revision: shown.skill_revision, skill_integrity: shown.skill_integrity, diagnostics: shown.diagnostics, source: shown.source, definition_version: shown.definition_version, scope: shown.scope, effective_scope: shown.effective_scope, context: shown.context, inherited: shown.inherited, task_profile: shown.definition, ...explainSelection({ definition: shown.definition, level: options.level, task: options.task, role: options.role || 'task_delegate', selected: shown.active, active: options.scope === undefined && shown.active && shown.effective_scope === 'global', unsupportedPrimary: options.unsupportedPrimary }) };
     } else if (action === 'models') {
       const { recordedModelCheck } = await import('../lib/model-history.mjs');
       data = await recordedModelCheck({ home, scope: options.scope, project: options.project, thread: options.thread, verify: Boolean(options.verify), discover: Boolean(options.discover), expectCatalog: options.expectCatalog, target: options.model ? { model: options.model, effort: options.effort } : undefined, expectRevision: options.expectRevision });
